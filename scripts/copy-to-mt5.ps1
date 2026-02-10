@@ -5,9 +5,9 @@ $ProjectRoot = "C:\Users\guill\Projects\trading-bot-saas"
 $Mql5BasePath = "C:\Users\guill\AppData\Roaming\MetaQuotes\Terminal"
 
 # Colores para output
-function Write-Success($msg) { Write-Host "✓ $msg" -ForegroundColor Green }
-function Write-Info($msg) { Write-Host "→ $msg" -ForegroundColor Cyan }
-function Write-Error($msg) { Write-Host "✗ $msg" -ForegroundColor Red }
+function Write-Success($msg) { Write-Host "[OK] $msg" -ForegroundColor Green }
+function Write-Info($msg) { Write-Host "[INFO] $msg" -ForegroundColor Cyan }
+function Write-Error($msg) { Write-Host "[ERROR] $msg" -ForegroundColor Red }
 function Write-Section($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Yellow }
 
 Write-Section "COPIA DE EAS XISCO A MT5"
