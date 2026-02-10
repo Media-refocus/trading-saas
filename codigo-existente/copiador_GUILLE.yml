@@ -1,0 +1,32 @@
+platform: MT5          # No toques esto (MT4 requiere otra lógica).
+
+telegram:              # <─ Se usa una sola sesión TG para todas las cuentas.
+  api_id:     20993460               # ← tu API ID
+  api_hash:   "ac9bc64d7e7ad98770a1ff17290a9fab"  # ← tu API hash
+  session:    "bot_beta_demo.session"    # ← nombre del archivo .session
+  channels:                       #  los canales de señales que seguirá el bot
+    - {id: 2164511324, access_hash: -4688926061597264256}
+    - {id: 7835111505}
+
+# ─────────────  CUENTAS (una por bloque)  ─────────────
+accounts:
+  - login:    11921504                # ← Login MT5 de la 1.ª cuenta
+    password: "^ss&m2aQ"            # ← Contraseña
+    server:   "VTMarkets-Live"         # ← Nombre exacto del servidor
+    path:     "C:/Bots/Bot_Oro_Sleepy/WOLFCAPITALS/MetaTrader5_Guille/terminal64.exe"   # ← Ruta al terminal
+    symbol:   XAUUSD-STDc              # ← Nombre de símbolo en ESA cuenta
+    magic:    20250612                # ← Magic Number único
+    entry:
+      lot: 0.10
+      num_orders: 1
+      trailing:
+        activate: 30             # se activa al +30 pips
+        step: 10                 # mueve el SL cada +10 pips extra                # │ Nº de órdenes simultáneas en la entrada
+    promedios:                        # ╰─── PARÁMETROS DE PROMEDIOS
+      step_pips:  10                  #   Distancia entre niveles (pips)
+      lot:        0.10                #   Lote por orden de promedio
+      max:        40                   #   Máx. niveles de promedio (no órdenes)
+      num_orders: 1                   #   Órdenes por nivel
+      tolerance_pips: 1       # ← NUEVO (±0.2 USD de holgura)
+
+
