@@ -120,6 +120,7 @@ double StopsClamp(){
 string Preview(const string &s, int n=120){
   if(StringLen(s)<=n) return s;
   return StringSubstr(s,0,n) + "...";
+}
 
 //============================= Detección de Restricciones ===========================
 // Detectar restricción en el campo de texto
@@ -127,25 +128,25 @@ ENUM_RESTRICTION DetectRestriction(const string text){
   string upper = text;
   StringToUpper(upper);
 
-  if(StringFind(upper, 'SIN PROMEDIOS') >= 0 ||
-     StringFind(upper, 'SIN_PROMEDIOS') >= 0 ||
-     StringFind(upper, 'NO AVERRAGING') >= 0 ||
-     StringFind(upper, 'NO PROMEDIOS') >= 0){
-    if(InpVerbose) PrintFormat('RESTRICCIÓN DETECTADA: SIN PROMEDIOS -> 1 nivel');
+  if(StringFind(upper, "SIN PROMEDIOS") >= 0 ||
+     StringFind(upper, "SIN_PROMEDIOS") >= 0 ||
+     StringFind(upper, "NO AVERRAGING") >= 0 ||
+     StringFind(upper, "NO PROMEDIOS") >= 0){
+    if(InpVerbose) PrintFormat("RESTRICCIÓN DETECTADA: SIN PROMEDIOS -> 1 nivel");
     return RESTRICTION_NO_AVG;
   }
 
-  if(StringFind(upper, 'RIESGO') >= 0 ||
-     StringFind(upper, 'RISK') >= 0){
-    if(InpVerbose) PrintFormat('RESTRICCIÓN DETECTADA: RIESGO -> 2 niveles');
+  if(StringFind(upper, "RIESGO") >= 0 ||
+     StringFind(upper, "RISK") >= 0){
+    if(InpVerbose) PrintFormat("RESTRICCIÓN DETECTADA: RIESGO -> 2 niveles");
     return RESTRICTION_RIESGO;
   }
 
-  if(StringFind(upper, 'SOLO 1 PROMEDIO') >= 0 ||
-     StringFind(upper, 'SOLO_1_PROMEDIO') >= 0 ||
-     StringFind(upper, 'SOLO UN PROMEDIO') >= 0 ||
-     StringFind(upper, '1 PROMEDIO MAX') >= 0){
-    if(InpVerbose) PrintFormat('RESTRICCIÓN DETECTADA: SOLO 1 PROMEDIO -> 2 niveles');
+  if(StringFind(upper, "SOLO 1 PROMEDIO") >= 0 ||
+     StringFind(upper, "SOLO_1_PROMEDIO") >= 0 ||
+     StringFind(upper, "SOLO UN PROMEDIO") >= 0 ||
+     StringFind(upper, "1 PROMEDIO MAX") >= 0){
+    if(InpVerbose) PrintFormat("RESTRICCIÓN DETECTADA: SOLO 1 PROMEDIO -> 2 niveles");
     return RESTRICTION_ONE_AVG;
   }
 
@@ -165,14 +166,14 @@ int GetMaxLevelsForRestriction(ENUM_RESTRICTION restr){
 
 string GetRestrictionName(ENUM_RESTRICTION restr){
   switch(restr){
-    case RESTRICTION_NO_AVG:   return 'SIN_PROMEDIOS';
-    case RESTRICTION_RIESGO:   return 'RIESGO';
-    case RESTRICTION_ONE_AVG:  return 'SOLO_1_PROMEDIO';
+    case RESTRICTION_NO_AVG:   return "SIN_PROMEDIOS";
+    case RESTRICTION_RIESGO:   return "RIESGO";
+    case RESTRICTION_ONE_AVG:  return "SOLO_1_PROMEDIO";
     case RESTRICTION_NONE:
-    default:                   return 'NONE';
+    default:                   return "NONE";
   }
 }
-}
+
 
 bool ParseTSFlexible(string src, datetime &out)
 {
