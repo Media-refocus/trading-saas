@@ -27,7 +27,8 @@ Write-Success "Encontradas $($mql5Folders.Count) instalaciones de MT5"
 $easToCopy = @(
     "Backtester_Xisco_G2.mq5",
     "Backtester_Xisco_G4.mq5",
-    "Backtester_Xisco_Restrictions.mq5"
+    "Backtester_Xisco_Restrictions.mq5",
+    "Backtester_Xisco_DEBUG.mq5"
 )
 
 $csvToCopy = @(

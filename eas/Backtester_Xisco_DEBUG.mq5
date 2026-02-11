@@ -1,16 +1,13 @@
 //+------------------------------------------------------------------+
-//|                                          Backtester_Xisco_Restrictions      |
-//| Guía Vikingo Trading con Restricciones - Capital $250-$500                       |
-//| - 0.01 lotes, 30 pips distancia, SIN SL/TP                        |
-//| - S00 scalper: cierra en +20 pips automáticamente                |
-//| - L00 base: corre hasta range_close (sin SL/TP)                   |
-//| - Grid: promedios sin TP, cierran en range_close                  |
-//| CSV (MQL5/Files): ts_utc;kind;side;price_hint;range_id;...      |
+//|                                          Backtester_Xisco_DEBUG                      |
+//| DEBUG EXTREMO - Imprime TODOS los detalles de cada evento        |
+//| - Logs detallados de cada línea del CSV                         |
+//| - Validación robusta de datos                                   |
+//| - Distingue claramente range_open vs range_close                 |
 //+------------------------------------------------------------------+
 #property strict
 #property tester_file "signals_simple.csv"
-#property description "Guía Vikingo Trading con Restricciones (Capital $250-$500)"
-#property description "0.01 lotes, 20 pips step (o según restricción), S00 +20 auto, L00 sin SL/TP"
+#property description "DEBUG EXTREMO - Imprime TODOS los detalles"
 
 #include <Trade/Trade.mqh>
 CTrade trade;
@@ -27,28 +24,24 @@ input double  InpPipSize         = 0.10;                 // 1 pip (XAUUSD)=0.10
 input long    InpMagic           = 20250673;             // magic
 input bool    InpRequireHedging  = true;                 // abortar si NETTING
 
-// Lotes (Guía 2)
+// Lotes
 input double  InpLotEntry        = 0.01;                 // L00 - Posición base
 input double  InpLotScalper      = 0.01;                 // S00 - Scalper
 input double  InpLotGrid         = 0.01;                 // L01..L03 - Promedios
 
-// Grid (Guía 2: 30 pips)
+// Grid
 input int     InpStepPips        = 20;                   // distancia entre promedios
 input int     InpMaxLevels       = 4;                    // 1 base + 3 promedios
 
 // S00 Scalper
 input int     InpScalperTPPips   = 20;                   // TP de S00 en pips
 
-// SL/TP (PARA FUTURO AUTOMEJORA - NO USADOS ACTUALMENTE)
-input double  InpSLMentalPips    = 0.0;                  // NO USADO: SL mental desactivado
-input int     InpTPPips          = 0;                    // NO USADO: TP desactivado
-
 // Simulación
 input double  InpSlippagePips    = 0.5;                  // slippage de fill
 input int     InpLatencySeconds  = 0;                    // latencia artificial (seg)
 input bool    InpDrawGraphics    = true;                 // flechas/rectángulos/HLines
 input bool    InpExportCSVs      = true;                 // export ranges.csv
-input bool    InpVerbose         = true;                 // logs de depuración
+input bool    InpVerbose         = true;                 // logs de depuración (SIEMPRE true)
 
 //============================= Constantes ===========================
 #define COMMENT_L00      "Xisco_L00"
@@ -62,7 +55,7 @@ struct EventRow {
   string side;
   string price_hint;
   string range_id;
-  string confidence;     // Campo para detectar restricciones
+  string confidence;
 };
 EventRow g_events[];
 int g_ev_idx=0;
@@ -92,9 +85,9 @@ struct RangeState {
   double   mae_pips;
   Leg      legs[10];
   int      legs_n;
-  bool     s00_closed;          // S00 ya cerrado?
-  int      max_levels;         // Máximos niveles para este rango
-  ENUM_RESTRICTION restriction; // Restricción detectada
+  bool     s00_closed;
+  int      max_levels;
+  ENUM_RESTRICTION restriction;
 };
 RangeState g_rng;
 
@@ -103,6 +96,7 @@ int      g_digits=2;
 double   g_pip=0.10, g_slip_pts=0.0;
 int      g_serverOffsetSec=0;
 int      g_ranges=INVALID_HANDLE;
+int      g_debug_line_counter=0;  // Contador de líneas procesadas
 
 //============================= Utils ===============================
 double PriceBid(){ return SymbolInfoDouble(InpSymbol,SYMBOL_BID); }
@@ -122,23 +116,39 @@ string Preview(const string &s, int n=120){
   return StringSubstr(s,0,n) + "...";
 }
 
+//============================= DEBUG FUNCTIONS ============================
+void DebugSeparator(const string title){
+  PrintFormat("========================================");
+  PrintFormat("=== %s", title);
+  PrintFormat("========================================");
+}
+
+void DebugEvent(const EventRow &ev, int idx){
+  PrintFormat("--- EVENTO #%d DETALLADO ---", idx);
+  PrintFormat("  ts_utc       : %s", TimeToString(ev.ts, TIME_DATE|TIME_SECONDS));
+  PrintFormat("  kind         : %s", ev.kind);
+  PrintFormat("  side         : %s", ev.side);
+  PrintFormat("  price_hint   : %s", ev.price_hint);
+  PrintFormat("  range_id     : %s", ev.range_id);
+  PrintFormat("  confidence   : [%s]", ev.confidence);
+}
+
 //============================= Detección de Restricciones ===========================
-// Detectar restricción en el campo de texto
 ENUM_RESTRICTION DetectRestriction(const string text){
   string upper = text;
   StringToUpper(upper);
 
   if(StringFind(upper, "SIN PROMEDIOS") >= 0 ||
      StringFind(upper, "SIN_PROMEDIOS") >= 0 ||
-     StringFind(upper, "NO AVERRAGING") >= 0 ||
+     StringFind(upper, "NO AVERAGING") >= 0 ||
      StringFind(upper, "NO PROMEDIOS") >= 0){
-    if(InpVerbose) PrintFormat("RESTRICCIÓN DETECTADA: SIN PROMEDIOS -> 1 nivel");
+    PrintFormat("  [RESTRICCIÓN DETECTADA]: SIN PROMEDIOS -> 1 nivel");
     return RESTRICTION_NO_AVG;
   }
 
   if(StringFind(upper, "RIESGO") >= 0 ||
      StringFind(upper, "RISK") >= 0){
-    if(InpVerbose) PrintFormat("RESTRICCIÓN DETECTADA: RIESGO -> 2 niveles");
+    PrintFormat("  [RESTRICCIÓN DETECTADA]: RIESGO -> 2 niveles");
     return RESTRICTION_RIESGO;
   }
 
@@ -146,19 +156,18 @@ ENUM_RESTRICTION DetectRestriction(const string text){
      StringFind(upper, "SOLO_1_PROMEDIO") >= 0 ||
      StringFind(upper, "SOLO UN PROMEDIO") >= 0 ||
      StringFind(upper, "1 PROMEDIO MAX") >= 0){
-    if(InpVerbose) PrintFormat("RESTRICCIÓN DETECTADA: SOLO 1 PROMEDIO -> 2 niveles");
+    PrintFormat("  [RESTRICCIÓN DETECTADA]: SOLO 1 PROMEDIO -> 2 niveles");
     return RESTRICTION_ONE_AVG;
   }
 
   return RESTRICTION_NONE;
 }
 
-// Obtener máximos niveles según restricción
 int GetMaxLevelsForRestriction(ENUM_RESTRICTION restr){
   switch(restr){
-    case RESTRICTION_NO_AVG:   return 1;  // Solo base
-    case RESTRICTION_RIESGO:   return 2;  // Base + 1 promedio
-    case RESTRICTION_ONE_AVG:  return 2;  // Base + 1 promedio
+    case RESTRICTION_NO_AVG:   return 1;
+    case RESTRICTION_RIESGO:   return 2;
+    case RESTRICTION_ONE_AVG:  return 2;
     case RESTRICTION_NONE:
     default:                   return InpMaxLevels;
   }
@@ -173,7 +182,6 @@ string GetRestrictionName(ENUM_RESTRICTION restr){
     default:                   return "NONE";
   }
 }
-
 
 bool ParseTSFlexible(string src, datetime &out)
 {
@@ -195,7 +203,7 @@ bool ParseTSFlexible(string src, datetime &out)
   datetime dtt = StringToTime(s_iso);
   if(dtt != 0){
     out = dtt;
-    if(InpVerbose) PrintFormat("TS-OK '%s' -> %s", Preview(s0), TimeToString(out, TIME_DATE|TIME_SECONDS));
+    PrintFormat("  [TS-OK] '%s' -> %s", Preview(s0,50), TimeToString(out, TIME_DATE|TIME_SECONDS));
     return true;
   }
 
@@ -222,87 +230,95 @@ bool ParseTSFlexible(string src, datetime &out)
   if(in_num && gsz<6) groups[gsz++] = acc;
 
   if(gsz < 3){
-    if(InpVerbose) PrintFormat("TS-FAIL <3 groups | src='%s'", Preview(s0));
+    PrintFormat("  [TS-FAIL] <3 grupos | src='%s'", Preview(s0,50));
     out=0; return false;
   }
   int y=groups[0], m=groups[1], d=groups[2];
   int H=(gsz>=4?groups[3]:0), M=(gsz>=5?groups[4]:0), S=(gsz>=6?groups[5]:0);
   if(y<=1970 || m<1||m>12 || d<1||d>31){
-    if(InpVerbose) PrintFormat("TS-FAIL invalid YMD | src='%s'", Preview(s0));
+    PrintFormat("  [TS-FAIL] YMD inválido | src='%s'", Preview(s0,50));
     out=0; return false;
   }
   if(H<0||H>23 || M<0||M>59 || S<0||S>59){
-    if(InpVerbose) PrintFormat("TS-FAIL invalid HMS | src='%s'", Preview(s0));
+    PrintFormat("  [TS-FAIL] HMS inválido | src='%s'", Preview(s0,50));
     out=0; return false;
   }
   MqlDateTime dt2; ZeroMemory(dt2);
   dt2.year=y; dt2.mon=m; dt2.day=d; dt2.hour=H; dt2.min=M; dt2.sec=S;
   out = StructToTime(dt2);
-  if(InpVerbose) PrintFormat("TS-OK '%s' -> %s", Preview(s0), TimeToString(out, TIME_DATE|TIME_SECONDS));
+  PrintFormat("  [TS-OK-MANUAL] '%s' -> %s", Preview(s0,50), TimeToString(out, TIME_DATE|TIME_SECONDS));
   return (out>0);
 }
 
-// Validar estructura del CSV
 bool ValidateCSVHeader(const string header_line, ushort sep)
 {
   string cols[];
   int n = StringSplit(header_line, sep, cols);
 
+  PrintFormat("========================================");
+  PrintFormat("VALIDANDO HEADER del CSV");
+  PrintFormat("========================================");
+  PrintFormat("Columnas detectadas: %d", n);
+
   if(n < 2){
-    PrintFormat("ERR: Header tiene solo %d columnas (mínimo 2 requerido)", n);
+    PrintFormat("ERROR: Header tiene solo %d columnas (mínimo 2)", n);
     return false;
   }
 
-  // Buscar columnas críticas (case insensitive)
-  bool has_ts = false, has_kind = false, has_side = false;
+  bool has_ts = false, has_kind = false, has_side = false, has_confidence = false;
   for(int i=0; i<n; i++){
     string col = cols[i];
     StringTrimLeft(col);
     StringTrimRight(col);
-    StringToLower(col);
+    PrintFormat("  Col[%d]: '%s'", i, col);
 
-    if(StringFind(col, "ts") >= 0 && StringFind(col, "utc") >= 0) has_ts = true;
-    if(StringFind(col, "kind") >= 0) has_kind = true;
-    if(StringFind(col, "side") >= 0) has_side = true;
+    string low = col;
+    StringToLower(low);
+    if(StringFind(low, "ts") >= 0 && StringFind(low, "utc") >= 0) has_ts = true;
+    if(StringFind(low, "kind") >= 0) has_kind = true;
+    if(StringFind(low, "side") >= 0) has_side = true;
+    if(StringFind(low, "confidence") >= 0) has_confidence = true;
   }
 
+  PrintFormat("Validación de columnas críticas:");
+  PrintFormat("  ts_utc     : %s", has_ts ? "OK" : "FALTA");
+  PrintFormat("  kind       : %s", has_kind ? "OK" : "FALTA");
+  PrintFormat("  side       : %s", has_side ? "OK" : "FALTA");
+  PrintFormat("  confidence : %s", has_confidence ? "OK" : "FALTA");
+
   if(!has_ts){
-    Print("ERR: Header no tiene columna 'ts_utc'");
+    PrintFormat("ERROR: Header no tiene columna 'ts_utc'");
     return false;
   }
   if(!has_kind){
-    Print("ERR: Header no tiene columna 'kind'");
+    PrintFormat("ERROR: Header no tiene columna 'kind'");
     return false;
   }
   if(!has_side){
-    Print("ERR: Header no tiene columna 'side'");
+    PrintFormat("ERROR: Header no tiene columna 'side'");
     return false;
   }
 
-  if(InpVerbose){
-    PrintFormat("CSV Header OK: %d columnas detectadas", n);
-    for(int i=0; i<n && i<10; i++){
-      string c = cols[i];
-      StringTrimLeft(c);
-      StringTrimRight(c);
-      PrintFormat("  Col[%d]: %s", i, c);
-    }
-  }
+  PrintFormat("HEADER VALIDADO OK");
   return true;
 }
 
 bool LoadEvents()
 {
+  DebugSeparator("INICIANDO CARGA DE CSV");
+
   int h = FileOpen(InpCsvFileName, FILE_READ | FILE_BIN);
   if(h == INVALID_HANDLE){
-    Print("ERR: no se pudo abrir ", InpCsvFileName);
+    Print("ERROR: No se pudo abrir ", InpCsvFileName);
     return false;
   }
+  PrintFormat("Archivo abierto OK: %s", InpCsvFileName);
 
   long fileSize = FileSize(h);
+  PrintFormat("Tamaño del archivo: %ld bytes", fileSize);
   if(fileSize <= 0){
     FileClose(h);
-    Print("ERR: CSV vacío");
+    Print("ERROR: CSV vacío");
     return false;
   }
 
@@ -312,25 +328,29 @@ bool LoadEvents()
   FileClose(h);
 
   if(bytesRead != fileSize){
-    Print("ERR: No se pudo leer el CSV completo");
+    PrintFormat("ERROR: Leídos %d de %ld bytes", bytesRead, fileSize);
     return false;
   }
+  PrintFormat("Bytes leídos: %d", bytesRead);
 
   string content = CharArrayToString(buffer, 0, -1, CP_UTF8);
   if(StringLen(content) >= 3 && StringGetCharacter(content,0)==0xEF &&
      StringGetCharacter(content,1)==0xBB && StringGetCharacter(content,2)==0xBF){
     content = StringSubstr(content,3);
+    PrintFormat("BOM UTF-8 detectado y removido");
   }
 
   string lines[];
   int nlines = StringSplit(content, '\n', lines);
-  if(InpVerbose) PrintFormat("CSV: %d líneas detectadas", nlines);
+  PrintFormat("Líneas detectadas en CSV: %d", nlines);
 
   ArrayResize(g_events, 0);
   ushort SEP = 0;
   bool header_seen = false;
   datetime t_min = 0, t_max = 0;
 
+  // Auto-detectar separador
+  PrintFormat("Detectando separador...");
   for(int i=0; i<MathMin(nlines,10) && SEP==0; i++){
     string tmp = lines[i];
     StringReplace(tmp,"\r","");
@@ -342,8 +362,7 @@ bool LoadEvents()
     else if(StringFind(tmp, ",") >= 0) SEP = ',';
   }
   if(SEP==0) { SEP=';'; }
-
-  if(InpVerbose) PrintFormat("Separador detectado: '%c' (0x%04X)", (char)SEP, SEP);
+  PrintFormat("Separador detectado: '%c' (código 0x%04X)", (char)SEP, SEP);
 
   for(int i=0; i<nlines; i++){
     string ln = lines[i];
@@ -358,9 +377,10 @@ bool LoadEvents()
       StringToLower(low);
       if(StringFind(low, "ts_utc") >= 0 && StringFind(low, "kind") >= 0){
         header_seen = true;
-        // Validar header
+        PrintFormat("========================================");
+        PrintFormat("Header encontrado en línea %d", i);
         if(!ValidateCSVHeader(ln, SEP)){
-          Print("ERR: Header inválido. Formato esperado: ts_utc;kind;side;price_hint;range_id;message_id;confidence");
+          PrintFormat("ERROR: Header inválido");
           return false;
         }
         continue;
@@ -372,9 +392,8 @@ bool LoadEvents()
     if(cols < 2) continue;
     for(int k=0;k<cols;k++){ StringTrimLeft(p[k]); StringTrimRight(p[k]); }
 
-    // Validar columnas mínimas
     if(cols < 2){
-      if(InpVerbose) PrintFormat("WARN: Línea %d tiene solo %d columnas, saltando", i, cols);
+      PrintFormat("WARN: Línea %d tiene solo %d columnas, saltando", i, cols);
       continue;
     }
 
@@ -384,15 +403,26 @@ bool LoadEvents()
     string s_side = (cols>=3 ? p[2] : "");
     string s_price = (cols>=4 ? p[3] : "");
     string s_rid = (cols>=5 ? p[4] : "");
-    string s_conf = (cols>=7 ? p[6] : "");  // Columna 7: confidence (índice 6)
+    string s_conf = (cols>=7 ? p[6] : "");
 
     StringToUpper(s_side);
 
-    if(s_kind!="range_open" && s_kind!="range_close") continue;
-    if(s_kind=="range_open" && s_side!="BUY" && s_side!="SELL") continue;
+    PrintFormat("Línea %d parseada: kind=%s side=%s cols=%d", i, s_kind, s_side, cols);
+
+    if(s_kind!="range_open" && s_kind!="range_close"){
+      PrintFormat("  SKIP: kind no válido (%s)", s_kind);
+      continue;
+    }
+    if(s_kind=="range_open" && s_side!="BUY" && s_side!="SELL"){
+      PrintFormat("  SKIP: side no válido para range_open (%s)", s_side);
+      continue;
+    }
 
     datetime ts_raw;
-    if(!ParseTSFlexible(s_ts, ts_raw)) continue;
+    if(!ParseTSFlexible(s_ts, ts_raw)){
+      PrintFormat("  SKIP: timestamp inválido (%s)", s_ts);
+      continue;
+    }
 
     datetime ts = ts_raw;
     if(InpCsvIsUTC){
@@ -409,16 +439,17 @@ bool LoadEvents()
     g_events[z].range_id = s_rid;
     g_events[z].confidence = s_conf;
 
-    if(InpVerbose){
-      PrintFormat("Evento #%d cargado: %s %s %s range_id=%s conf=%s",
-                  z, TimeToString(ts, TIME_DATE|TIME_SECONDS),
-                  s_kind, s_side, s_rid, s_conf);
-    }
+    PrintFormat("  -> EVENTO #%d AÑADIDO: %s %s range_id=%s conf=[%s]",
+                z, TimeToString(ts, TIME_DATE|TIME_MINUTES),
+                s_kind, s_side, s_rid, s_conf);
 
     if(t_min==0 || ts<t_min) t_min=ts;
     if(t_max==0 || ts>t_max) t_max=ts;
   }
 
+  // Ordenar por timestamp
+  PrintFormat("========================================");
+  PrintFormat("Ordenando %d eventos por timestamp...", ArraySize(g_events));
   int m = ArraySize(g_events);
   for(int a=0; a<m-1; a++)
     for(int b=a+1; b<m; b++)
@@ -427,16 +458,22 @@ bool LoadEvents()
         g_events[a] = g_events[b];
         g_events[b] = t;
       }
+  PrintFormat("Eventos ordenados");
 
   if(ArraySize(g_events)==0){
-    Print("WARN: 0 eventos válidos");
+    Print("ERROR: 0 eventos válidos cargados");
     return false;
   }
 
-  PrintFormat("CSV OK: %d eventos. Ventana: [%s → %s]",
-              ArraySize(g_events),
+  PrintFormat("========================================");
+  PrintFormat("CSV CARGADO OK");
+  PrintFormat("========================================");
+  PrintFormat("Total eventos  : %d", ArraySize(g_events));
+  PrintFormat("Ventana tiempo : [%s -> %s]",
               TimeToString(t_min, TIME_DATE|TIME_MINUTES),
               TimeToString(t_max, TIME_DATE|TIME_MINUTES));
+  PrintFormat("========================================");
+
   return true;
 }
 
@@ -528,6 +565,7 @@ bool SendPendingLimit(const string side, double vol, double px, const string cmt
   req.comment = cmt;
   bool ok = trade.OrderSend(req,res);
   if(!ok) Print("Pending fallo ", cmt, " ret=", res.retcode);
+  else PrintFormat("  [ORDER] Orden pendiente colocada: %s @ %.2f", cmt, px);
   return ok;
 }
 
@@ -552,15 +590,16 @@ bool PlaceLimitLevel(int lvl){
 }
 
 void RebuildGrid(){
-  for(int lvl=1; lvl<g_rng.max_levels; ++lvl) PlaceLimitLevel(lvl);
+  PrintFormat("  [GRID] Reconstruyendo grid (max_levels=%d)...", g_rng.max_levels);
+  for(int lvl=1; lvl<g_rng.max_levels; ++lvl)
+    if(!PlaceLimitLevel(lvl))
+      PrintFormat("    Nivel %d no pudo colocarse", lvl);
 }
 
 //============================= S00 Scalper ===========================
-// Cierra S00 cuando alcanza +InpScalperTPPips pips
 void CheckScalperTP(){
   if(!g_rng.open || g_rng.s00_closed) return;
 
-  // Buscar posición S00
   if(!ExistsPositionByComment(COMMENT_S00)) return;
 
   int total = (int)PositionsTotal();
@@ -578,7 +617,7 @@ void CheckScalperTP(){
     double gain = (typ==POSITION_TYPE_BUY? last-open : open-last);
 
     if(gain >= InpScalperTPPips * g_pip){
-      if(InpVerbose) PrintFormat("S00 TP +%.0f pips alcanzado. Cerrando S00.", InpScalperTPPips);
+      PrintFormat("  [S00] TP +%.0f pips alcanzado. Cerrando S00.", InpScalperTPPips);
       trade.SetExpertMagicNumber(InpMagic);
       trade.PositionClose((ulong)PositionGetInteger(POSITION_TICKET), 100);
       g_rng.s00_closed = true;
@@ -595,6 +634,7 @@ void OpenL00(const string side){
   bool ok = (side=="BUY" ? trade.Buy(InpLotEntry, InpSymbol, px, 0.0, 0.0, COMMENT_L00)
                          : trade.Sell(InpLotEntry, InpSymbol, px, 0.0, 0.0, COMMENT_L00));
   if(ok){
+    PrintFormat("  [L00] Abierto: %s @ %.2f lotes=%.2f", side, px, InpLotEntry);
     int total=(int)PositionsTotal();
     g_rng.entry_price = px;
     for(int i=0;i<total;i++){
@@ -617,7 +657,7 @@ void OpenL00(const string side){
     string nm_ent = StringFormat("ENT_L00_%s", TimeToString(g_rng.ts_open_msg, TIME_DATE|TIME_SECONDS));
     DrawArrow(nm_ent, g_rng.ts_open_msg, g_rng.entry_price, (side=="BUY"? clrLime: clrRed));
   } else {
-    Print("L00 falla: ", _LastError);
+    PrintFormat("  [L00] FALLÓ: %d", _LastError);
   }
 }
 
@@ -628,19 +668,26 @@ void OpenS00(const string side){
   bool ok = (side=="BUY" ? trade.Buy(InpLotScalper, InpSymbol, px, 0.0, 0.0, COMMENT_S00)
                          : trade.Sell(InpLotScalper, InpSymbol, px, 0.0, 0.0, COMMENT_S00));
   if(ok){
+    PrintFormat("  [S00] Abierto: %s @ %.2f lotes=%.2f", side, px, InpLotScalper);
     g_rng.s00_closed = false;
     string nm_ent = StringFormat("ENT_S00_%s", TimeToString(g_rng.ts_open_msg, TIME_DATE|TIME_SECONDS));
     DrawArrow(nm_ent, g_rng.ts_open_msg, px, clrBlue);
-
-    if(InpVerbose) PrintFormat("S00 abierto: %s @ %.1f", side, px);
   } else {
-    Print("S00 falla: ", _LastError);
+    PrintFormat("  [S00] FALLÓ: %d", _LastError);
   }
 }
 
 void OpenRange(const EventRow &ev){
-  if(g_rng.open) return;
+  if(g_rng.open){
+    PrintFormat("WARN: Rango ya abierto, ignorando nuevo range_open");
+    return;
+  }
   if(ev.side!="BUY" && ev.side!="SELL") return;
+
+  PrintFormat("========================================");
+  PrintFormat("ABRIENDO NUEVO RANGO");
+  PrintFormat("========================================");
+  DebugEvent(ev, g_ev_idx);
 
   g_rng.open = true;
   g_rng.side = ev.side;
@@ -648,16 +695,16 @@ void OpenRange(const EventRow &ev){
   g_rng.ts_open_msg = ev.ts + InpLatencySeconds;
   g_rng.s00_closed = false;
 
-  // Detectar restricción
   ENUM_RESTRICTION restr = DetectRestriction(ev.confidence);
   g_rng.restriction = restr;
   g_rng.max_levels = GetMaxLevelsForRestriction(restr);
 
-  if(InpVerbose){
-    PrintFormat("ABRIENDO RANGO: range_id=%s side=%s max_levels=%d restricción=%s conf=%s",
-                ev.range_id, ev.side, g_rng.max_levels,
-                GetRestrictionName(restr), ev.confidence);
-  }
+  PrintFormat("Configuración del rango:");
+  PrintFormat("  side         : %s", ev.side);
+  PrintFormat("  range_id     : %s", ev.range_id);
+  PrintFormat("  max_levels   : %d", g_rng.max_levels);
+  PrintFormat("  restricción  : %s", GetRestrictionName(restr));
+  PrintFormat("  confidence   : [%s]", ev.confidence);
 
   OpenL00(g_rng.side);
   OpenS00(g_rng.side);
@@ -665,14 +712,16 @@ void OpenRange(const EventRow &ev){
 
   g_rng.mfe_pips = -1e9;
   g_rng.mae_pips = 1e9;
+  PrintFormat("RANGO ABIERTO");
+  PrintFormat("========================================");
 }
 
 void EnsureRangesCSV(){
   if(!InpExportCSVs) return;
   if(g_ranges==INVALID_HANDLE){
-    g_ranges = FileOpen("ranges_Restrictions.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,';');
+    g_ranges = FileOpen("ranges_DEBUG.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,';');
     if(FileTell(g_ranges)==0)
-      FileWrite(g_ranges,"range_id,side,open_ts,close_ts,mfe_pips,mae_pips,pnl_total_pips,max_levels,s00_closed");
+      FileWrite(g_ranges,"range_id,side,open_ts,close_ts,mfe_pips,mae_pips,pnl_total_pips,max_levels,s00_closed,restriction");
   }
 }
 
@@ -695,17 +744,22 @@ void ExportRangeClose(){
             DoubleToString(g_rng.mae_pips,2),
             DoubleToString(pnl_tot,2),
             IntegerToString(g_rng.legs_n),
-            (g_rng.s00_closed ? "1" : "0"));
+            (g_rng.s00_closed ? "1" : "0"),
+            GetRestrictionName(g_rng.restriction));
 }
 
 void CloseAll(){
   trade.SetExpertMagicNumber(InpMagic);
 
+  PrintFormat("  [CLOSE] Cerrando todas las posiciones y órdenes...");
+
   for(int i=(int)PositionsTotal()-1;i>=0;i--){
     if(!PosSelectByIndex(i)) continue;
     if((long)PositionGetInteger(POSITION_MAGIC)!=InpMagic) continue;
     if((string)PositionGetString(POSITION_SYMBOL)!=InpSymbol) continue;
-    trade.PositionClose((ulong)PositionGetInteger(POSITION_TICKET), 100);
+    ulong ticket = (ulong)PositionGetInteger(POSITION_TICKET);
+    PrintFormat("    Cerrando posición ticket=%d", ticket);
+    trade.PositionClose(ticket, 100);
   }
 
   for(int j=(int)OrdersTotal()-1;j>=0;j--){
@@ -714,13 +768,29 @@ void CloseAll(){
     if(!OrderSelect(ticket)) continue;
     if((long)OrderGetInteger(ORDER_MAGIC)!=InpMagic) continue;
     if((string)OrderGetString(ORDER_SYMBOL)!=InpSymbol) continue;
+    PrintFormat("    Borrando orden ticket=%d", ticket);
     trade.OrderDelete(ticket);
   }
 }
 
 void CloseRange(const EventRow &ev){
   if(!g_rng.open) return;
+
+  PrintFormat("========================================");
+  PrintFormat("CERRANDO RANGO");
+  PrintFormat("========================================");
+  DebugEvent(ev, g_ev_idx);
+
   g_rng.ts_close_msg = ev.ts + InpLatencySeconds;
+
+  PrintFormat("Resumen del rango:");
+  PrintFormat("  range_id     : %s", g_rng.range_id);
+  PrintFormat("  side         : %s", g_rng.side);
+  PrintFormat("  legs         : %d", g_rng.legs_n);
+  PrintFormat("  mfe_pips     : %.2f", g_rng.mfe_pips);
+  PrintFormat("  mae_pips     : %.2f", g_rng.mae_pips);
+  PrintFormat("  s00_closed   : %s", g_rng.s00_closed ? "SI" : "NO");
+  PrintFormat("  restricción  : %s", GetRestrictionName(g_rng.restriction));
 
   ExportRangeClose();
   CloseAll();
@@ -739,6 +809,8 @@ void CloseRange(const EventRow &ev){
 
   ZeroMemory(g_rng);
   g_rng.open = false;
+  PrintFormat("RANGO CERRADO");
+  PrintFormat("========================================");
 }
 
 //============================= Estado en tick =======================
@@ -781,6 +853,7 @@ void OnTradeTransaction(const MqlTradeTransaction& trans,
         g_rng.legs[n].open_price = price;
         g_rng.legs[n].ts_open = t;
         g_rng.legs_n = n+1;
+        PrintFormat("  [DEAL] Nueva leg: %s vol=%.2f px=%.2f", cm, vol, price);
       }
     }
   }
@@ -788,16 +861,32 @@ void OnTradeTransaction(const MqlTradeTransaction& trans,
 
 //============================= Eventos EA ===========================
 int OnInit(){
+  PrintFormat("========================================");
+  PrintFormat("BACKTESTER XISCO - DEBUG MODE");
+  PrintFormat("========================================");
+  PrintFormat("Modo VERBOSE ACTIVADO");
+  PrintFormat("Todos los eventos serán impresos");
+  PrintFormat("========================================");
+
   g_digits = (int)SymbolInfoInteger(InpSymbol,SYMBOL_DIGITS);
   g_pip = InpPipSize;
   g_slip_pts = InpSlippagePips*g_pip;
 
+  PrintFormat("Configuración:");
+  PrintFormat("  Símbolo      : %s", InpSymbol);
+  PrintFormat("  Dígitos      : %d", g_digits);
+  PrintFormat("  Pip size     : %.4f", g_pip);
+  PrintFormat("  Slippage     : %.1f pips", InpSlippagePips);
+  PrintFormat("  Latency      : %d seg", InpLatencySeconds);
+  PrintFormat("  Magic        : %d", InpMagic);
+
   if(!SymbolSelect(InpSymbol,true)){
-    Print("No se pudo seleccionar ",InpSymbol);
+    PrintFormat("ERROR: No se pudo seleccionar %s", InpSymbol);
     return INIT_FAILED;
   }
 
   g_serverOffsetSec = (int)((long)TimeCurrent() - (long)TimeGMT());
+  PrintFormat("Offset servidor: %d seg (%.1f horas)", g_serverOffsetSec, g_serverOffsetSec/3600.0);
 
   string chart_sym = Symbol();
   if(chart_sym != InpSymbol){
@@ -807,27 +896,44 @@ int OnInit(){
   if(InpRequireHedging){
     ENUM_ACCOUNT_MARGIN_MODE mm = (ENUM_ACCOUNT_MARGIN_MODE)AccountInfoInteger(ACCOUNT_MARGIN_MODE);
     if(mm==ACCOUNT_MARGIN_MODE_RETAIL_NETTING || mm==ACCOUNT_MARGIN_MODE_EXCHANGE){
-      Print("ERROR: Cuenta en modo NETTING. Activa 'Hedging'");
+      PrintFormat("ERROR: Cuenta en modo NETTING. Activa 'Hedging'");
       return INIT_FAILED;
     }
+    PrintFormat("Modo Hedging: OK");
   }
 
-  PrintFormat("XISCO RESTRICTIONS INIT: Guía 2 ($250-$500) | 0.01 lotes | 20 pips step (o según restricción)");
-  PrintFormat("S00 scalper: +%.0f pips auto | L00: sin SL/TP (cierra en range_close)", InpScalperTPPips);
+  PrintFormat("Lotes:");
+  PrintFormat("  L00 (base)   : %.2f", InpLotEntry);
+  PrintFormat("  S00 (scalp)  : %.2f", InpLotScalper);
+  PrintFormat("  Grid (avg)   : %.2f", InpLotGrid);
+  PrintFormat("Grid:");
+  PrintFormat("  Step pips    : %d", InpStepPips);
+  PrintFormat("  Max levels  : %d", InpMaxLevels);
+  PrintFormat("S00 Scalper:");
+  PrintFormat("  TP pips      : %d", InpScalperTPPips);
+  PrintFormat("========================================");
 
   if(!LoadEvents()){
-    Print("CSV vacío o inválido");
+    PrintFormat("ERROR: CSV vacío o inválido");
     return INIT_FAILED;
   }
 
   g_ev_idx = 0;
   ZeroMemory(g_rng);
+
+  PrintFormat("========================================");
+  PrintFormat("INIT COMPLETADO - Iniciando backtest");
+  PrintFormat("========================================");
+
   return INIT_SUCCEEDED;
 }
 
 void OnDeinit(const int reason){
   if(g_ranges!=INVALID_HANDLE){ FileClose(g_ranges); g_ranges=INVALID_HANDLE; }
-  PrintFormat("XISCO RESTRICTIONS END: Backtest finalizado");
+  PrintFormat("========================================");
+  PrintFormat("BACKTEST FINALIZADO");
+  PrintFormat("Razón: %d", reason);
+  PrintFormat("========================================");
 }
 
 void OnTick(){
@@ -839,22 +945,19 @@ void OnTick(){
 
     EventRow ev = g_events[g_ev_idx];
 
-    if(InpVerbose){
-      if(ev.kind=="range_open")
-        PrintFormat("=== RANGE_OPEN #%d === side=%s range_id=%s ts=%s price_hint=%s conf=%s",
-                    g_ev_idx, ev.side, ev.range_id,
-                    TimeToString(ev.ts, TIME_DATE|TIME_SECONDS),
-                    ev.price_hint, ev.confidence);
-      else if(ev.kind=="range_close")
-        PrintFormat("=== RANGE_CLOSE #%d === range_id=%s ts=%s",
-                    g_ev_idx, ev.range_id,
-                    TimeToString(ev.ts, TIME_DATE|TIME_SECONDS));
-    }
+    PrintFormat("========================================");
+    PrintFormat("TICK EVENTO #%d - %s",
+                g_ev_idx, TimeToString(ev.ts, TIME_DATE|TIME_SECONDS));
+    PrintFormat("========================================");
+    DebugEvent(ev, g_ev_idx);
 
-    if(ev.kind=="range_open")
+    if(ev.kind=="range_open"){
+      PrintFormat("ACCION: ABRIR RANGO");
       OpenRange(ev);
-    else if(ev.kind=="range_close")
+    } else if(ev.kind=="range_close"){
+      PrintFormat("ACCION: CERRAR RANGO");
       CloseRange(ev);
+    }
 
     g_ev_idx++;
   }
