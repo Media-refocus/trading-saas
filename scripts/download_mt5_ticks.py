@@ -122,7 +122,7 @@ def download_ticks(symbol: str, start: datetime, end: datetime) -> pd.DataFrame:
 
 def save_ticks(df: pd.DataFrame, symbol: str, start: datetime, end: datetime):
     """
-    Guarda ticks en CSV comprimido
+    Guarda ticks en CSV comprimido (optimizado con pandas batch)
 
     Args:
         df: DataFrame con ticks
@@ -133,25 +133,33 @@ def save_ticks(df: pd.DataFrame, symbol: str, start: datetime, end: datetime):
     # Crear directorio si no existe
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Nombre del archivo
-    year = start.year
-    filename = f"{symbol.replace('-', '')}_{year}.csv.gz"
-    filepath = OUTPUT_DIR / filename
+    # Agrupar por año para archivos más manejables
+    df['year'] = df['timestamp'].dt.year
+    years = df['year'].unique()
 
-    # Guardar comprimido
-    print(f"Guardando en: {filepath}")
+    for year in sorted(years):
+        year_df = df[df['year'] == year].drop(columns=['year'])
 
-    with gzip.open(filepath, 'wt', encoding='utf-8') as f:
-        # Header
-        f.write("timestamp,bid,ask,spread\n")
+        filename = f"{symbol.replace('-', '')}_{year}.csv.gz"
+        filepath = OUTPUT_DIR / filename
 
-        # Datos
-        for _, row in tqdm(df.iterrows(), total=len(df), desc="Guardando"):
-            f.write(f"{row['timestamp'].isoformat()},{row['bid']:.5f},{row['ask']:.5f},{row['spread']:.2f}\n")
+        print(f"Guardando {len(year_df):,} ticks en: {filepath}")
 
-    # Estadísticas del archivo
-    file_size = filepath.stat().st_size
-    print(f"Archivo creado: {file_size / 1024 / 1024:.1f} MB")
+        # Formatear timestamp como ISO string
+        year_df['timestamp'] = year_df['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S.%f').str.rstrip('0').str.rstrip('.')
+
+        # Guardar con pandas (mucho más rápido que iterrows)
+        year_df.to_csv(
+            filepath,
+            index=False,
+            compression='gzip',
+            encoding='utf-8',
+            float_format='%.5f'
+        )
+
+        # Estadísticas del archivo
+        file_size = filepath.stat().st_size
+        print(f"Archivo creado: {file_size / 1024 / 1024:.1f} MB")
 
 
 def main():
