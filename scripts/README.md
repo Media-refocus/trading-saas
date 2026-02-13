@@ -4,7 +4,45 @@ Scripts de automatización para el proyecto de trading bot.
 
 ## 📁 Scripts Disponibles
 
-### 1. copy-to-mt5.ps1
+### 1. download_mt5_ticks.py
+**Propósito**: Descargar ticks históricos de MT5 para el backtester
+
+**Uso**:
+```bash
+# Descargar último año de XAUUSD
+python scripts/download_mt5_ticks.py
+
+# Descargar símbolo específico y período
+python scripts/download_mt5_ticks.py --symbol XAUUSD-STDc --days 365
+
+# Descargar rango de fechas específico
+python scripts/download_mt5_ticks.py --start 2024-01-01 --end 2024-12-31
+```
+
+**Qué hace**:
+- Se conecta a MT5
+- Descarga ticks históricos del símbolo especificado
+- Guarda en `data/ticks/` en formato CSV comprimido (.gz)
+
+**Requisitos**:
+- MT5 instalado y abierto
+- Python 3.7+
+- MetaTrader5, pandas, tqdm: `pip install MetaTrader5 pandas tqdm`
+
+**Output**:
+```
+data/ticks/XAUUSDSTDc_2024.csv.gz
+```
+
+Formato del CSV:
+```
+timestamp,bid,ask,spread
+2024-01-01T00:00:00.123,2034.50000,2034.60000,10.00
+```
+
+---
+
+### 2. copy-to-mt5.ps1
 **Propósito**: Copiar EAs y CSVs a MetaTrader 5 automáticamente
 
 **Uso**:
