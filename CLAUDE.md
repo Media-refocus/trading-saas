@@ -63,3 +63,4 @@ Cada cliente (tenant) tiene:
 1. **Seguridad**: API keys encriptadas, aislamiento de datos
 2. **Fiabilidad**: Bot nunca para, logs completos
 3. **UX**: Onboarding sencillo, dashboard claro
+
