@@ -238,29 +238,34 @@ export async function getMarketPriceAt(
 
   const ticks = await loadTicksFromGzip(filePath);
 
-  // Buscar el tick más cercano
-  const targetTime = timestamp.getTime();
-  let bestTick: RealTick | null = null;
-  let bestDiff = Infinity;
+  if (ticks.length === 0) {
+    return null;
+  }
 
-  // Búsqueda binaria para eficiencia
+  // Buscar el tick más cercano con búsqueda binaria
+  const targetTime = timestamp.getTime();
   let left = 0;
   let right = ticks.length - 1;
 
-  while (left <= right) {
+  while (left < right) {
     const mid = Math.floor((left + right) / 2);
-    const tickTime = ticks[mid].timestamp.getTime();
-    const diff = Math.abs(tickTime - targetTime);
-
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      bestTick = ticks[mid];
-    }
-
-    if (tickTime < targetTime) {
+    if (ticks[mid].timestamp.getTime() < targetTime) {
       left = mid + 1;
     } else {
-      right = mid - 1;
+      right = mid;
+    }
+  }
+
+  // Verificar ticks adyacentes para encontrar el más cercano
+  let bestTick = ticks[left];
+  let bestDiff = Math.abs(bestTick.timestamp.getTime() - targetTime);
+
+  // Verificar tick anterior
+  if (left > 0) {
+    const prevDiff = Math.abs(ticks[left - 1].timestamp.getTime() - targetTime);
+    if (prevDiff < bestDiff) {
+      bestTick = ticks[left - 1];
+      bestDiff = prevDiff;
     }
   }
 
@@ -269,9 +274,11 @@ export async function getMarketPriceAt(
     return null;
   }
 
-  return bestTick
-    ? { bid: bestTick.bid, ask: bestTick.ask, spread: bestTick.spread }
-    : null;
+  return {
+    bid: bestTick.bid,
+    ask: bestTick.ask,
+    spread: bestTick.spread,
+  };
 }
 
 /**
