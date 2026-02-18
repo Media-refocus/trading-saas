@@ -4,12 +4,16 @@ Parser de señales de Telegram
 ==============================
 
 Extrae señales estructuradas de los mensajes raw de Telegram.
-Convierte el formato libre a señales BUY/SELL con rangos.
+Solo detecta señales con formato "rango" (desde agosto 2024).
 
 Formatos soportados:
-1. Formato nuevo con ID: "Sell 5016 XAUUSD rango corto"
-2. Formato nuevo sin ID: "SELL XAUUSD rango corto"
-3. Formato antiguo: "XAUUSD SELL" (legacy)
+1. Formato con ID: "Sell 5016 XAUUSD rango corto"
+2. Formato sin ID: "SELL XAUUSD rango corto"
+
+Patrones de cierre:
+- "Cerramos rango" -> cierra el último rango abierto
+- "Cerramos todo" -> cierra TODOS los rangos abiertos
+- "Rango inhabilitado/anulado" -> cierra el rango actual
 
 Uso:
     python scripts/parse_telegram_signals.py
@@ -39,7 +43,7 @@ class Signal:
     message_id: int
     confidence: float
     raw_text: str
-    signal_number: Optional[int] = None  # Número de señal (ej: 5016)
+    signal_number: Optional[int] = None
 
 
 def parse_price(text: str, pattern: str) -> Optional[float]:
@@ -53,26 +57,28 @@ def parse_price(text: str, pattern: str) -> Optional[float]:
     return None
 
 
-def detect_signal_type(text: str) -> tuple[Optional[str], Optional[float], bool, Optional[int]]:
+def detect_cierre_rango(text: str) -> tuple[bool, bool]:
     """
-    Detecta si el mensaje es una señal de entrada o salida.
-
-    NOTA: Solo detecta señales con formato "rango" (desde agosto 2024).
-    Las señales antiguas sin "rango" son ignoradas por ser inconsistentes.
+    Detecta si el mensaje es un cierre de rango.
 
     Returns:
-        (side, price, is_close, signal_number)
-        - side: "BUY" o "SELL" si es entrada
-        - price: precio si se encuentra
-        - is_close: True si es mensaje de cierre
-        - signal_number: número de señal si existe (ej: 5016)
+        (is_cierre, is_cerrar_todo)
+        - is_cierre: True si es un mensaje de cierre
+        - is_cerrar_todo: True si debe cerrar TODOS los rangos abiertos
     """
     text_upper = text.upper()
+    text_lower = text.lower()
 
-    # Detectar cierre de rango
+    # Detectar "Cerramos todo" o variantes - cierra TODOS los rangos
+    if re.search(r"CERRAMOS\s*TODO", text_upper):
+        return True, True
+
+    # Detectar "Cerramos rango" o variantes (incluyendo typos como "cerramoa")
+    if re.search(r"CERRAM[OA]S?\s*RANGO", text_upper):
+        return True, False
+
+    # Detectar cierres explícitos del rango actual
     close_patterns = [
-        r"CERRAMOS\s*RANGO",
-        r"CERRAMOS\s*TODO",
         r"CERRAMOS\s*EN\s*BE",
         r"CERRAMOS\s*LA\s*OPERACION",
         r"RANGO\s*INHABILITADO",
@@ -80,15 +86,45 @@ def detect_signal_type(text: str) -> tuple[Optional[str], Optional[float], bool,
         r"RANGO\s*QUEDA\s*CERRADO",
         r"RANGO\s*INACTIVO",
         r"SL\s*DE\s*RANGO",
-        r"CERRAMOS\s*$",
+        r"RANGO\s*CORTO\s*CERRADO",
     ]
     for pattern in close_patterns:
         if re.search(pattern, text_upper):
-            return None, None, True, None
+            return True, False
 
-    # Formato nuevo con ID: "Sell 5016 XAUUSD rango" o "Buy 4032 XAUUSD rango"
+    # Detectar "+XX pips cerramos rango" (formato inverso)
+    if re.search(r"\d+\s*PIPS?.*CERRAM[OA]S?\s*RANGO", text_upper):
+        return True, False
+
+    return False, False
+
+
+def detect_apertura_rango(text: str) -> tuple[Optional[str], Optional[float], Optional[int]]:
+    """
+    Detecta si el mensaje es una apertura de rango.
+
+    Returns:
+        (side, price, signal_number)
+        - side: "BUY" o "SELL"
+        - price: precio de entrada si se encuentra
+        - signal_number: número de señal si existe (ej: 5016)
+    """
+    text_upper = text.upper()
+
+    # Debe contener "rango corto" o "rango largo" para ser válido
+    # Excluye "Rango operativo" que es un formato antiguo/diferente
+    if "RANGO CORTO" not in text_upper and "RANGO LARGO" not in text_upper:
+        # También aceptar solo "rango" si tiene el formato con ID numérico
+        if not re.search(r"(SELL|BUY)\s+\d{3,5}\s+XAUUSD", text_upper):
+            return None, None, None
+
+    # Debe contener XAUUSD
+    if "XAUUSD" not in text_upper:
+        return None, None, None
+
+    # Formato con ID: "Sell 5016 XAUUSD rango" o "Buy 4032 XAUUSD rango"
     match_nuevo_id = re.search(
-        r"(SELL|BUY|VENTA|COMPRA)\s+(\d{3,5})\s+XAUUSD.*RANGO",
+        r"(SELL|BUY|VENTA|COMPRA)\s+(\d{3,5})\s+XAUUSD",
         text_upper
     )
     if match_nuevo_id:
@@ -101,11 +137,11 @@ def detect_signal_type(text: str) -> tuple[Optional[str], Optional[float], bool,
         if entrada_match:
             price = float(entrada_match.group(1).replace(",", "."))
 
-        return side, price, False, signal_number
+        return side, price, signal_number
 
-    # Formato nuevo sin ID: "SELL XAUUSD rango corto" o "BUY XAUUSD rango"
+    # Formato sin ID: "SELL XAUUSD rango corto" o "BUY XAUUSD rango"
     match_nuevo = re.search(
-        r"(SELL|BUY|VENTA|COMPRA)\s+XAUUSD.*RANGO",
+        r"(SELL|BUY|VENTA|COMPRA)\s+XAUUSD",
         text_upper
     )
     if match_nuevo:
@@ -117,7 +153,7 @@ def detect_signal_type(text: str) -> tuple[Optional[str], Optional[float], bool,
         # Formato con rango de precios "2502-2495"
         rango_match = re.search(r"(\d{4})\s*[-–]\s*(\d{4})", text)
         if rango_match:
-            price = float(rango_match.group(1))  # Usar el primer precio
+            price = float(rango_match.group(1))
 
         # O buscar "Entrada"
         if not price:
@@ -125,20 +161,18 @@ def detect_signal_type(text: str) -> tuple[Optional[str], Optional[float], bool,
             if entrada_match:
                 price = float(entrada_match.group(1).replace(",", "."))
 
-        return side, price, False, None
+        return side, price, None
 
-    # NOTA: Formato antiguo "XAUUSD SELL" ignorado intencionamente
-    # Las señales sin "rango" tienen cierres confusos y no merece la pena
-
-    return None, None, False, None
+    return None, None, None
 
 
 def parse_messages(input_file: Path) -> list[Signal]:
     """Parsea todos los mensajes y extrae señales."""
     signals = []
     range_counter = 0
-    current_range_id = None
-    current_side = None
+
+    # Lista de rangos actualmente abiertos
+    open_ranges: list[dict] = []
 
     with open(input_file, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f, delimiter=";")
@@ -153,47 +187,62 @@ def parse_messages(input_file: Path) -> list[Signal]:
             except ValueError:
                 continue
 
-            side, price, is_close, signal_number = detect_signal_type(text)
+            # Detectar apertura de rango
+            side, price, signal_number = detect_apertura_rango(text)
 
-            if side and not is_close:
+            if side:
                 # Nueva señal de entrada
                 range_counter += 1
                 date_prefix = timestamp.strftime("%Y-%m-%d")
 
-                # Incluir número de señal si existe
-                if signal_number:
-                    current_range_id = f"{date_prefix}-{signal_number}"
-                else:
-                    current_range_id = f"{date_prefix}-{range_counter}"
-                current_side = side
+                # Usar message_id para garantizar unicidad
+                # Incluir signal_number si existe para referencia
+                range_id = f"{date_prefix}-msg{message_id}"
 
-                signals.append(Signal(
+                signal = Signal(
                     timestamp=timestamp,
                     kind="range_open",
                     side=side,
                     price_hint=price,
-                    range_id=current_range_id,
+                    range_id=range_id,
                     message_id=message_id,
                     confidence=0.90,
                     raw_text=text[:100],
                     signal_number=signal_number
-                ))
+                )
 
-            elif is_close and current_range_id:
-                # Cierre de señal
-                signals.append(Signal(
-                    timestamp=timestamp,
-                    kind="range_close",
-                    side=None,
-                    price_hint=None,
-                    range_id=current_range_id,
-                    message_id=message_id,
-                    confidence=0.95,
-                    raw_text=text[:100]
-                ))
-                # Reset para siguiente rango
-                current_range_id = None
-                current_side = None
+                signals.append(signal)
+
+                # Añadir a la lista de rangos abiertos
+                open_ranges.append({
+                    "range_id": range_id,
+                    "open_signal": signal
+                })
+
+            # Detectar cierre de rango
+            else:
+                is_cierre, is_cerrar_todo = detect_cierre_rango(text)
+
+                if is_cierre and open_ranges:
+                    if is_cerrar_todo:
+                        # Cerrar TODOS los rangos abiertos
+                        ranges_to_close = open_ranges.copy()
+                        open_ranges.clear()
+                    else:
+                        # Cerrar solo el último rango
+                        ranges_to_close = [open_ranges.pop()] if open_ranges else []
+
+                    for range_info in ranges_to_close:
+                        signals.append(Signal(
+                            timestamp=timestamp,
+                            kind="range_close",
+                            side=None,
+                            price_hint=None,
+                            range_id=range_info["range_id"],
+                            message_id=message_id,
+                            confidence=0.95,
+                            raw_text=text[:100]
+                        ))
 
     return signals
 
@@ -230,11 +279,18 @@ def print_stats(signals: list[Signal]):
     buys = [s for s in opens if s.side == "BUY"]
     sells = [s for s in opens if s.side == "SELL"]
 
+    # Contar rangos con cierre vs sin cierre
+    open_ids = {s.range_id for s in opens}
+    close_ids = {s.range_id for s in closes}
+    unclosed = open_ids - close_ids
+
     print("\n=== ESTADÍSTICAS ===")
     print(f"Total señales: {len(opens)} rangos abiertos")
     print(f"Señales BUY: {len(buys)}")
     print(f"Señales SELL: {len(sells)}")
     print(f"Cierres detectados: {len(closes)}")
+    print(f"Rangos CON cierre: {len(open_ids & close_ids)}")
+    print(f"Rangos SIN cierre: {len(unclosed)}")
 
     if opens:
         print(f"\nPrimera señal: {opens[0].timestamp.date()}")
