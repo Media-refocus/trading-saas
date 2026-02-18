@@ -41,7 +41,7 @@ const BacktestConfigSchema = z.object({
   useStopLoss: z.boolean().default(false),
   restrictionType: z.enum(["RIESGO", "SIN_PROMEDIOS", "SOLO_1_PROMEDIO"]).optional(),
   // Fuente de señales
-  signalsSource: z.enum(["signals_simple.csv", "signals_parsed.csv"]).optional().default("signals_simple.csv"),
+  signalsSource: z.string().optional().default("signals_simple.csv"),
   useRealPrices: z.boolean().optional().default(true), // Enriquecer con precios reales
 });
 
