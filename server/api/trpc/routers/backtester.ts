@@ -1,11 +1,11 @@
 /**
- * Router tRPC del Backtester (OPTIMIZADO)
+ * Router tRPC del Backtester (SQLITE VERSION)
  *
- * Mejoras:
- * - Cache de ticks en memoria (carga una vez al iniciar)
- * - Cache de resultados por configuración
- * - Sistema de jobs en background para backtests pesados
- * - Endpoints síncronos y asíncronos
+ * Arquitectura optimizada:
+ * - Ticks almacenados en SQLite (no en memoria)
+ * - Consultas rápidas con índices
+ * - Bajo uso de memoria (~50MB vs ~1GB)
+ * - Escala con múltiples usuarios
  */
 
 import { z } from "zod";
@@ -27,14 +27,13 @@ import {
   getTicksInfo,
 } from "@/lib/parsers/ticks-loader";
 import {
-  initializeTicksCache,
-  getCacheStatus,
-  getTicksFromCache,
-  getMarketPriceFromCache,
-  isCacheReady,
-  waitForCache,
-  preloadDaysForSignals,
-} from "@/lib/ticks-cache";
+  getTicksFromDB,
+  getMarketPrice,
+  getTicksStats,
+  isTicksDBReady,
+  getTicksByDays,
+  clearTicksCache,
+} from "@/lib/ticks-db";
 import {
   getCachedResult,
   cacheResult,
@@ -100,7 +99,7 @@ function generateSyntheticTicksForSignal(
 export const backtesterRouter = router({
   /**
    * Ejecuta un backtest síncrono (rápido, para pocas señales)
-   * Usa cache de ticks y cache de resultados
+   * Usa SQLite para ticks y cache de resultados
    */
   execute: procedure
     .input(
@@ -129,18 +128,9 @@ export const backtesterRouter = router({
           };
         }
 
-        // Solo inicializar cache si se van a usar precios reales y el usuario lo solicita explícitamente
-        // Si el cache no está listo, se usarán ticks sintéticos automáticamente
+        // Verificar si SQLite tiene ticks
+        const dbReady = await isTicksDBReady();
         const wantsRealPrices = input.config.useRealPrices === true;
-        const cacheReady = isCacheReady();
-
-        if (wantsRealPrices && !cacheReady) {
-          console.log(`[Backtester] Cache no listo, inicializando en background...`);
-          // Inicializar en background, no bloquear
-          initializeTicksCache().catch(err => {
-            console.error(`[Backtester] Error inicializando cache:`, err);
-          });
-        }
 
         // Cargar señales
         const signalsPath = path.join(process.cwd(), signalsSource);
@@ -150,13 +140,12 @@ export const backtesterRouter = router({
           signals = signals.slice(0, input.signalLimit);
         }
 
-        // Enriquecer con precios del cache solo si está disponible y el usuario lo quiere
-        const cacheStatus = getCacheStatus();
-        if (wantsRealPrices && cacheStatus.isLoaded) {
+        // Enriquecer con precios de SQLite si está disponible
+        if (wantsRealPrices && dbReady) {
           const enrichedSignals: TradingSignal[] = [];
 
           for (const signal of signals) {
-            const marketPrice = await getMarketPriceFromCache(signal.timestamp);
+            const marketPrice = await getMarketPrice(signal.timestamp);
 
             if (marketPrice) {
               const entryPrice = (marketPrice.bid + marketPrice.ask) / 2;
@@ -185,19 +174,18 @@ export const backtesterRouter = router({
           engine.startSignal(signal.side, signal.entryPrice);
           engine.openInitialOrders(signal.entryPrice);
 
-          // Obtener ticks del cache o generar sintéticos
+          // Obtener ticks desde SQLite o generar sintéticos
           let ticks: { timestamp: Date; bid: number; ask: number; spread: number }[] = [];
 
-          // Solo usar ticks reales si useRealPrices es true y el cache está cargado
-          if (input.config.useRealPrices !== false && cacheStatus.isLoaded) {
+          if (wantsRealPrices && dbReady) {
             const endTime = signal.closeTimestamp
               ? new Date(Math.min(signal.closeTimestamp.getTime(), signal.timestamp.getTime() + 24 * 60 * 60 * 1000))
               : new Date(signal.timestamp.getTime() + 24 * 60 * 60 * 1000);
 
-            ticks = await getTicksFromCache(signal.timestamp, endTime);
+            ticks = await getTicksFromDB(signal.timestamp, endTime);
           }
 
-          // Si no hay ticks reales o useRealPrices es false, usar sintéticos
+          // Si no hay ticks reales, usar sintéticos
           if (ticks.length === 0 || input.config.useRealPrices === false) {
             ticks = generateSyntheticTicksForSignal(signal, input.config);
           }
@@ -320,47 +308,54 @@ export const backtesterRouter = router({
   }),
 
   /**
-   * Obtiene el estado del cache de ticks
+   * Obtiene el estado de la base de datos de ticks (SQLite)
    */
-  getCacheStatus: procedure.query(() => {
-    return getCacheStatus();
+  getCacheStatus: procedure.query(async () => {
+    const stats = await getTicksStats();
+    return {
+      isLoaded: stats.totalTicks > 0,
+      isLoading: false,
+      totalTicks: stats.totalTicks,
+      totalDays: 0, // No aplicable con SQLite
+      memoryMB: 50, // Aproximado, Prisma client
+      cachedDays: 0,
+      dbReady: stats.totalTicks > 0,
+      firstTick: stats.firstTick,
+      lastTick: stats.lastTick,
+      estimatedSizeMB: stats.estimatedSizeMB,
+    };
   }),
 
   /**
-   * Inicializa el cache de ticks manualmente
+   * Verifica si la BD de ticks está lista
    */
   initCache: procedure.mutation(async () => {
-    await initializeTicksCache();
-    return getCacheStatus();
+    const ready = await isTicksDBReady();
+    const stats = await getTicksStats();
+    return {
+      isLoaded: ready,
+      totalTicks: stats.totalTicks,
+      firstTick: stats.firstTick,
+      lastTick: stats.lastTick,
+    };
   }),
 
   /**
-   * Precarga los días de ticks para una fuente de señales
-   * Esto hace que el primer backtest sea rápido
+   * Precarga ticks (no-op con SQLite - ya están en disco)
    */
   preloadTicks: procedure
     .input(z.object({
       signalsSource: z.string().optional().default("signals_intradia.csv"),
     }))
     .mutation(async ({ input }) => {
-      // Cargar señales
-      const signalsPath = path.join(process.cwd(), input.signalsSource);
-      const signals = await loadSignalsFromFile(signalsPath);
-
-      console.log(`[Backtester] Precargando ticks para ${signals.length} señales de ${input.signalsSource}`);
-
-      // Inicializar índice si no está listo
-      if (!isCacheReady()) {
-        await initializeTicksCache();
-      }
-
-      // Precargar días
-      await preloadDaysForSignals(signals);
+      // Con SQLite, no necesitamos precargar nada
+      // Los datos ya están en disco
+      const stats = await getTicksStats();
 
       return {
         success: true,
-        signalsCount: signals.length,
-        cacheStatus: getCacheStatus(),
+        message: "SQLite no requiere precarga - los datos ya están en disco",
+        dbStats: stats,
       };
     }),
 
@@ -392,16 +387,16 @@ export const backtesterRouter = router({
   /**
    * Obtiene información sobre los datos de ticks disponibles
    */
-  getTicksInfo: procedure.query(() => {
-    const hasRealTicks = hasTicksData();
-    const info = getTicksInfo();
-    const cacheStatus = getCacheStatus();
+  getTicksInfo: procedure.query(async () => {
+    const hasRealTicks = await isTicksDBReady();
+    const stats = await getTicksStats();
+    const fileSystemInfo = getTicksInfo();
 
     return {
       hasRealTicks,
-      files: info.files,
-      totalSizeMB: info.totalSizeMB,
-      cache: cacheStatus,
+      dbStats: stats,
+      files: fileSystemInfo.files,
+      totalSizeMB: fileSystemInfo.totalSizeMB,
     };
   }),
 
@@ -438,5 +433,19 @@ export const backtesterRouter = router({
     }
 
     return sources;
+  }),
+
+  /**
+   * Migración: Importa ticks desde .gz a SQLite
+   * Este endpoint permite disparar la migración desde la UI
+   */
+  importTicks: procedure.mutation(async () => {
+    // Esta operación se hace con el script migrate-ticks-to-sqlite.ts
+    // Aquí solo devolvemos instrucciones
+    return {
+      success: false,
+      message: "Ejecuta el script de migración desde terminal:",
+      command: "npx tsx scripts/migrate-ticks-to-sqlite.ts",
+    };
   }),
 });

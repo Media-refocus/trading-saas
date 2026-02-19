@@ -239,3 +239,28 @@ model SimulatedTrade {
 
   createdAt       DateTime             @default(now())
 }
+
+// ============================================
+// TICKS CACHE - Datos históricos para backtesting
+// ============================================
+// Usamos SQLite como cache de disco para evitar cargar ~1GB en memoria.
+// Los ticks se importan una vez desde archivos .gz y luego las consultas son rápidas.
+
+model TickData {
+  id        Int      @id @default(autoincrement())
+
+  // Símbolo del activo
+  symbol    String              // "XAUUSD"
+
+  // Timestamp del tick (almacenado como número para índice eficiente)
+  timestamp DateTime            // UTC
+
+  // Precios
+  bid       Float
+  ask       Float
+  spread    Float
+
+  // Índice compuesto para consultas rápidas por rango de fechas
+  @@index([symbol, timestamp])
+  @@index([timestamp])
+}
