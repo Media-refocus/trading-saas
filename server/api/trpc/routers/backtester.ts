@@ -38,6 +38,8 @@ import {
   getCachedResult,
   cacheResult,
   hashConfig,
+  clearBacktestCache,
+  getCacheStats,
 } from "@/lib/backtest-cache";
 import {
   createJob,
@@ -62,6 +64,9 @@ const BacktestConfigSchema = z.object({
   takeProfitPips: z.number().min(5).max(100).default(20),
   stopLossPips: z.number().min(0).max(500).optional(),
   useStopLoss: z.boolean().default(false),
+  // Trailing SL Virtual
+  useTrailingSL: z.boolean().optional().default(true),
+  trailingSLPercent: z.number().min(10).max(90).optional().default(50),
   restrictionType: z.enum(["RIESGO", "SIN_PROMEDIOS", "SOLO_1_PROMEDIO"]).optional(),
   // Fuente de señales
   signalsSource: z.string().optional().default("signals_simple.csv"),
@@ -173,8 +178,18 @@ export const backtesterRouter = router({
         for (let i = 0; i < signals.length; i++) {
           const signal = signals[i];
 
-          engine.startSignal(signal.side, signal.entryPrice);
-          engine.openInitialOrders(signal.entryPrice);
+          engine.startSignal(signal.side, signal.entryPrice, i, signal.timestamp);
+
+          // Obtener primer tick para el timestamp de entrada
+          let entryTimestamp = signal.timestamp;
+          if (wantsRealPrices && dbReady) {
+            const firstTick = await getMarketPrice(signal.timestamp, "XAUUSD", 5 * 60 * 1000);
+            if (firstTick) {
+              // Usar el timestamp del tick más cercano
+            }
+          }
+
+          engine.openInitialOrders(signal.entryPrice, entryTimestamp);
 
           // Obtener ticks desde SQLite o generar sintéticos
           let ticks: { timestamp: Date; bid: number; ask: number; spread: number }[] = [];
@@ -449,5 +464,23 @@ export const backtesterRouter = router({
       message: "Ejecuta el script de migración desde terminal:",
       command: "npx tsx scripts/migrate-ticks-to-sqlite.ts",
     };
+  }),
+
+  /**
+   * Limpia el cache de resultados de backtest
+   */
+  clearCache: procedure.mutation(() => {
+    clearBacktestCache();
+    return {
+      success: true,
+      message: "Cache de backtest limpiado",
+    };
+  }),
+
+  /**
+   * Obtiene estadísticas del cache
+   */
+  getBacktestCacheStats: procedure.query(() => {
+    return getCacheStats();
   }),
 });

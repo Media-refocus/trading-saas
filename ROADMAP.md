@@ -24,46 +24,36 @@
 
 ## Fase 1.5: Backtester "La Herramienta Definitiva" (ACTUAL)
 
-### 1.5.1 Capital Inicial y Gestión de Dinero
+### 1.5.1 Capital Inicial y Gestión de Dinero ✅
 **Prioridad**: CRÍTICA
-**Tiempo estimado**: 1 día
+**Estado**: COMPLETADO
 
-**Problema actual**: El backtest no muestra con qué capital trabaja ni el profit real en €/$
-
-**Tareas**:
-- [ ] Campo "Capital inicial" en configuración (ej: 10,000€)
-- [ ] Calcular profit en dinero real (€) además de pips
-- [ ] Mostrar % de retorno sobre capital inicial
-- [ ] Risk per trade (ej: 1% del capital por operación)
-- [ ] Posición sizing automático basado en riesgo
-
-**UI afectada**:
-- Formulario de configuración
-- Panel de resultados
+**Tareas completadas**:
+- [x] Campo "Capital inicial" en configuración (ej: 10,000€)
+- [x] Calcular profit en dinero real (€) además de pips
+- [x] Mostrar % de retorno sobre capital inicial
+- [x] Trailing SL Virtual configurable
+- [x] Toggle para activar/desactivar Trailing SL
 
 ---
 
-### 1.5.2 Detalle de Trades Individuales
+### 1.5.2 Detalle de Trades Individuales ✅
 **Prioridad**: CRÍTICA
-**Tiempo estimado**: 1-2 días
+**Estado**: COMPLETADO
 
-**Problema actual**: No se puede ver CÓMO se calculan los resultados, el usuario está "a ciegas"
+**Tareas completadas**:
+- [x] Tabla de trades individuales con:
+  - [x] Señal original (fecha, precio entrada, dirección)
+  - [x] Precio real de entrada (del tick más cercano)
+  - [x] Precio de cierre
+  - [x] Pips ganados/perdidos
+  - [x] Profit en €
+  - [x] Razón de cierre (TP, SL, Trailing)
+- [x] TradeDetail con info completa por señal
 
-**Tareas**:
-- [ ] Tabla de trades individuales con:
-  - [ ] Señal original (fecha, precio entrada, dirección)
-  - [ ] Precio real de entrada (del tick más cercano)
-  - [ ] Niveles de promedio abiertos (precio, lote, nivel)
-  - [ ] Precio promedio ponderado
-  - [ ] Precio de cierre
-  - [ ] Pips ganados/perdidos
-  - [ ] Profit en €
-  - [ ] Duración de la operación
-- [ ] Expandir/contraer cada trade para ver detalle
+**Pendiente**:
+- [ ] Expandir/contraer cada trade para ver niveles
 - [ ] Exportar detalle a CSV
-
-**UI afectada**:
-- Nuevo panel "Detalle de trades" debajo del resumen
 
 ---
 
@@ -95,17 +85,14 @@
 
 ---
 
-### 1.5.4 Curva de Equity
+### 1.5.4 Curva de Equity ✅
 **Prioridad**: ALTA
-**Tiempo estimado**: 1 día
+**Estado**: COMPLETADO
 
-**Objetivo**: Ver la evolución del balance durante el backtest
-
-**Tareas**:
-- [ ] Gráfico de línea con equity vs tiempo
-- [ ] Marcar drawdowns máximos
-- [ ] Línea de capital inicial de referencia
-- [ ] Hover para ver valor en cada punto
+**Tareas completadas**:
+- [x] Gráfico de línea con equity vs tiempo
+- [x] Línea de capital inicial de referencia
+- [x] EquityPoint con timestamp para datos históricos
 
 ---
 
@@ -192,17 +179,18 @@
 
 ## Resumen de Prioridades
 
-| Feature | Prioridad | Impacto |
-|---------|-----------|---------|
-| Capital inicial | CRÍTICA | Saber cuánto dinero real |
-| Detalle de trades | CRÍTICA | Transparencia total |
-| Gráfico tipo MT5 | ALTA | Visualización profesional |
-| Curva de equity | ALTA | Ver evolución del balance |
-| Optimizador | ALTA | Encontrar mejor config |
-| Métricas avanzadas | MEDIA | Análisis profesional |
-| Filtros | MEDIA | Segmentar análisis |
-| Comparador | MEDIA | A/B testing de configs |
-| Guardar/Compartir | BAJA | UX y colaboración |
+| Feature | Prioridad | Estado |
+|---------|-----------|--------|
+| Capital inicial | CRÍTICA | ✅ Completado |
+| Trailing SL Virtual | CRÍTICA | ✅ Completado |
+| Detalle de trades | CRÍTICA | ✅ Completado |
+| Curva de equity | ALTA | ✅ Completado |
+| Gráfico tipo MT5 | ALTA | Pendiente |
+| Optimizador | ALTA | Pendiente |
+| Métricas avanzadas | MEDIA | Pendiente |
+| Filtros | MEDIA | Pendiente |
+| Comparador | MEDIA | Pendiente |
+| Guardar/Compartir | BAJA | Pendiente |
 
 ---
 

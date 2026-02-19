@@ -34,6 +34,10 @@ export interface BacktestConfig {
   stopLossPips?: number; // SL de emergencia (opcional)
   useStopLoss: boolean; // Si el usuario activa gestión de riesgo
 
+  // Trailing SL Virtual
+  useTrailingSL?: boolean; // Activar/desactivar Trailing SL Virtual (default: true)
+  trailingSLPercent?: number; // % del TP para el trailing (default: 50 = la mitad)
+
   // Restricciones de canal
   restrictionType?: "RIESGO" | "SIN_PROMEDIOS" | "SOLO_1_PROMEDIO";
 
@@ -58,7 +62,8 @@ export interface BacktestResult {
 
   // Detalles
   trades: any[];
-  equityCurve: number[];
+  tradeDetails: TradeDetail[];  // Detalle ampliado por señal
+  equityCurve: EquityPoint[];   // Curva de equity con timestamps
 }
 
 export interface PriceTick {
@@ -81,6 +86,53 @@ export interface SimulatedTrade {
   signalIndex?: number; // Índice en el CSV de señales
 }
 
+// ==================== NUEVOS TIPOS PARA DETALLE ====================
+
+export interface TradeLevel {
+  level: number;           // 0 = base, 1+ = promedios
+  openPrice: number;       // Precio de apertura
+  closePrice: number;      // Precio de cierre
+  lotSize: number;         // Tamaño del lote
+  profit: number;          // Profit en $
+  profitPips: number;      // Profit en pips
+  openTime: Date;          // Cuándo se abrió
+  closeTime: Date;         // Cuándo se cerró
+}
+
+export interface TradeDetail {
+  signalIndex: number;           // Índice de la señal
+  signalTimestamp: Date;         // Fecha/hora de la señal
+  signalSide: Side;              // BUY o SELL
+  signalPrice: number;           // Precio de la señal
+
+  // Entrada real
+  entryPrice: number;            // Precio real de entrada (del tick)
+  entryTime: Date;               // Cuándo se entró
+
+  // Salida
+  exitPrice: number;             // Precio de cierre
+  exitTime: Date;                // Cuándo se cerró
+  exitReason: "TAKE_PROFIT" | "STOP_LOSS" | "TRAILING_SL";
+
+  // Métricas
+  totalLots: number;             // Suma de lotes
+  avgPrice: number;              // Precio promedio ponderado
+  totalProfit: number;           // Profit total en $
+  totalProfitPips: number;       // Profit total en pips
+  durationMinutes: number;       // Duración en minutos
+  maxLevels: number;             // Niveles alcanzados
+
+  // Desglose por nivel
+  levels: TradeLevel[];
+}
+
+export interface EquityPoint {
+  timestamp: Date;
+  equity: number;          // Balance + floating P&L
+  balance: number;         // Balance sin floating
+  drawdown: number;        // Drawdown actual
+}
+
 // ==================== CONSTANTES ====================
 
 const PIP_VALUE = 0.10; // 1 pip ≈ 0.10 USD (XAU/USD típico)
@@ -101,20 +153,38 @@ export class BacktestEngine {
   private totalTicks = 0;
 
   private trades: any[] = [];
+  private tradeDetails: TradeDetail[] = []; // Detalle ampliado por señal
+  private equityCurve: EquityPoint[] = []; // Curva de equity
+
+  // Tracking de la señal actual
+  private currentSignalIndex: number = 0;
+  private currentSignalTimestamp: Date | null = null;
+  private currentSignalPrice: number | null = null;
+  private currentEntryTime: Date | null = null;
+  private currentLevels: TradeLevel[] = [];
+
   private highEquity: number = 0;
   private lowEquity: number = 0;
   private currentEquity: number = 0;
+  private currentBalance: number = 0;
   private peakEquity: number = 0;
   private maxDrawdown: number = 0;
 
   constructor(config: BacktestConfig) {
     this.config = config;
+    this.currentBalance = config.initialCapital || 10000;
   }
 
   /**
    * Inicia una nueva señal
    */
-  startSignal(side: Side, price: number): void {
+  startSignal(side: Side, price: number, signalIndex: number = 0, signalTimestamp: Date = new Date()): void {
+    // Guardar info de la señal actual
+    this.currentSignalIndex = signalIndex;
+    this.currentSignalTimestamp = signalTimestamp;
+    this.currentSignalPrice = price;
+    this.currentLevels = [];
+
     this.side = side;
     this.entryPrice = price;
     this.entryOpen = false;
@@ -148,9 +218,12 @@ export class BacktestEngine {
   /**
    * Abre las operaciones iniciales según numOrders
    */
-  openInitialOrders(currentPrice: number): any[] {
+  openInitialOrders(currentPrice: number, tickTimestamp: Date = new Date()): any[] {
     const trades: any[] = [];
     const { lotajeBase, numOrders, takeProfitPips } = this.config;
+
+    // Guardar tiempo de entrada
+    this.currentEntryTime = tickTimestamp;
 
     for (let i = 0; i < numOrders; i++) {
       const isTPFixed = (i === 0); // Primera operación con TP fijo
@@ -167,7 +240,7 @@ export class BacktestEngine {
         level: i,
         profit: 0,
         profitPips: 0,
-        timestamp: new Date(),
+        timestamp: tickTimestamp,
       };
 
       trades.push(trade);
@@ -202,7 +275,7 @@ export class BacktestEngine {
     // 2. Verificar si se ha golpeado el SL virtual de la entrada
     const entrySLHit = this.checkEntryStopLoss(closePrice);
     if (entrySLHit) {
-      newTrades.push(...this.closeAllPositions(closePrice, "STOP_LOSS"));
+      newTrades.push(...this.closeAllPositions(closePrice, "STOP_LOSS", tick.timestamp));
       return newTrades;
     }
 
@@ -219,7 +292,7 @@ export class BacktestEngine {
       : (this.entryPrice - avgPrice) / PIP_VALUE;
 
     if (profitPips >= this.config.takeProfitPips) {
-      newTrades.push(...this.closeAllLevelsInProfit(closePrice, avgPrice));
+      newTrades.push(...this.closeAllLevelsInProfit(closePrice, avgPrice, tick.timestamp));
       return newTrades;
     }
 
@@ -227,46 +300,61 @@ export class BacktestEngine {
     this.manageGridLevels(closePrice, avgPrice);
 
     // 6. Actualizar métricas de equity
-    this.updateEquityMetrics(closePrice);
+    this.updateEquityMetrics(closePrice, tick.timestamp);
 
     return newTrades.length > 0 ? newTrades : null;
   }
 
   /**
    * Actualiza el Stop Loss virtual (trailing)
+   *
+   * NOTA: El Trailing SL solo se activa si useTrailingSL es true (default)
+   * El backDistance es proporcional al activateDistance para garantizar profit
    */
   private updateTrailingStopLoss(currentPrice: number): void {
     if (!this.entryOpen || !this.entryPrice || !this.side) {
       return;
     }
 
-    const { takeProfitPips } = this.config;
+    // Si el usuario desactivó el Trailing SL, no hacer nada
+    if (this.config.useTrailingSL === false) {
+      return;
+    }
+
+    const { takeProfitPips, trailingSLPercent } = this.config;
     const isBuy = this.side === "BUY";
 
-    // La operación 0 (TP fijo) no tiene SL virtual
-    // La operación 1 tiene SL que se mueve
+    // Distancia para activar el trailing SL (takeProfitPips)
     const activateDistance = takeProfitPips * PIP_VALUE;
-    const backDistance = 20 * PIP_VALUE;
+
+    // Back distance: % del activateDistance (default 50% = la mitad)
+    // Esto garantiza que el trailing SL proteja ganancias
+    // Ejemplo: TP=20 pips, trailing 50% = SL a 10 pips detrás = cierra con +10 pips mínimo
+    const trailingPercent = trailingSLPercent ?? 50;
+    const backDistance = (activateDistance * trailingPercent) / 100;
+
     const stepDistance = 10 * PIP_VALUE;
     const buffer = 1 * PIP_VALUE;
 
     if (isBuy) {
-      // BUY: El SL está por encima (venta)
+      // BUY: El SL está por debajo (venta para cerrar)
       if (currentPrice >= this.entryPrice + activateDistance) {
         const targetSL = currentPrice - backDistance - buffer;
         const currentSL = this.entrySL;
 
-        if (currentSL === null || (targetSL - currentSL >= stepDistance - 0.000001)) {
+        // Solo mover el SL a favor (hacia arriba para BUY)
+        if (currentSL === null || targetSL > currentSL) {
           this.entrySL = targetSL;
         }
       }
     } else {
-      // SELL: El SL está por debajo (compra)
+      // SELL: El SL está por encima (compra para cerrar)
       if (currentPrice <= this.entryPrice - activateDistance) {
         const targetSL = currentPrice + backDistance + buffer;
         const currentSL = this.entrySL;
 
-        if (currentSL === null || (currentSL - targetSL >= stepDistance - 0.000001)) {
+        // Solo mover el SL a favor (hacia abajo para SELL)
+        if (currentSL === null || targetSL < currentSL) {
           this.entrySL = targetSL;
         }
       }
@@ -400,9 +488,14 @@ export class BacktestEngine {
   /**
    * Cierra todas las operaciones en profit (take profit)
    */
-  private closeAllLevelsInProfit(currentPrice: number, avgPrice: number): any[] {
+  private closeAllLevelsInProfit(currentPrice: number, avgPrice: number, closeTimestamp: Date = new Date()): any[] {
     const closingTrades: any[] = [];
     const isBuy = this.side === "BUY";
+    const levels: TradeLevel[] = [];
+    let totalProfit = 0;
+    let totalProfitPips = 0;
+    let totalLots = 0;
+    let weightedPrice = 0;
 
     for (const [level, trades] of this.positions.entries()) {
       for (const trade of trades) {
@@ -426,7 +519,53 @@ export class BacktestEngine {
 
         closingTrades.push(closingTrade);
         this.trades.push(closingTrade);
+
+        // Acumular para TradeDetail
+        totalProfit += profit;
+        totalProfitPips += profitPips;
+        totalLots += trade.lotSize;
+        weightedPrice += trade.price * trade.lotSize;
+
+        levels.push({
+          level: trade.level,
+          openPrice: trade.price,
+          closePrice: currentPrice,
+          lotSize: trade.lotSize,
+          profit,
+          profitPips,
+          openTime: trade.timestamp,
+          closeTime: closeTimestamp,
+        });
       }
+    }
+
+    // Crear TradeDetail
+    if (this.currentEntryTime && this.currentSignalTimestamp) {
+      const durationMinutes = (closeTimestamp.getTime() - this.currentEntryTime.getTime()) / 60000;
+
+      const detail: TradeDetail = {
+        signalIndex: this.currentSignalIndex,
+        signalTimestamp: this.currentSignalTimestamp,
+        signalSide: this.side!,
+        signalPrice: this.currentSignalPrice!,
+        entryPrice: totalLots > 0 ? weightedPrice / totalLots : this.entryPrice!,
+        entryTime: this.currentEntryTime,
+        exitPrice: currentPrice,
+        exitTime: closeTimestamp,
+        exitReason: "TAKE_PROFIT",
+        totalLots,
+        avgPrice: totalLots > 0 ? weightedPrice / totalLots : this.entryPrice!,
+        totalProfit,
+        totalProfitPips,
+        durationMinutes,
+        maxLevels: levels.length,
+        levels,
+      };
+
+      this.tradeDetails.push(detail);
+
+      // Actualizar balance
+      this.currentBalance += totalProfit;
     }
 
     // Limpiar posiciones
@@ -441,9 +580,14 @@ export class BacktestEngine {
   /**
    * Cierra todas las operaciones (cuando SL de entrada o emergencia)
    */
-  private closeAllPositions(currentPrice: number, reason: "TAKE_PROFIT" | "STOP_LOSS"): any[] {
+  private closeAllPositions(currentPrice: number, reason: "TAKE_PROFIT" | "STOP_LOSS", closeTimestamp: Date = new Date()): any[] {
     const closingTrades: any[] = [];
     const isBuy = this.side === "BUY";
+    const levels: TradeLevel[] = [];
+    let totalProfit = 0;
+    let totalProfitPips = 0;
+    let totalLots = 0;
+    let weightedPrice = 0;
 
     for (const [level, trades] of this.positions.entries()) {
       for (const trade of trades) {
@@ -467,7 +611,61 @@ export class BacktestEngine {
 
         closingTrades.push(closingTrade);
         this.trades.push(closingTrade);
+
+        // Acumular para TradeDetail
+        totalProfit += profit;
+        totalProfitPips += profitPips;
+        totalLots += trade.lotSize;
+        weightedPrice += trade.price * trade.lotSize;
+
+        levels.push({
+          level: trade.level,
+          openPrice: trade.price,
+          closePrice: currentPrice,
+          lotSize: trade.lotSize,
+          profit,
+          profitPips,
+          openTime: trade.timestamp,
+          closeTime: closeTimestamp,
+        });
       }
+    }
+
+    // Crear TradeDetail
+    if (this.currentEntryTime && this.currentSignalTimestamp) {
+      const durationMinutes = (closeTimestamp.getTime() - this.currentEntryTime.getTime()) / 60000;
+
+      // Determinar razón de salida real
+      let exitReason: "TAKE_PROFIT" | "STOP_LOSS" | "TRAILING_SL" = "STOP_LOSS";
+      if (reason === "STOP_LOSS" && this.entrySL !== null) {
+        exitReason = "TRAILING_SL";
+      } else if (reason === "TAKE_PROFIT") {
+        exitReason = "TAKE_PROFIT";
+      }
+
+      const detail: TradeDetail = {
+        signalIndex: this.currentSignalIndex,
+        signalTimestamp: this.currentSignalTimestamp,
+        signalSide: this.side!,
+        signalPrice: this.currentSignalPrice!,
+        entryPrice: totalLots > 0 ? weightedPrice / totalLots : this.entryPrice!,
+        entryTime: this.currentEntryTime,
+        exitPrice: currentPrice,
+        exitTime: closeTimestamp,
+        exitReason,
+        totalLots,
+        avgPrice: totalLots > 0 ? weightedPrice / totalLots : this.entryPrice!,
+        totalProfit,
+        totalProfitPips,
+        durationMinutes,
+        maxLevels: levels.length,
+        levels,
+      };
+
+      this.tradeDetails.push(detail);
+
+      // Actualizar balance
+      this.currentBalance += totalProfit;
     }
 
     this.positions.clear();
@@ -481,7 +679,7 @@ export class BacktestEngine {
   /**
    * Actualiza métricas de equity y drawdown
    */
-  private updateEquityMetrics(currentPrice: number): void {
+  private updateEquityMetrics(currentPrice: number, timestamp: Date = new Date()): void {
     // Calcular equity actual
     let floatingProfit = 0;
 
@@ -500,13 +698,10 @@ export class BacktestEngine {
       }
     }
 
-    // Sumar profit de operaciones cerradas
-    let closedProfit = 0;
-    for (const trade of this.trades) {
-      closedProfit += trade.profit;
-    }
+    // Calcular balance actual (profit de operaciones cerradas)
+    const closedProfit = this.tradeDetails.reduce((sum, d) => sum + d.totalProfit, 0);
 
-    this.currentEquity = 10000 + floatingProfit + closedProfit; // 10000 = balance inicial
+    this.currentEquity = this.currentBalance + floatingProfit;
 
     // Actualizar peak
     if (this.currentEquity > this.peakEquity) {
@@ -517,6 +712,20 @@ export class BacktestEngine {
     const dd = this.peakEquity - this.currentEquity;
     if (dd > this.maxDrawdown) {
       this.maxDrawdown = dd;
+    }
+
+    // Guardar punto en equity curve (solo cada 60 segundos para no generar demasiados puntos)
+    const lastPoint = this.equityCurve[this.equityCurve.length - 1];
+    const shouldAddPoint = !lastPoint ||
+      (timestamp.getTime() - lastPoint.timestamp.getTime() >= 60000);
+
+    if (shouldAddPoint && this.entryOpen) {
+      this.equityCurve.push({
+        timestamp,
+        equity: this.currentEquity,
+        balance: this.currentBalance,
+        drawdown: dd,
+      });
     }
   }
 
@@ -532,8 +741,8 @@ export class BacktestEngine {
     // Capital inicial (del config o default 10000)
     const initialCapital = this.config.initialCapital || 10000;
 
-    // Profit total (el engine trabaja con equity, así que calculamos la diferencia)
-    const totalProfit = this.currentEquity - initialCapital;
+    // Profit total (basado en tradeDetails para mayor precisión)
+    const totalProfit = this.tradeDetails.reduce((sum, d) => sum + d.totalProfit, 0);
 
     // Capital final
     const finalCapital = initialCapital + totalProfit;
@@ -544,13 +753,28 @@ export class BacktestEngine {
     // Porcentaje de drawdown
     const maxDrawdownPercent = (this.maxDrawdown / initialCapital) * 100;
 
+    // Win rate basado en tradeDetails
+    const winningDetails = this.tradeDetails.filter(d => d.totalProfit > 0);
+    const winRate = this.tradeDetails.length > 0
+      ? (winningDetails.length / this.tradeDetails.length) * 100
+      : 0;
+
+    // Profit factor basado en tradeDetails
+    const totalWinningDetail = winningDetails.reduce((sum, d) => sum + d.totalProfit, 0);
+    const losingDetails = this.tradeDetails.filter(d => d.totalProfit < 0);
+    const totalLosingDetail = losingDetails.reduce((sum, d) => sum + Math.abs(d.totalProfit), 0);
+    const profitFactor = totalLosingDetail > 0 ? totalWinningDetail / totalLosingDetail : 0;
+
+    // Total pips
+    const totalProfitPips = this.tradeDetails.reduce((sum, d) => sum + d.totalProfitPips, 0);
+
     return {
-      totalTrades: this.trades.length,
+      totalTrades: this.tradeDetails.length,
       totalProfit,
-      totalProfitPips: this.trades.reduce((sum: any, t: any) => sum + t.profitPips, 0),
-      winRate: this.trades.length > 0 ? (winningTrades.length / this.trades.length) * 100 : 0,
+      totalProfitPips,
+      winRate,
       maxDrawdown: this.maxDrawdown,
-      profitFactor: totalLosing > 0 ? totalWinning / Math.abs(totalLosing) : 0,
+      profitFactor,
       // Campos nuevos de capital
       initialCapital,
       finalCapital,
@@ -558,7 +782,8 @@ export class BacktestEngine {
       maxDrawdownPercent,
       // Detalles
       trades: this.trades,
-      equityCurve: [], // TODO: Implementar
+      tradeDetails: this.tradeDetails,
+      equityCurve: this.equityCurve,
     };
   }
 }

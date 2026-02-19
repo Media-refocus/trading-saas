@@ -1,13 +1,10 @@
 /**
- * MIGRACIÓN DE TICKS: Archivos .gz → SQLite
+ * MIGRACIÓN DE TICKS: Archivos .gz → SQLite (VERSION OPTIMIZADA)
  *
- * Este script importa todos los ticks desde los archivos .gz comprimidos
- * a la base de datos SQLite para backtests rápidos sin consumir memoria.
+ * Esta versión inserta ticks en lotes pequeños mientras procesa
+ * para evitar quedarse sin memoria con archivos grandes.
  *
  * Uso:
- *   npx ts-node scripts/migrate-ticks-to-sqlite.ts
- *
- * O con tsx:
  *   npx tsx scripts/migrate-ticks-to-sqlite.ts
  */
 
@@ -20,7 +17,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const TICKS_DIR = path.join(process.cwd(), "data", "ticks");
-const BATCH_SIZE = 5000; // Insertar en lotes para eficiencia
+const BATCH_SIZE = 5000; // Insertar cada 5000 ticks
 
 interface TickRow {
   symbol: string;
@@ -61,22 +58,47 @@ function parseTickLine(line: string, symbol: string = "XAUUSD"): TickRow | null 
 }
 
 /**
- * Procesa un archivo .gz y retorna los ticks
+ * Procesa un archivo .gz e inserta ticks en lotes
  */
-async function processGzFile(filePath: string, symbol: string = "XAUUSD"): Promise<TickRow[]> {
+async function processGzFile(filePath: string, symbol: string = "XAUUSD"): Promise<{ processed: number; inserted: number }> {
   return new Promise((resolve, reject) => {
-    const ticks: TickRow[] = [];
+    const batch: TickRow[] = [];
+    let processed = 0;
+    let inserted = 0;
     let buffer = "";
-    let lineCount = 0;
 
     console.log(`  [Procesando] ${path.basename(filePath)}...`);
 
     const fileStream = createReadStream(filePath);
     const gunzip = createGunzip();
 
+    const insertBatch = async () => {
+      if (batch.length === 0) return;
+
+      const ticksToInsert = [...batch];
+      batch.length = 0;
+
+      try {
+        await prisma.tickData.createMany({
+          data: ticksToInsert,
+        });
+        inserted += ticksToInsert.length;
+      } catch (error) {
+        // Si falla el lote completo, intentar uno por uno
+        for (const tick of ticksToInsert) {
+          try {
+            await prisma.tickData.create({ data: tick });
+            inserted++;
+          } catch {
+            // Ignorar duplicados
+          }
+        }
+      }
+    };
+
     fileStream
       .pipe(gunzip)
-      .on("data", (chunk: Buffer) => {
+      .on("data", async (chunk: Buffer) => {
         buffer += chunk.toString();
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
@@ -84,55 +106,40 @@ async function processGzFile(filePath: string, symbol: string = "XAUUSD"): Promi
         for (const line of lines) {
           const tick = parseTickLine(line, symbol);
           if (tick) {
-            ticks.push(tick);
-            lineCount++;
+            batch.push(tick);
+            processed++;
 
-            if (lineCount % 100000 === 0) {
-              console.log(`    ${lineCount.toLocaleString()} líneas procesadas...`);
+            // Insertar cuando el lote está lleno
+            if (batch.length >= BATCH_SIZE) {
+              // Pausar el stream mientras insertamos
+              fileStream.pause();
+              await insertBatch();
+              fileStream.resume();
+
+              if (processed % 100000 === 0) {
+                console.log(`    📊 ${processed.toLocaleString()} procesados, ${inserted.toLocaleString()} insertados...`);
+              }
             }
           }
         }
       })
-      .on("end", () => {
-        // Procesar última línea si queda algo en buffer
+      .on("end", async () => {
+        // Procesar última línea y lote final
         if (buffer) {
           const tick = parseTickLine(buffer, symbol);
           if (tick) {
-            ticks.push(tick);
+            batch.push(tick);
+            processed++;
           }
         }
-        console.log(`    ✅ Total: ${ticks.length.toLocaleString()} ticks`);
-        resolve(ticks);
+
+        await insertBatch();
+
+        console.log(`    ✅ Completado: ${processed.toLocaleString()} procesados, ${inserted.toLocaleString()} insertados`);
+        resolve({ processed, inserted });
       })
       .on("error", reject);
   });
-}
-
-/**
- * Inserta ticks en lotes a la base de datos
- */
-async function insertTicksBatch(ticks: TickRow[]): Promise<number> {
-  let inserted = 0;
-
-  for (let i = 0; i < ticks.length; i += BATCH_SIZE) {
-    const batch = ticks.slice(i, i + BATCH_SIZE);
-
-    try {
-      await prisma.tickData.createMany({
-        data: batch,
-        // SQLite no soporta skipDuplicates, usamos try/catch para manejar errores
-      });
-      inserted += batch.length;
-
-      if ((i + BATCH_SIZE) % 50000 === 0) {
-        console.log(`    💾 Insertados ${inserted.toLocaleString()} ticks en BD...`);
-      }
-    } catch (error) {
-      console.error(`    ⚠️ Error insertando lote ${i}:`, error);
-    }
-  }
-
-  return inserted;
 }
 
 /**
@@ -140,7 +147,7 @@ async function insertTicksBatch(ticks: TickRow[]): Promise<number> {
  */
 async function main() {
   console.log("=".repeat(60));
-  console.log("MIGRACIÓN DE TICKS: .gz → SQLite");
+  console.log("MIGRACIÓN DE TICKS: .gz → SQLite (Optimizado)");
   console.log("=".repeat(60));
 
   // Verificar directorio
@@ -166,12 +173,9 @@ async function main() {
   const existingCount = await prisma.tickData.count();
   console.log(`\n📊 Ticks existentes en BD: ${existingCount.toLocaleString()}`);
 
-  if (existingCount > 0) {
-    console.log("⚠️  La BD ya tiene ticks. Se continuarán añadiendo (skipDuplicates activado).");
-  }
-
   // Procesar cada archivo
   const startTime = Date.now();
+  let totalProcessed = 0;
   let totalInserted = 0;
 
   for (const file of files) {
@@ -180,20 +184,9 @@ async function main() {
     const filePath = path.join(TICKS_DIR, file);
 
     try {
-      // Procesar archivo
-      const ticks = await processGzFile(filePath);
-
-      if (ticks.length === 0) {
-        console.log("    ⚠️  No se encontraron ticks válidos");
-        continue;
-      }
-
-      // Insertar en BD
-      console.log(`    💾 Insertando en SQLite...`);
-      const inserted = await insertTicksBatch(ticks);
-      totalInserted += inserted;
-
-      console.log(`    ✅ Insertados: ${inserted.toLocaleString()} ticks`);
+      const result = await processGzFile(filePath);
+      totalProcessed += result.processed;
+      totalInserted += result.inserted;
     } catch (error) {
       console.error(`    ❌ Error procesando ${file}:`, error);
     }
@@ -207,25 +200,19 @@ async function main() {
   console.log("MIGRACIÓN COMPLETADA");
   console.log("=".repeat(60));
   console.log(`⏱️  Tiempo total: ${Math.round(elapsed / 1000)}s`);
-  console.log(`📝 Ticks procesados: ${totalInserted.toLocaleString()}`);
+  console.log(`📝 Ticks procesados: ${totalProcessed.toLocaleString()}`);
+  console.log(`💾 Ticks insertados: ${totalInserted.toLocaleString()}`);
   console.log(`📊 Total en BD: ${finalCount.toLocaleString()}`);
-  console.log(`💾 Tamaño BD: ${await getDbSize()}`);
-  console.log("=".repeat(60));
-}
 
-/**
- * Obtiene el tamaño de la base de datos
- */
-async function getDbSize(): Promise<string> {
+  // Tamaño de la BD
   const dbPath = path.join(process.cwd(), "prisma", "dev.db");
-
   if (fs.existsSync(dbPath)) {
     const stats = fs.statSync(dbPath);
     const mb = stats.size / 1024 / 1024;
-    return `${mb.toFixed(2)} MB`;
+    console.log(`💿 Tamaño BD: ${mb.toFixed(2)} MB`);
   }
 
-  return "N/A";
+  console.log("=".repeat(60));
 }
 
 // Ejecutar

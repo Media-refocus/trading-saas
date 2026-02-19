@@ -1,5 +1,5 @@
 # Ejecutar 30 estrategias con señales intradía (1516 señales)
-# Endpoint: backtester.execute
+# Endpoint: backtester.execute (OPTIMIZADO con cache)
 
 $ResultsDir = "backtest_results_intradia"
 $LogFile = "backtests-intradia.log"
@@ -67,7 +67,6 @@ function Run-Backtest {
     $body = @{
         json = @{
             config = $Config
-            signalLimit = 100
         }
     } | ConvertTo-Json -Depth 10
 
@@ -77,6 +76,8 @@ function Run-Backtest {
         $response = Invoke-RestMethod -Uri $url -Method POST -Body $body -ContentType "application/json" -TimeoutSec 600
 
         $results = $response.result.data.json.results
+        $fromCache = $response.result.data.json.fromCache
+        $elapsedMs = $response.result.data.json.elapsedMs
         $trades = $results.totalTrades
         $profit = $results.totalProfit
         $maxDD = $results.maxDrawdown
@@ -87,6 +88,8 @@ function Run-Backtest {
             Profit = $profit
             MaxDD = $maxDD
             Results = $results
+            FromCache = $fromCache
+            ElapsedMs = $elapsedMs
         }
     } catch {
         return @{
@@ -96,14 +99,27 @@ function Run-Backtest {
     }
 }
 
+# Verificar que el servidor está corriendo
+Log-Write "Verificando servidor..."
+try {
+    $healthCheck = Invoke-RestMethod -Uri "$BaseUrl/api/trpc/backtester.getCacheStatus" -TimeoutSec 5
+    $cacheStatus = $healthCheck.result.data.json
+    Log-Write "Cache de ticks: $($cacheStatus.isLoaded) ($($cacheStatus.totalTicks) ticks, $($cacheStatus.totalDays) dias)"
+} catch {
+    Log-Write "ERROR: El servidor no está corriendo. Ejecuta 'npm run dev' primero."
+    exit 1
+}
+
 # Main
-Log-Write "=== INICIANDO BACKTESTS CON 1516 SENALES INTRADIA ==="
+Log-Write "=== INICIANDO BACKTESTS CON 1516 SENALES INTRADIA (OPTIMIZADO) ==="
 Log-Write "Archivo de senales: $SignalFile"
 Log-Write "Total estrategias: $($Strategies.Count)"
 
 $allResults = @()
 $successCount = 0
 $errorCount = 0
+$cacheHits = 0
+$totalTime = 0
 
 foreach ($strategy in $Strategies) {
     $num = $strategy.Num
@@ -116,8 +132,13 @@ foreach ($strategy in $Strategies) {
     $result = Run-Backtest -StrategyNum $num -StrategyName $name -Config $config
 
     if ($result.Success) {
-        Log-Write "  OK - Trades: $($result.Trades), Profit: `$$($result.Profit), Max DD: `$$($result.MaxDD)"
+        $cacheLabel = if ($result.FromCache) { "(CACHE)" } else { "" }
+        $timeLabel = "$($result.ElapsedMs)ms"
+        Log-Write "  OK $cacheLabel - Trades: $($result.Trades), Profit: `$$($result.Profit), Max DD: `$$($result.MaxDD) [$timeLabel]"
         $successCount++
+
+        if ($result.FromCache) { $cacheHits++ }
+        $totalTime += $result.ElapsedMs
 
         # Guardar resultado individual
         $resultFile = "$ResultsDir/estrategia_${num}_${name}.json"
@@ -130,6 +151,8 @@ foreach ($strategy in $Strategies) {
             Trades = $result.Trades
             Profit = $result.Profit
             MaxDD = $result.MaxDD
+            ElapsedMs = $result.ElapsedMs
+            FromCache = $result.FromCache
         }
     } else {
         Log-Write "  ERROR: $($result.Error)"
@@ -146,16 +169,20 @@ $ranking = $allResults | Sort-Object Profit -Descending
 $rank = 0
 
 $rankingFile = "$ResultsDir/ranking_profit.md"
-$rankingContent = "# Ranking por Profit (1516 senales intradia)`n`n"
-$rankingContent += "| Pos | Estrategia | Grupo | Profit | Trades | Max DD |`n"
-$rankingContent += "|-----|-----------|-------|--------|--------|--------|`n"
+$rankingContent = "# Ranking por Profit (1516 senales intradia - OPTIMIZADO)`n`n"
+$rankingContent += "Tiempo total: $([math]::Round($totalTime / 1000, 2))s | Cache hits: $cacheHits/$($Strategies.Count)`n`n"
+$rankingContent += "| Pos | Estrategia | Grupo | Profit | Trades | Max DD | Tiempo |`n"
+$rankingContent += "|-----|-----------|-------|--------|--------|--------|--------|`n"
 foreach ($r in $ranking) {
     $rank++
-    $rankingContent += "| $rank | $($r.Name) | $($r.Grupo) | `$$($r.Profit) | $($r.Trades) | `$$($r.MaxDD) |`n"
+    $cacheMark = if ($r.FromCache) { "*" } else { "" }
+    $rankingContent += "| $rank | $($r.Name) | $($r.Grupo) | `$$($r.Profit) | $($r.Trades) | `$$($r.MaxDD) | $([math]::Round($r.ElapsedMs / 1000, 2))s$cacheMark |`n"
 }
-$rankingContent | Out-File $rankingFile
+$rankingContent | Out-File $rankingFile -Encoding UTF8
 
 Log-Write "=== BACKTESTS COMPLETADOS ==="
 Log-Write "Exitosos: $successCount"
 Log-Write "Errores: $errorCount"
+Log-Write "Cache hits: $cacheHits"
+Log-Write "Tiempo total: $([math]::Round($totalTime / 1000, 2))s"
 Log-Write "Resultados guardados en: $ResultsDir"

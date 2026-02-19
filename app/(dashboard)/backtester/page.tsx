@@ -16,6 +16,8 @@ interface BacktestConfig {
   takeProfitPips: number;
   stopLossPips?: number;
   useStopLoss: boolean;
+  useTrailingSL?: boolean;
+  trailingSLPercent?: number;
   restrictionType?: "RIESGO" | "SIN_PROMEDIOS" | "SOLO_1_PROMEDIO";
   signalsSource?: string;
   initialCapital?: number;
@@ -29,6 +31,8 @@ const defaultConfig: BacktestConfig = {
   maxLevels: 4,
   takeProfitPips: 20,
   useStopLoss: false,
+  useTrailingSL: true,
+  trailingSLPercent: 50,
   signalsSource: "signals_simple.csv",
   initialCapital: 10000,
 };
@@ -43,6 +47,7 @@ export default function BacktesterPage() {
   const cacheStatus = trpc.backtester.getCacheStatus.useQuery();
   const executeBacktest = trpc.backtester.execute.useMutation();
   const allJobs = trpc.backtester.getAllJobs.useQuery();
+  const clearCache = trpc.backtester.clearCache.useMutation();
 
   const handleExecute = async () => {
     try {
@@ -323,6 +328,44 @@ export default function BacktesterPage() {
               </div>
             </div>
 
+            {/* Trailing Stop Loss Virtual */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                Trailing Stop Loss Virtual
+              </h3>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="useTrailingSL"
+                  checked={config.useTrailingSL}
+                  onChange={(e) => updateConfig("useTrailingSL", e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <Label htmlFor="useTrailingSL" className="cursor-pointer">
+                  Activar Trailing SL Virtual
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                El trailing SL se activa al alcanzar el TP y se arrastra detrás del precio para proteger ganancias.
+              </p>
+              {config.useTrailingSL && (
+                <div>
+                  <Label htmlFor="trailingSLPercent">Distancia del trailing (% del TP)</Label>
+                  <Input
+                    id="trailingSLPercent"
+                    type="number"
+                    min="10"
+                    max="90"
+                    value={config.trailingSLPercent}
+                    onChange={(e) => updateConfig("trailingSLPercent", parseInt(e.target.value))}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    50% = El SL se queda a mitad de camino (ej: TP 20 pips → SL cierra con +10 pips mínimo)
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Límite de señales */}
             <div>
               <Label htmlFor="signalLimit">Señales a simular</Label>
@@ -355,6 +398,22 @@ export default function BacktesterPage() {
                 "Ejecutar Backtest"
               )}
             </Button>
+
+            {/* Botón limpiar cache */}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                clearCache.mutate();
+                executeBacktest.reset();
+              }}
+              disabled={clearCache.isPending}
+            >
+              {clearCache.isPending ? "Limpiando..." : "Limpiar Cache"}
+            </Button>
+            {clearCache.isSuccess && (
+              <p className="text-xs text-green-600 text-center">Cache limpiado</p>
+            )}
 
             {executeBacktest.isError && (
               <div className="p-3 bg-red-100 text-red-700 rounded-md text-sm">
@@ -530,6 +589,90 @@ export default function BacktesterPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Curva de Equity */}
+      {results?.equityCurve && results.equityCurve.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Curva de Equity</CardTitle>
+            <CardDescription>
+              Evolución del balance durante el backtest
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EquityChart
+              data={results.equityCurve}
+              initialCapital={results.initialCapital}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Detalle de Trades */}
+      {results?.tradeDetails && results.tradeDetails.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Detalle de Operaciones</CardTitle>
+            <CardDescription>
+              {results.tradeDetails.length} operaciones completadas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-2">#</th>
+                    <th className="text-left py-2 px-2">Fecha</th>
+                    <th className="text-left py-2 px-2">Side</th>
+                    <th className="text-right py-2 px-2">Señal</th>
+                    <th className="text-right py-2 px-2">Entrada</th>
+                    <th className="text-right py-2 px-2">Salida</th>
+                    <th className="text-right py-2 px-2">Niveles</th>
+                    <th className="text-right py-2 px-2">Pips</th>
+                    <th className="text-right py-2 px-2">Profit</th>
+                    <th className="text-left py-2 px-2">Cierre</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.tradeDetails.slice(-50).reverse().map((trade: any, i: number) => (
+                    <tr key={i} className={`border-b ${trade.totalProfit >= 0 ? "bg-green-50/50" : "bg-red-50/50"}`}>
+                      <td className="py-2 px-2 font-mono text-xs">{results.tradeDetails.length - i}</td>
+                      <td className="py-2 px-2">
+                        {new Date(trade.signalTimestamp).toLocaleDateString()}
+                      </td>
+                      <td className={`py-2 px-2 font-semibold ${trade.signalSide === "BUY" ? "text-green-600" : "text-red-600"}`}>
+                        {trade.signalSide}
+                      </td>
+                      <td className="py-2 px-2 text-right font-mono">{trade.signalPrice?.toFixed(2)}</td>
+                      <td className="py-2 px-2 text-right font-mono">{trade.entryPrice?.toFixed(2)}</td>
+                      <td className="py-2 px-2 text-right font-mono">{trade.exitPrice?.toFixed(2)}</td>
+                      <td className="py-2 px-2 text-right">{trade.maxLevels}</td>
+                      <td className={`py-2 px-2 text-right font-mono ${trade.totalProfitPips >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {trade.totalProfitPips >= 0 ? "+" : ""}{trade.totalProfitPips?.toFixed(1)}
+                      </td>
+                      <td className={`py-2 px-2 text-right font-mono font-semibold ${trade.totalProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {trade.totalProfit >= 0 ? "+" : ""}{trade.totalProfit?.toFixed(2)}€
+                      </td>
+                      <td className="py-2 px-2">
+                        <span className={`px-2 py-0.5 rounded text-xs ${
+                          trade.exitReason === "TAKE_PROFIT"
+                            ? "bg-green-100 text-green-800"
+                            : trade.exitReason === "TRAILING_SL"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                        }`}>
+                          {trade.exitReason === "TAKE_PROFIT" ? "TP" : trade.exitReason === "TRAILING_SL" ? "Trail" : "SL"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -558,6 +701,84 @@ function MetricCard({
       >
         {value}
       </div>
+    </div>
+  );
+}
+
+// Componente para gráfico de equity
+function EquityChart({
+  data,
+  initialCapital,
+}: {
+  data: Array<{ timestamp: Date; equity: number; balance: number; drawdown: number }>;
+  initialCapital: number;
+}) {
+  if (data.length === 0) return null;
+
+  const width = 800;
+  const height = 300;
+  const padding = 40;
+
+  const minEquity = Math.min(...data.map(d => d.equity), initialCapital);
+  const maxEquity = Math.max(...data.map(d => d.equity), initialCapital);
+  const range = maxEquity - minEquity || 1;
+
+  const xScale = (i: number) => padding + (i / (data.length - 1)) * (width - 2 * padding);
+  const yScale = (v: number) => height - padding - ((v - minEquity) / range) * (height - 2 * padding);
+
+  const pathD = data
+    .map((d, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i)} ${yScale(d.equity)}`)
+    .join(' ');
+
+  const baselineY = yScale(initialCapital);
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto min-w-[600px]">
+        {/* Línea de capital inicial */}
+        <line
+          x1={padding}
+          y1={baselineY}
+          x2={width - padding}
+          y2={baselineY}
+          stroke="#94a3b8"
+          strokeDasharray="5,5"
+        />
+
+        {/* Área bajo la curva */}
+        <path
+          d={`${pathD} L ${xScale(data.length - 1)} ${height - padding} L ${padding} ${height - padding} Z`}
+          fill="url(#equityGradient)"
+          opacity="0.3"
+        />
+
+        {/* Línea de equity */}
+        <path
+          d={pathD}
+          fill="none"
+          stroke="#3b82f6"
+          strokeWidth="2"
+        />
+
+        {/* Gradiente */}
+        <defs>
+          <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* Labels */}
+        <text x={padding} y={20} className="text-xs fill-muted-foreground">
+          {maxEquity.toFixed(0)}€
+        </text>
+        <text x={padding} y={height - 10} className="text-xs fill-muted-foreground">
+          {minEquity.toFixed(0)}€
+        </text>
+        <text x={width - padding - 80} y={baselineY - 5} className="text-xs fill-muted-foreground">
+          Capital inicial
+        </text>
+      </svg>
     </div>
   );
 }
