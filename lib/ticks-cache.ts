@@ -1,7 +1,15 @@
 /**
  * Cache inteligente de ticks para optimizar el backtester
  *
- * ESTRATEGIA: No cargar todos los ticks en memoria (son 80M+, usaría 4GB+)
+ * ⚠️ DEPRECADO - Usar lib/ticks-db.ts en su lugar
+ *
+ * Este archivo se mantiene por compatibilidad pero NO debe usarse para nuevos desarrollos.
+ * El nuevo sistema usa SQLite (ticks-db.ts) que:
+ * - No consume memoria (los datos están en disco)
+ * - Es más rápido para consultas por rango de fechas
+ * - Escala mejor con múltiples usuarios
+ *
+ * ESTRATEGIA ORIGINAL: No cargar todos los ticks en memoria (son 80M+, usaría 4GB+)
  * En su lugar:
  * - Cargar índice de posiciones por día (ligero)
  * - Cargar ticks bajo demanda y cachearlos por día (LRU)
@@ -552,8 +560,16 @@ export async function preloadDaysForSignals(signals: { timestamp: Date; closeTim
  * Precarga TODOS los días del índice en memoria
  * Esto hace que todos los backtests sean instantáneos
  * Tarda 5-10 minutos pero solo se ejecuta una vez al iniciar el servidor
+ *
+ * ⚠️ DEPRECATED: Esta función causa OOM con muchos ticks.
+ * Usar SQLite (ticks-db.ts) en su lugar.
  */
 export async function preloadAllTicks(): Promise<void> {
+  // DESACTIVADO - Causa Out of Memory con ~40M ticks
+  // Usar SQLite (lib/ticks-db.ts) en su lugar
+  console.warn("[TicksCache] ⚠️ preloadAllTicks() está DEPRECADO y desactivado.");
+  console.warn("[TicksCache] Usar SQLite (lib/ticks-db.ts) para backtests eficientes.");
+  return;
   if (!indexLoaded) {
     await initializeTicksCache();
   }

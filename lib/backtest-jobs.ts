@@ -181,7 +181,7 @@ async function executeJob(job: BacktestJob): Promise<void> {
     // Importar dinámicamente para evitar dependencias circulares
     const { BacktestEngine } = await import("./backtest-engine");
     const { loadSignalsFromFile } = await import("./parsers/signals-csv");
-    const { getTicksFromCache, getMarketPriceFromCache, waitForCache, isCacheReady } = await import("./ticks-cache");
+    const { getTicksFromDB, getMarketPrice, isTicksDBReady } = await import("./ticks-db");
     const { getCachedResult, cacheResult } = await import("./backtest-cache");
 
     // Verificar cache primero
@@ -193,10 +193,9 @@ async function executeJob(job: BacktestJob): Promise<void> {
       return;
     }
 
-    // Esperar a que el cache de ticks esté listo
-    if (!isCacheReady()) {
-      console.log(`[BacktestJobs] Esperando cache de ticks...`);
-      await waitForCache();
+    // Verificar que SQLite tiene datos
+    if (!(await isTicksDBReady())) {
+      throw new Error("La base de datos de ticks no está lista. Ejecuta: npx tsx scripts/migrate-ticks-to-sqlite.ts");
     }
 
     // Cargar señales
@@ -236,7 +235,7 @@ async function executeJob(job: BacktestJob): Promise<void> {
         ? new Date(Math.min(signal.closeTimestamp.getTime(), signal.timestamp.getTime() + 24 * 60 * 60 * 1000))
         : new Date(signal.timestamp.getTime() + 24 * 60 * 60 * 1000);
 
-      const ticks = await getTicksFromCache(signal.timestamp, endTime);
+      const ticks = await getTicksFromDB(signal.timestamp, endTime);
 
       // Procesar ticks
       for (const tick of ticks) {
