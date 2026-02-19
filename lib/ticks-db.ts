@@ -170,7 +170,7 @@ export async function getTicksCount(symbol: string = "XAUUSD"): Promise<number> 
 }
 
 /**
- * Obtiene estadísticas de la BD de ticks
+ * Obtiene estadísticas de la BD de ticks (optimizado para tablas grandes)
  */
 export async function getTicksStats(): Promise<{
   totalTicks: number;
@@ -179,30 +179,27 @@ export async function getTicksStats(): Promise<{
   symbols: string[];
   estimatedSizeMB: number;
 }> {
-  const [totalTicks, firstTick, lastTick, symbols] = await Promise.all([
-    prisma.tickData.count(),
-    prisma.tickData.findFirst({
-      orderBy: { timestamp: "asc" },
-      select: { timestamp: true },
-    }),
-    prisma.tickData.findFirst({
-      orderBy: { timestamp: "desc" },
-      select: { timestamp: true },
-    }),
-    prisma.tickData.findMany({
-      distinct: ["symbol"],
-      select: { symbol: true },
-    }),
+  // Usar SQL directo para evitar que Prisma cargue todo en memoria
+  const [totalResult, firstResult, lastResult, symbolsResult] = await Promise.all([
+    prisma.$queryRaw<[{ count: bigint }]>`SELECT COUNT(*) as count FROM TickData`,
+    prisma.$queryRaw<[{ timestamp: Date }]>`SELECT timestamp FROM TickData ORDER BY timestamp ASC LIMIT 1`,
+    prisma.$queryRaw<[{ timestamp: Date }]>`SELECT timestamp FROM TickData ORDER BY timestamp DESC LIMIT 1`,
+    prisma.$queryRaw<[{ symbol: string }]>`SELECT DISTINCT symbol FROM TickData`,
   ]);
+
+  const totalTicks = Number(totalResult[0]?.count || 0);
+  const firstTick = firstResult[0]?.timestamp || null;
+  const lastTick = lastResult[0]?.timestamp || null;
+  const symbols = symbolsResult.map((s) => s.symbol);
 
   // Estimar tamaño (cada tick ~48 bytes)
   const estimatedSizeMB = (totalTicks * 48) / 1024 / 1024;
 
   return {
     totalTicks,
-    firstTick: firstTick?.timestamp || null,
-    lastTick: lastTick?.timestamp || null,
-    symbols: symbols.map((s) => s.symbol),
+    firstTick,
+    lastTick,
+    symbols,
     estimatedSizeMB: Math.round(estimatedSizeMB * 100) / 100,
   };
 }

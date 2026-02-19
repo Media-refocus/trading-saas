@@ -12,31 +12,197 @@
 
 ---
 
-## Fase 1: Optimización de Backtesting (ACTUAL)
+## Fase 1: Optimización de Backtesting (COMPLETADA)
 
-### 1.1 Cache de Ticks en SQLite
+### 1.1 Cache de Ticks en SQLite ✅
+**Estado**: COMPLETADO
+- 116M de ticks migrados a SQLite
+- Memoria: ~50MB (vs ~2GB+ antes)
+- Arranque instantáneo
+
+---
+
+## Fase 1.5: Backtester "La Herramienta Definitiva" (ACTUAL)
+
+### 1.5.1 Capital Inicial y Gestión de Dinero
 **Prioridad**: CRÍTICA
-**Dependencias**: Ninguna
-**Tiempo estimado**: 2-3 días
+**Tiempo estimado**: 1 día
 
-**Objetivo**: Migrar ticks de archivos .gz a SQLite para backtests rápidos sin consumir memoria.
+**Problema actual**: El backtest no muestra con qué capital trabaja ni el profit real en €/$
 
 **Tareas**:
-- [ ] Crear esquema Prisma para tabla `TickData`
-- [ ] Script de migración: importar .gz a SQLite
-- [ ] Actualizar `ticks-cache.ts` para usar SQLite
-- [ ] Índices optimizados para consultas por rango de fechas
-- [ ] Test: backtest de 388 señales en <30 segundos
+- [ ] Campo "Capital inicial" en configuración (ej: 10,000€)
+- [ ] Calcular profit en dinero real (€) además de pips
+- [ ] Mostrar % de retorno sobre capital inicial
+- [ ] Risk per trade (ej: 1% del capital por operación)
+- [ ] Posición sizing automático basado en riesgo
 
-**Criterios de aceptación**:
-- Memoria usada <100MB durante backtest
-- Tiempo de backtest completo <60 segundos
-- PC de desarrollo funciona fluida durante tests
+**UI afectada**:
+- Formulario de configuración
+- Panel de resultados
 
-**Archivos afectados**:
-- `prisma/schema.prisma`
-- `lib/ticks-cache.ts` → `lib/ticks-db.ts`
-- `scripts/migrate-ticks-to-sqlite.ts` (nuevo)
+---
+
+### 1.5.2 Detalle de Trades Individuales
+**Prioridad**: CRÍTICA
+**Tiempo estimado**: 1-2 días
+
+**Problema actual**: No se puede ver CÓMO se calculan los resultados, el usuario está "a ciegas"
+
+**Tareas**:
+- [ ] Tabla de trades individuales con:
+  - [ ] Señal original (fecha, precio entrada, dirección)
+  - [ ] Precio real de entrada (del tick más cercano)
+  - [ ] Niveles de promedio abiertos (precio, lote, nivel)
+  - [ ] Precio promedio ponderado
+  - [ ] Precio de cierre
+  - [ ] Pips ganados/perdidos
+  - [ ] Profit en €
+  - [ ] Duración de la operación
+- [ ] Expandir/contraer cada trade para ver detalle
+- [ ] Exportar detalle a CSV
+
+**UI afectada**:
+- Nuevo panel "Detalle de trades" debajo del resumen
+
+---
+
+### 1.5.3 Visualización Gráfica (Tipo MT5)
+**Prioridad**: ALTA
+**Tiempo estimado**: 3-4 días
+
+**Objetivo**: Ver el movimiento del precio y las operaciones como en MT5
+
+**Tareas**:
+- [ ] Gráfico de velas (candlestick) con datos de ticks
+- [ ] Marcadores en el gráfico:
+  - [ ] Flecha de entrada (verde BUY / rojo SELL)
+  - [ ] Líneas de niveles de promedio (horizontal punteada)
+  - [ ] Línea de Take Profit (verde)
+  - [ ] Línea de Stop Loss (rojo) si aplica
+  - [ ] Marcador de cierre
+- [ ] Zoom y paneo del gráfico
+- [ ] Tooltip al pasar por velas/operaciones
+- [ ] Selector de trade para resaltar en gráfico
+
+**Librerías candidatas**:
+- Lightweight Charts (TradingView) - recomendado
+- Recharts
+- Plotly
+
+**UI afectada**:
+- Nuevo panel "Gráfico" con tabs por cada trade
+
+---
+
+### 1.5.4 Curva de Equity
+**Prioridad**: ALTA
+**Tiempo estimado**: 1 día
+
+**Objetivo**: Ver la evolución del balance durante el backtest
+
+**Tareas**:
+- [ ] Gráfico de línea con equity vs tiempo
+- [ ] Marcar drawdowns máximos
+- [ ] Línea de capital inicial de referencia
+- [ ] Hover para ver valor en cada punto
+
+---
+
+### 1.5.5 Métricas Avanzadas
+**Prioridad**: MEDIA
+**Tiempo estimado**: 1 día
+
+**Objetivo**: Métricas profesionales de trading
+
+**Tareas**:
+- [ ] Sharpe Ratio (retorno ajustado al riesgo)
+- [ ] Sortino Ratio (solo downside risk)
+- [ ] Calmar Ratio (retorno vs max drawdown)
+- [ ] Expectancy (ganancia esperada por trade)
+- [ ] Average win / Average loss
+- [ ] Max consecutive wins/losses
+- [ ] Profit factor por mes/trimestre
+
+---
+
+### 1.5.6 Filtros y Segmentación
+**Prioridad**: MEDIA
+**Tiempo estimado**: 1-2 días
+
+**Objetivo**: Poder analizar por segmentos
+
+**Tareas**:
+- [ ] Filtro por rango de fechas (from/to)
+- [ ] Filtro por día de la semana (lunes vs viernes)
+- [ ] Filtro por hora del día (sesión asiática, europea, USA)
+- [ ] Filtro por dirección (solo BUY / solo SELL)
+- [ ] Comparar rendimiento por segmentos
+
+---
+
+### 1.5.7 Optimizador de Parámetros
+**Prioridad**: ALTA
+**Tiempo estimado**: 2-3 días
+
+**Objetivo**: Encontrar la mejor configuración automáticamente
+
+**Tareas**:
+- [ ] Definir rangos de parámetros a optimizar:
+  - [ ] Pips distancia: 5-20
+  - [ ] Max niveles: 1-8
+  - [ ] Take profit: 10-40
+- [ ] Ejecutar múltiples combinaciones
+- [ ] Ranking de resultados por:
+  - [ ] Mayor profit total
+  - [ ] Mayor win rate
+  - [ ] Mejor profit factor
+  - [ ] Menor drawdown
+- [ ] Guardar mejores configuraciones
+- [ ] "Usar esta configuración" con un click
+
+---
+
+### 1.5.8 Comparador de Estrategias
+**Prioridad**: MEDIA
+**Tiempo estimado**: 1-2 días
+
+**Objetivo**: Comparar side-by-side diferentes configuraciones
+
+**Tareas**:
+- [ ] Guardar resultados de backtest
+- [ ] Selector para comparar 2-3 configuraciones
+- [ ] Tabla comparativa de métricas
+- [ ] Gráfico superpuesto de equity curves
+- [ ] Exportar comparación a PDF
+
+---
+
+### 1.5.9 Guardar y Compartir
+**Prioridad**: BAJA
+**Tiempo estimado**: 1 día
+
+**Tareas**:
+- [ ] Guardar configuraciones de estrategia (mis estrategias)
+- [ ] Guardar resultados de backtests históricos
+- [ ] Generar link compartible de resultado
+- [ ] Exportar a PDF/Excel con branding
+
+---
+
+## Resumen de Prioridades
+
+| Feature | Prioridad | Impacto |
+|---------|-----------|---------|
+| Capital inicial | CRÍTICA | Saber cuánto dinero real |
+| Detalle de trades | CRÍTICA | Transparencia total |
+| Gráfico tipo MT5 | ALTA | Visualización profesional |
+| Curva de equity | ALTA | Ver evolución del balance |
+| Optimizador | ALTA | Encontrar mejor config |
+| Métricas avanzadas | MEDIA | Análisis profesional |
+| Filtros | MEDIA | Segmentar análisis |
+| Comparador | MEDIA | A/B testing de configs |
+| Guardar/Compartir | BAJA | UX y colaboración |
 
 ---
 
