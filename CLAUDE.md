@@ -114,3 +114,52 @@ Abrir http://localhost:3000/backtester
 1. **Descargar ticks completos** de MT5 (Jun 2024 - Feb 2026)
 2. **Probar con 1516 señales** y ticks reales
 3. **Verificar rendimiento** con múltiples usuarios concurrentes
+
+---
+
+## 🔄 PR AGENT LOOP — REGLAS DE TRABAJO (2026-02-20)
+
+Este repo usa el sistema de Deterministic PR Agent Loop. Como CC trabajando aquí:
+
+### Reglas obligatorias
+- **NUNCA push directo a `main`** — siempre crear branch descriptivo (`feat/`, `fix/`, `chore/`)
+- **Siempre abrir PR** después de implementar — no hacer merge tú mismo
+- **Un branch = una tarea** — no mezclar múltiples issues en el mismo PR
+- **Commits atómicos** — cada commit reversible individualmente
+
+### Si el CI falla
+1. Leer los logs del workflow `.github/workflows/pr-agent-loop.yml`
+2. Arreglar el problema específico
+3. Push al mismo branch (no crear uno nuevo)
+4. El loop se re-activa automáticamente
+
+### Risk tiers (definidos en `risk-contract.json`)
+- **HIGH** (requiere Claude review + CI): `app/api/**`, `server/api/trpc/routers/**`, `db/schema.ts`
+- **LOW** (solo CI): todo lo demás
+
+### Contexto del plan completo
+Plan detallado en: https://raw.githubusercontent.com/Media-refocus/clawd-workspace/main/projects/pr-agent-loop-plan.md
+
+---
+
+## ⚠️ REGLAS DE SEGURIDAD (Plan Mode)
+
+Antes de cualquier operación destructiva:
+> "Voy a hacer X. Riesgo: Y. Alternativa si falla: Z."
+
+- **NUNCA** modificar `db/schema.ts` sin backup previo
+- **NUNCA** tocar endpoints de autenticación sin tests
+- **NUNCA** borrar datos de señales/ticks (son irreemplazables)
+
+---
+
+## 🤝 TRABAJO COLABORATIVO
+
+Este repo puede ser editado simultáneamente por:
+- **Guillermo** desde su PC local (branching desde `main`)
+- **Clawd/CC en VPS** (branching desde `main`)
+
+**Para evitar conflictos:**
+- Siempre `git pull origin main` antes de empezar una nueva tarea
+- Trabajar en branches — nunca editar `main` directamente
+- Comunicar qué tarea estás trabajando (via Mission Control task #)
