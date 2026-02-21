@@ -188,29 +188,15 @@ export default function BacktestChart({ ticks, trade, config, hasRealTicks = tru
         },
       });
 
-      // API de lightweight-charts v5 - usar addCandlestickSeries si está disponible
-      if (typeof (chart as any).addCandlestickSeries === 'function') {
-        candleSeries = (chart as any).addCandlestickSeries({
-          upColor: "#a6e3a1",
-          downColor: "#f38ba8",
-          borderUpColor: "#a6e3a1",
-          borderDownColor: "#f38ba8",
-          wickUpColor: "#a6e3a1",
-          wickDownColor: "#f38ba8",
-        });
-      } else {
-        // Fallback para otras versiones
-        candleSeries = (chart as any).addSeries({
-          type: 'Candlestick',
-        }, {
-          upColor: "#a6e3a1",
-          downColor: "#f38ba8",
-          borderUpColor: "#a6e3a1",
-          borderDownColor: "#f38ba8",
-          wickUpColor: "#a6e3a1",
-          wickDownColor: "#f38ba8",
-        });
-      }
+      // API de lightweight-charts v5
+      candleSeries = (chart as any).addCandlestickSeries({
+        upColor: "#a6e3a1",
+        downColor: "#f38ba8",
+        borderUpColor: "#a6e3a1",
+        borderDownColor: "#f38ba8",
+        wickUpColor: "#a6e3a1",
+        wickDownColor: "#f38ba8",
+      });
 
       chartRef.current = chart;
       candleSeriesRef.current = candleSeries;
@@ -299,45 +285,83 @@ export default function BacktestChart({ ticks, trade, config, hasRealTicks = tru
   useEffect(() => {
     if (!isPlaying || !candleSeriesRef.current || !trade) return;
 
-    const ticksToUse = ticks.length > 0 ? ticks : [];
-    if (ticksToUse.length === 0) {
-      setIsPlaying(false);
-      return;
-    }
+    // Si hay ticks reales, usar el iterador de ticks
+    if (ticks.length > 0) {
+      const iterator = candlesIterator(ticks, timeframe);
+      const intervalMs = Math.max(10, 100 / speed);
 
-    const iterator = candlesIterator(ticksToUse, timeframe);
-    const intervalMs = Math.max(10, 100 / speed);
+      // Saltar al índice actual si es que se pausó
+      for (let i = 0; i < currentCandleIndex; i++) {
+        iterator.next();
+      }
 
-    // Saltar al índice actual si es que se pausó
-    for (let i = 0; i < currentCandleIndex; i++) {
-      iterator.next();
-    }
+      const interval = setInterval(() => {
+        const result = iterator.next();
 
-    const interval = setInterval(() => {
-      const result = iterator.next();
+        if (result.done) {
+          setIsPlaying(false);
+          clearInterval(interval);
+          return;
+        }
 
-      if (result.done) {
+        const { candle, tickIndex, totalTicks } = result.value;
+
+        // Actualizar vela en el gráfico
+        try {
+          candleSeriesRef.current?.update(candle);
+        } catch (e) {
+          // Ignorar errores de actualización
+        }
+
+        setCurrentPrice(candle.close);
+        setProgress((tickIndex / totalTicks) * 100);
+        setCurrentCandleIndex(tickIndex);
+
+      }, intervalMs);
+
+      return () => clearInterval(interval);
+    } else {
+      // Sin ticks reales: reproducir velas sintéticas gradualmente
+      const syntheticCandles = generateSyntheticCandles(
+        trade.entryPrice,
+        trade.exitPrice,
+        new Date(trade.entryTime),
+        new Date(trade.exitTime),
+        timeframe
+      );
+
+      if (syntheticCandles.length === 0) {
         setIsPlaying(false);
-        clearInterval(interval);
         return;
       }
 
-      const { candle, tickIndex, totalTicks } = result.value;
+      const intervalMs = Math.max(50, 200 / speed);
+      let candleIndex = currentCandleIndex;
 
-      // Actualizar vela en el gráfico
-      try {
-        candleSeriesRef.current?.update(candle);
-      } catch (e) {
-        // Ignorar errores de actualización
-      }
+      const interval = setInterval(() => {
+        if (candleIndex >= syntheticCandles.length) {
+          setIsPlaying(false);
+          clearInterval(interval);
+          return;
+        }
 
-      setCurrentPrice(candle.close);
-      setProgress((tickIndex / totalTicks) * 100);
-      setCurrentCandleIndex(tickIndex);
+        // Mostrar velas una por una
+        const candlesToShow = syntheticCandles.slice(0, candleIndex + 1);
+        try {
+          candleSeriesRef.current?.setData(candlesToShow);
+        } catch (e) {
+          // Ignorar errores
+        }
 
-    }, intervalMs);
+        setCurrentPrice(syntheticCandles[candleIndex].close);
+        setProgress(((candleIndex + 1) / syntheticCandles.length) * 100);
+        setCurrentCandleIndex(candleIndex);
+        candleIndex++;
 
-    return () => clearInterval(interval);
+      }, intervalMs);
+
+      return () => clearInterval(interval);
+    }
   }, [isPlaying, speed, ticks, timeframe, trade, currentCandleIndex]);
 
   // Reset
@@ -410,7 +434,7 @@ export default function BacktestChart({ ticks, trade, config, hasRealTicks = tru
         {/* Play/Pause */}
         <button
           onClick={() => setIsPlaying(!isPlaying)}
-          disabled={ticks.length === 0}
+          disabled={!trade}
           className={`px-4 py-1.5 rounded font-medium ${
             isPlaying
               ? "bg-amber-600 hover:bg-amber-700"

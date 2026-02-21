@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
-import BacktestChart from "@/components/backtest-chart";
+import SimpleCandleChart from "@/components/simple-candle-chart";
 
 interface BacktestFilters {
   dateFrom?: string;
@@ -30,7 +30,7 @@ interface BacktestConfig {
   restrictionType?: "RIESGO" | "SIN_PROMEDIOS" | "SOLO_1_PROMEDIO";
   signalsSource?: string;
   initialCapital?: number;
-  useRealPrices?: boolean; // Desactivado por defecto - muy lento con 116M ticks
+  useRealPrices?: boolean; // Habilitado para tests con pocas señales
   filters?: BacktestFilters;
 }
 
@@ -46,7 +46,7 @@ const defaultConfig: BacktestConfig = {
   trailingSLPercent: 50,
   signalsSource: "signals_simple.csv",
   initialCapital: 10000,
-  useRealPrices: false, // Usar ticks sintéticos (rápido)
+  useRealPrices: true, // Habilitado para tests con pocas señales
 };
 
 export default function BacktesterPage() {
@@ -1396,7 +1396,7 @@ function TradeChartWrapper({
   );
 
   return (
-    <BacktestChart
+    <SimpleCandleChart
       ticks={tradeTicks.data?.ticks || []}
       trade={trade}
       config={config}
