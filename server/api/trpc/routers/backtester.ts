@@ -84,7 +84,7 @@ const BacktestConfigSchema = z.object({
   restrictionType: z.enum(["RIESGO", "SIN_PROMEDIOS", "SOLO_1_PROMEDIO"]).optional(),
   // Fuente de señales
   signalsSource: z.string().optional().default("signals_simple.csv"),
-  useRealPrices: z.boolean().optional().default(true),
+  useRealPrices: z.boolean().optional().default(false), // Desactivado por defecto (muy lento con 116M ticks)
   // Capital inicial
   initialCapital: z.number().min(100).max(10000000).optional().default(10000),
   // Filtros

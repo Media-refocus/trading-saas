@@ -30,6 +30,7 @@ interface BacktestConfig {
   restrictionType?: "RIESGO" | "SIN_PROMEDIOS" | "SOLO_1_PROMEDIO";
   signalsSource?: string;
   initialCapital?: number;
+  useRealPrices?: boolean; // Desactivado por defecto - muy lento con 116M ticks
   filters?: BacktestFilters;
 }
 
@@ -45,6 +46,7 @@ const defaultConfig: BacktestConfig = {
   trailingSLPercent: 50,
   signalsSource: "signals_simple.csv",
   initialCapital: 10000,
+  useRealPrices: false, // Usar ticks sintéticos (rápido)
 };
 
 export default function BacktesterPage() {
