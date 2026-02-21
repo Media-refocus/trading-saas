@@ -140,69 +140,100 @@ export default function BacktestChart({ ticks, trade, config, hasRealTicks = tru
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: 450,
-      layout: {
-        background: { type: ColorType.Solid, color: "#1e1e2e" },
-        textColor: "#cdd6f4",
-      },
-      grid: {
-        vertLines: { color: "#313244" },
-        horzLines: { color: "#313244" },
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-        vertLine: {
-          color: "#89b4fa",
-          width: 1,
-          style: LineStyle.Dashed,
-          labelBackgroundColor: "#89b4fa",
-        },
-        horzLine: {
-          color: "#89b4fa",
-          width: 1,
-          style: LineStyle.Dashed,
-          labelBackgroundColor: "#89b4fa",
-        },
-      },
-      rightPriceScale: {
-        borderColor: "#313244",
-        scaleMargins: { top: 0.1, bottom: 0.1 },
-      },
-      timeScale: {
-        borderColor: "#313244",
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    });
+    // Verificar que el contenedor tiene dimensiones
+    const containerWidth = chartContainerRef.current.clientWidth;
+    if (containerWidth === 0) {
+      console.warn("Chart container has zero width, skipping chart creation");
+      return;
+    }
 
-    // API de lightweight-charts v5
-    const candleSeries = (chart as any).addSeries({
-      type: 'Candlestick',
-    }, {
-      upColor: "#a6e3a1",
-      downColor: "#f38ba8",
-      borderUpColor: "#a6e3a1",
-      borderDownColor: "#f38ba8",
-      wickUpColor: "#a6e3a1",
-      wickDownColor: "#f38ba8",
-    });
+    let chart: IChartApi;
+    let candleSeries: any;
 
-    chartRef.current = chart;
-    candleSeriesRef.current = candleSeries;
+    try {
+      chart = createChart(chartContainerRef.current, {
+        width: containerWidth,
+        height: 450,
+        layout: {
+          background: { type: ColorType.Solid, color: "#1e1e2e" },
+          textColor: "#cdd6f4",
+        },
+        grid: {
+          vertLines: { color: "#313244" },
+          horzLines: { color: "#313244" },
+        },
+        crosshair: {
+          mode: CrosshairMode.Normal,
+          vertLine: {
+            color: "#89b4fa",
+            width: 1,
+            style: LineStyle.Dashed,
+            labelBackgroundColor: "#89b4fa",
+          },
+          horzLine: {
+            color: "#89b4fa",
+            width: 1,
+            style: LineStyle.Dashed,
+            labelBackgroundColor: "#89b4fa",
+          },
+        },
+        rightPriceScale: {
+          borderColor: "#313244",
+          scaleMargins: { top: 0.1, bottom: 0.1 },
+        },
+        timeScale: {
+          borderColor: "#313244",
+          timeVisible: true,
+          secondsVisible: false,
+        },
+      });
+
+      // API de lightweight-charts v5 - usar addCandlestickSeries si está disponible
+      if (typeof (chart as any).addCandlestickSeries === 'function') {
+        candleSeries = (chart as any).addCandlestickSeries({
+          upColor: "#a6e3a1",
+          downColor: "#f38ba8",
+          borderUpColor: "#a6e3a1",
+          borderDownColor: "#f38ba8",
+          wickUpColor: "#a6e3a1",
+          wickDownColor: "#f38ba8",
+        });
+      } else {
+        // Fallback para otras versiones
+        candleSeries = (chart as any).addSeries({
+          type: 'Candlestick',
+        }, {
+          upColor: "#a6e3a1",
+          downColor: "#f38ba8",
+          borderUpColor: "#a6e3a1",
+          borderDownColor: "#f38ba8",
+          wickUpColor: "#a6e3a1",
+          wickDownColor: "#f38ba8",
+        });
+      }
+
+      chartRef.current = chart;
+      candleSeriesRef.current = candleSeries;
+    } catch (error) {
+      console.error("Error creating chart:", error);
+      return;
+    }
 
     // Responsive
     const handleResize = () => {
-      if (chartContainerRef.current) {
-        chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+      if (chartContainerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
       }
     };
     window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      chart.remove();
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+        candleSeriesRef.current = null;
+      }
     };
   }, []);
 
