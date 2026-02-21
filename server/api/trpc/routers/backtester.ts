@@ -51,9 +51,23 @@ import {
   getJobsStats,
   type BacktestJob,
 } from "@/lib/backtest-jobs";
+import {
+  filterSignals,
+  getSegmentationStats,
+} from "@/lib/backtest-filters";
 import path from "path";
 
 // ==================== SCHEMAS ====================
+
+const BacktestFiltersSchema = z.object({
+  dateFrom: z.date().optional(),
+  dateTo: z.date().optional(),
+  daysOfWeek: z.array(z.number().min(0).max(6)).optional(),
+  hourFrom: z.number().min(0).max(23).optional(),
+  hourTo: z.number().min(0).max(24).optional(),
+  session: z.enum(["ASIAN", "EUROPEAN", "US", "ALL"]).optional(),
+  side: z.enum(["BUY", "SELL"]).optional(),
+}).optional();
 
 const BacktestConfigSchema = z.object({
   strategyName: z.string().default("Toni (G4)"),
@@ -73,6 +87,8 @@ const BacktestConfigSchema = z.object({
   useRealPrices: z.boolean().optional().default(true),
   // Capital inicial
   initialCapital: z.number().min(100).max(10000000).optional().default(10000),
+  // Filtros
+  filters: BacktestFiltersSchema,
 });
 
 // ==================== HELPERS ====================
@@ -142,6 +158,13 @@ export const backtesterRouter = router({
         // Cargar señales
         const signalsPath = path.join(process.cwd(), signalsSource);
         let signals = await loadSignalsFromFile(signalsPath);
+
+        // Aplicar filtros
+        if (input.config.filters) {
+          const beforeFilter = signals.length;
+          signals = filterSignals(signals, input.config.filters as any);
+          console.log(`[Backtester] Filtros aplicados: ${beforeFilter} -> ${signals.length} señales`);
+        }
 
         if (input.signalLimit) {
           signals = signals.slice(0, input.signalLimit);
@@ -214,6 +237,13 @@ export const backtesterRouter = router({
 
         const results = engine.getResults();
 
+        // Calcular estadísticas de segmentación
+        const profits = results.tradeDetails.map(d => d.totalProfit);
+        const segmentation = getSegmentationStats(
+          signals.filter((_, i) => i < results.tradeDetails.length),
+          profits
+        );
+
         // Guardar en cache
         cacheResult(input.config as BacktestConfig, signalsSource, results);
 
@@ -223,7 +253,10 @@ export const backtesterRouter = router({
         return {
           jobId,
           status: "completed",
-          results,
+          results: {
+            ...results,
+            segmentation,
+          },
           fromCache: false,
           elapsedMs,
         };

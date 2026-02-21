@@ -15,6 +15,25 @@ export type Side = "BUY" | "SELL";
 
 export type TradeType = "OPEN" | "AVERAGE" | "CLOSE" | "TAKE_PROFIT" | "STOP_LOSS";
 
+export type TradingSession = "ASIAN" | "EUROPEAN" | "US" | "ALL";
+
+export interface BacktestFilters {
+  // Rango de fechas
+  dateFrom?: Date;       // Solo señales desde esta fecha
+  dateTo?: Date;         // Solo señales hasta esta fecha
+
+  // Día de la semana (0=domingo, 1=lunes, ..., 6=sábado)
+  daysOfWeek?: number[]; // ej: [1,2,3,4,5] para lunes-viernes
+
+  // Hora del día
+  hourFrom?: number;     // Hora inicio (0-23)
+  hourTo?: number;       // Hora fin (0-23)
+  session?: TradingSession; // Sesión predefinida
+
+  // Dirección
+  side?: Side;           // Solo BUY o solo SELL
+}
+
 export interface BacktestConfig {
   // Estrategia
   strategyName: string;
@@ -43,6 +62,9 @@ export interface BacktestConfig {
 
   // Capital y dinero
   initialCapital?: number; // Capital inicial en euros (default: 10000)
+
+  // Filtros
+  filters?: BacktestFilters;
 }
 
 export interface BacktestResult {

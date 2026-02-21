@@ -7,6 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 
+interface BacktestFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  daysOfWeek?: number[];
+  session?: "ASIAN" | "EUROPEAN" | "US" | "ALL";
+  side?: "BUY" | "SELL";
+}
+
 interface BacktestConfig {
   strategyName: string;
   lotajeBase: number;
@@ -21,6 +29,7 @@ interface BacktestConfig {
   restrictionType?: "RIESGO" | "SIN_PROMEDIOS" | "SOLO_1_PROMEDIO";
   signalsSource?: string;
   initialCapital?: number;
+  filters?: BacktestFilters;
 }
 
 const defaultConfig: BacktestConfig = {
@@ -372,6 +381,97 @@ export default function BacktesterPage() {
               )}
             </div>
 
+            {/* Filtros */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                Filtros
+              </h3>
+
+              {/* Filtro de sesión */}
+              <div>
+                <Label htmlFor="session">Sesión de Trading</Label>
+                <select
+                  id="session"
+                  className="w-full mt-1.5 px-3 py-2 border rounded-md bg-background"
+                  value={config.filters?.session || ""}
+                  onChange={(e) =>
+                    updateConfig("filters", {
+                      ...config.filters,
+                      session: e.target.value as any || undefined,
+                    })
+                  }
+                >
+                  <option value="">Todas</option>
+                  <option value="ASIAN">Asia (00:00-08:00 UTC)</option>
+                  <option value="EUROPEAN">Europa (08:00-16:00 UTC)</option>
+                  <option value="US">USA (13:00-21:00 UTC)</option>
+                </select>
+              </div>
+
+              {/* Filtro de dirección */}
+              <div>
+                <Label htmlFor="sideFilter">Dirección</Label>
+                <select
+                  id="sideFilter"
+                  className="w-full mt-1.5 px-3 py-2 border rounded-md bg-background"
+                  value={config.filters?.side || ""}
+                  onChange={(e) =>
+                    updateConfig("filters", {
+                      ...config.filters,
+                      side: e.target.value as any || undefined,
+                    })
+                  }
+                >
+                  <option value="">Todas</option>
+                  <option value="BUY">Solo BUY</option>
+                  <option value="SELL">Solo SELL</option>
+                </select>
+              </div>
+
+              {/* Filtro de días */}
+              <div>
+                <Label>Días de la semana</Label>
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {["L", "M", "X", "J", "V", "S", "D"].map((day, i) => {
+                    const dayNum = i === 6 ? 0 : i + 1; // Ajustar índice
+                    const isSelected = config.filters?.daysOfWeek?.includes(dayNum);
+                    return (
+                      <button
+                        key={day}
+                        onClick={() => {
+                          const current = config.filters?.daysOfWeek || [];
+                          const newDays = isSelected
+                            ? current.filter((d) => d !== dayNum)
+                            : [...current, dayNum];
+                          updateConfig("filters", {
+                            ...config.filters,
+                            daysOfWeek: newDays.length > 0 ? newDays : undefined,
+                          });
+                        }}
+                        className={`w-8 h-8 rounded text-sm font-medium ${
+                          isSelected
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Botón limpiar filtros */}
+              {(config.filters?.session || config.filters?.side || config.filters?.daysOfWeek) && (
+                <button
+                  onClick={() => updateConfig("filters", undefined)}
+                  className="text-xs text-red-600 hover:underline"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+
             {/* Límite de señales */}
             <div>
               <Label htmlFor="signalLimit">Señales a simular</Label>
@@ -568,6 +668,79 @@ export default function BacktesterPage() {
                         ))}
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* Segmentación */}
+                {results.segmentation && (
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                      Análisis por Segmentos
+                    </h3>
+
+                    {/* Por sesión */}
+                    {results.segmentation.bySession && results.segmentation.bySession.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Por Sesión</h4>
+                        <div className="grid grid-cols-3 gap-2">
+                          {results.segmentation.bySession.map((s: any) => (
+                            <div key={s.segment} className="p-2 rounded bg-muted/50 text-center">
+                              <div className="text-xs font-medium">{s.segment}</div>
+                              <div className={`text-sm font-bold ${s.totalProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {s.totalProfit >= 0 ? "+" : ""}{s.totalProfit.toFixed(0)}€
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">
+                                {s.total} trades | {s.winRate.toFixed(0)}% WR
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Por día */}
+                    {results.segmentation.byDay && results.segmentation.byDay.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Por Día</h4>
+                        <div className="overflow-x-auto">
+                          <div className="flex gap-1">
+                            {results.segmentation.byDay.map((s: any) => (
+                              <div key={s.segment} className="flex-shrink-0 p-2 rounded bg-muted/50 text-center min-w-[70px]">
+                                <div className="text-xs font-medium">{s.segment.slice(0, 3)}</div>
+                                <div className={`text-sm font-bold ${s.totalProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                  {s.totalProfit >= 0 ? "+" : ""}{s.totalProfit.toFixed(0)}€
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">{s.winRate.toFixed(0)}%</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Por dirección */}
+                    {results.segmentation.bySide && results.segmentation.bySide.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Por Dirección</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {results.segmentation.bySide.map((s: any) => (
+                            <div key={s.segment} className={`p-2 rounded text-center ${
+                              s.segment === "BUY" ? "bg-green-50" : "bg-red-50"
+                            }`}>
+                              <div className={`text-sm font-bold ${s.segment === "BUY" ? "text-green-600" : "text-red-600"}`}>
+                                {s.segment}
+                              </div>
+                              <div className={`text-lg font-bold ${s.totalProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {s.totalProfit >= 0 ? "+" : ""}{s.totalProfit.toFixed(0)}€
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {s.total} | {s.winRate.toFixed(0)}% WR
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
