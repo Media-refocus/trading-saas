@@ -177,8 +177,10 @@ export default function BacktestChart({ ticks, trade, config, hasRealTicks = tru
       },
     });
 
-    // Usar addCandlestickSeries (API de lightweight-charts v4)
-    const candleSeries = (chart as any).addCandlestickSeries({
+    // API de lightweight-charts v5
+    const candleSeries = (chart as any).addSeries({
+      type: 'Candlestick',
+    }, {
       upColor: "#a6e3a1",
       downColor: "#f38ba8",
       borderUpColor: "#a6e3a1",
