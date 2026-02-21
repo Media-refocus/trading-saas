@@ -60,6 +60,18 @@ export interface BacktestResult {
   profitPercent: number;      // % de retorno sobre capital inicial
   maxDrawdownPercent: number; // % de drawdown sobre capital inicial
 
+  // Métricas Avanzadas
+  sharpeRatio: number;        // Retorno ajustado al riesgo
+  sortinoRatio: number;       // Solo downside risk
+  calmarRatio: number;        // Retorno vs max drawdown
+  expectancy: number;         // Ganancia esperada por trade
+  avgWin: number;             // Profit medio en trades ganadores
+  avgLoss: number;            // Loss medio en trades perdedores
+  rewardRiskRatio: number;    // avgWin / avgLoss
+  maxConsecutiveWins: number; // Racha máxima de wins
+  maxConsecutiveLosses: number; // Racha máxima de losses
+  profitFactorByMonth: { month: string; profitFactor: number; profit: number }[];
+
   // Detalles
   trades: any[];
   tradeDetails: TradeDetail[];  // Detalle ampliado por señal
@@ -755,18 +767,105 @@ export class BacktestEngine {
 
     // Win rate basado en tradeDetails
     const winningDetails = this.tradeDetails.filter(d => d.totalProfit > 0);
+    const losingDetails = this.tradeDetails.filter(d => d.totalProfit < 0);
     const winRate = this.tradeDetails.length > 0
       ? (winningDetails.length / this.tradeDetails.length) * 100
       : 0;
 
     // Profit factor basado en tradeDetails
     const totalWinningDetail = winningDetails.reduce((sum, d) => sum + d.totalProfit, 0);
-    const losingDetails = this.tradeDetails.filter(d => d.totalProfit < 0);
     const totalLosingDetail = losingDetails.reduce((sum, d) => sum + Math.abs(d.totalProfit), 0);
     const profitFactor = totalLosingDetail > 0 ? totalWinningDetail / totalLosingDetail : 0;
 
     // Total pips
     const totalProfitPips = this.tradeDetails.reduce((sum, d) => sum + d.totalProfitPips, 0);
+
+    // ==================== MÉTRICAS AVANZADAS ====================
+
+    // Returns por trade (como % del capital)
+    const returns = this.tradeDetails.map(d => d.totalProfit / initialCapital);
+
+    // Sharpe Ratio (asumiendo risk-free rate anual 4%)
+    const riskFreeRateDaily = 0.04 / 252; // ~0.000159
+    const avgReturn = returns.length > 0 ? returns.reduce((a, b) => a + b, 0) / returns.length : 0;
+    const variance = returns.length > 1
+      ? returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / (returns.length - 1)
+      : 0;
+    const stdDev = Math.sqrt(variance);
+    const sharpeRatio = stdDev > 0 ? (avgReturn - riskFreeRateDaily) / stdDev * Math.sqrt(252) : 0;
+
+    // Sortino Ratio (solo downside deviation)
+    const negativeReturns = returns.filter(r => r < 0);
+    const downsideVariance = negativeReturns.length > 1
+      ? negativeReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / negativeReturns.length
+      : 0;
+    const downsideDev = Math.sqrt(downsideVariance);
+    const sortinoRatio = downsideDev > 0 ? (avgReturn - riskFreeRateDaily) / downsideDev * Math.sqrt(252) : 0;
+
+    // Calmar Ratio (retorno anualizado / max drawdown %)
+    const daysInBacktest = this.equityCurve.length > 1
+      ? Math.max(1, (this.equityCurve[this.equityCurve.length - 1].timestamp.getTime() -
+                     this.equityCurve[0].timestamp.getTime()) / (1000 * 60 * 60 * 24))
+      : 1;
+    const annualizedReturn = daysInBacktest > 0
+      ? (Math.pow(finalCapital / initialCapital, 252 / daysInBacktest) - 1) * 100
+      : profitPercent;
+    const calmarRatio = maxDrawdownPercent > 0 ? annualizedReturn / maxDrawdownPercent : 0;
+
+    // Expectancy
+    const winRateDecimal = winRate / 100;
+    const lossRateDecimal = 1 - winRateDecimal;
+    const avgWin = winningDetails.length > 0
+      ? totalWinningDetail / winningDetails.length
+      : 0;
+    const avgLoss = losingDetails.length > 0
+      ? totalLosingDetail / losingDetails.length
+      : 0;
+    const expectancy = (winRateDecimal * avgWin) - (lossRateDecimal * avgLoss);
+    const rewardRiskRatio = avgLoss > 0 ? avgWin / avgLoss : 0;
+
+    // Max consecutive wins/losses
+    let maxConsecutiveWins = 0;
+    let maxConsecutiveLosses = 0;
+    let currentWins = 0;
+    let currentLosses = 0;
+
+    for (const detail of this.tradeDetails) {
+      if (detail.totalProfit >= 0) {
+        currentWins++;
+        currentLosses = 0;
+        maxConsecutiveWins = Math.max(maxConsecutiveWins, currentWins);
+      } else {
+        currentLosses++;
+        currentWins = 0;
+        maxConsecutiveLosses = Math.max(maxConsecutiveLosses, currentLosses);
+      }
+    }
+
+    // Profit factor by month
+    const monthlyData = new Map<string, { wins: number; losses: number; profit: number }>();
+
+    for (const detail of this.tradeDetails) {
+      const month = detail.signalTimestamp.toISOString().slice(0, 7); // "YYYY-MM"
+      const existing = monthlyData.get(month) || { wins: 0, losses: 0, profit: 0 };
+
+      if (detail.totalProfit >= 0) {
+        existing.wins += detail.totalProfit;
+      } else {
+        existing.losses += Math.abs(detail.totalProfit);
+      }
+      existing.profit += detail.totalProfit;
+
+      monthlyData.set(month, existing);
+    }
+
+    const profitFactorByMonth = Array.from(monthlyData.entries())
+      .map(([month, data]) => ({
+        month,
+        profitFactor: data.losses > 0 ? data.wins / data.losses : data.wins > 0 ? Infinity : 0,
+        profit: data.profit,
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month));
 
     return {
       totalTrades: this.tradeDetails.length,
@@ -780,6 +879,17 @@ export class BacktestEngine {
       finalCapital,
       profitPercent,
       maxDrawdownPercent,
+      // Métricas avanzadas
+      sharpeRatio,
+      sortinoRatio,
+      calmarRatio,
+      expectancy,
+      avgWin,
+      avgLoss,
+      rewardRiskRatio,
+      maxConsecutiveWins,
+      maxConsecutiveLosses,
+      profitFactorByMonth,
       // Detalles
       trades: this.trades,
       tradeDetails: this.tradeDetails,

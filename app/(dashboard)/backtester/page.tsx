@@ -489,6 +489,82 @@ export default function BacktesterPage() {
                   />
                 </div>
 
+                {/* Métricas Avanzadas */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                    Métricas Avanzadas
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <MetricCard
+                      label="Sharpe Ratio"
+                      value={results.sharpeRatio?.toFixed(2) || "-"}
+                      positive={(results.sharpeRatio ?? 0) >= 1}
+                    />
+                    <MetricCard
+                      label="Sortino Ratio"
+                      value={results.sortinoRatio?.toFixed(2) || "-"}
+                      positive={(results.sortinoRatio ?? 0) >= 1}
+                    />
+                    <MetricCard
+                      label="Calmar Ratio"
+                      value={results.calmarRatio?.toFixed(2) || "-"}
+                      positive={(results.calmarRatio ?? 0) >= 3}
+                    />
+                    <MetricCard
+                      label="Expectancy"
+                      value={`${results.expectancy >= 0 ? "+" : ""}${results.expectancy?.toFixed(2) || "0"}€`}
+                      positive={(results.expectancy ?? 0) > 0}
+                    />
+                    <MetricCard
+                      label="Reward/Risk"
+                      value={results.rewardRiskRatio?.toFixed(2) || "-"}
+                      positive={(results.rewardRiskRatio ?? 0) >= 1.5}
+                    />
+                    <MetricCard
+                      label="Avg Win / Loss"
+                      value={`${results.avgWin?.toFixed(2) || "0"} / ${results.avgLoss?.toFixed(2) || "0"}`}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <MetricCard
+                      label="Racha Wins"
+                      value={results.maxConsecutiveWins?.toString() || "0"}
+                    />
+                    <MetricCard
+                      label="Racha Losses"
+                      value={results.maxConsecutiveLosses?.toString() || "0"}
+                      positive={(results.maxConsecutiveLosses ?? 0) < 5}
+                    />
+                  </div>
+                </div>
+
+                {/* Profit Factor por Mes */}
+                {results.profitFactorByMonth && results.profitFactorByMonth.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Profit Factor por Mes</h3>
+                    <div className="overflow-x-auto">
+                      <div className="flex gap-2 pb-2">
+                        {results.profitFactorByMonth.slice(-12).map((m: any) => (
+                          <div
+                            key={m.month}
+                            className={`flex-shrink-0 px-3 py-2 rounded text-center text-xs ${
+                              m.profit >= 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            <div className="font-medium">{m.month}</div>
+                            <div className="font-bold">
+                              {m.profitFactor === Infinity ? "∞" : m.profitFactor.toFixed(1)}
+                            </div>
+                            <div className="text-[10px]">
+                              {m.profit >= 0 ? "+" : ""}{m.profit.toFixed(0)}€
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Trades recientes */}
                 {results.trades.length > 0 && (
                   <div>
