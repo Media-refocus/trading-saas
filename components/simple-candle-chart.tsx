@@ -396,19 +396,22 @@ export default function SimpleCandleChart({
 
     const floatingPL = calculateFloatingPL(position, currentPrice);
     const usedMargin = calculateRequiredMargin(position);
-    const equity = account.balance + floatingPL;
-    const freeMargin = equity - usedMargin;
-    const marginLevel = usedMargin > 0 ? (equity / usedMargin) * 100 : 0;
 
-    setAccount(prev => ({
-      ...prev,
-      equity,
-      floatingPL,
-      usedMargin,
-      freeMargin,
-      marginLevel,
-    }));
-  }, [currentPrice, position, calculateFloatingPL, calculateRequiredMargin, account.balance]);
+    setAccount(prev => {
+      const equity = prev.balance + floatingPL;
+      const freeMargin = equity - usedMargin;
+      const marginLevel = usedMargin > 0 ? (equity / usedMargin) * 100 : 0;
+
+      return {
+        ...prev,
+        equity,
+        floatingPL,
+        usedMargin,
+        freeMargin,
+        marginLevel,
+      };
+    });
+  }, [currentPrice, position, calculateFloatingPL, calculateRequiredMargin]);
 
   // ==================== REPRODUCCIÓN ANIMADA ====================
 
