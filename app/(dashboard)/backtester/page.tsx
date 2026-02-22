@@ -1390,13 +1390,48 @@ function TradeChartWrapper({
   trade: any;
   config: { takeProfitPips: number; pipsDistance: number; maxLevels: number };
 }) {
+  // Convertir fechas de forma segura
+  const entryTime = trade?.entryTime ? new Date(trade.entryTime) : null;
+  const exitTime = trade?.exitTime ? new Date(trade.exitTime) : null;
+
   const tradeTicks = trpc.backtester.getTradeTicks.useQuery(
     {
-      entryTime: new Date(trade.entryTime),
-      exitTime: new Date(trade.exitTime),
+      entryTime: entryTime || new Date(),
+      exitTime: exitTime || new Date(),
     },
-    { enabled: !!trade }
+    {
+      enabled: !!trade && !!entryTime && !!exitTime,
+      retry: 1,
+    }
   );
+
+  // Mostrar estado de carga
+  if (tradeTicks.isLoading) {
+    return (
+      <div className="text-center py-12 text-gray-400">
+        <div className="animate-spin text-2xl mb-2">⏳</div>
+        Cargando datos del trade...
+      </div>
+    );
+  }
+
+  // Mostrar error si falla
+  if (tradeTicks.isError) {
+    return (
+      <div className="text-center py-12 text-red-400">
+        Error al cargar datos: {tradeTicks.error?.message || "Unknown error"}
+      </div>
+    );
+  }
+
+  // Validar que el trade tiene los datos necesarios
+  if (!trade || trade.entryPrice == null || trade.exitPrice == null) {
+    return (
+      <div className="text-center py-12 text-gray-400">
+        Datos del trade incompletos
+      </div>
+    );
+  }
 
   return (
     <SimpleCandleChart
