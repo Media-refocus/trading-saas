@@ -88,6 +88,17 @@ const COLORS = {
 
 // ==================== COMPONENTE PRINCIPAL ====================
 
+// Función helper para validar trade
+function isValidTrade(trade: TradeDetail | null): trade is TradeDetail {
+  if (!trade) return false;
+  if (trade.entryPrice == null || isNaN(trade.entryPrice)) return false;
+  if (trade.exitPrice == null || isNaN(trade.exitPrice)) return false;
+  if (!trade.entryTime) return false;
+  if (!trade.exitTime) return false;
+  if (!trade.signalSide) return false;
+  return true;
+}
+
 export default function SimpleCandleChart({
   ticks,
   trade,
@@ -729,10 +740,10 @@ export default function SimpleCandleChart({
 
   // ==================== RENDER ====================
 
-  if (!trade) {
+  if (!isValidTrade(trade)) {
     return (
       <div className="text-center py-12 text-gray-400">
-        Selecciona un trade para ver el gráfico
+        {!trade ? "Selecciona un trade para ver el gráfico" : "Datos del trade incompletos"}
       </div>
     );
   }
