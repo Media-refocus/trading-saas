@@ -1,0 +1,57 @@
+{
+  "id": "xisco-progressive-v1",
+  "name": "Xisco Progressive",
+  "version": "1.0",
+  "author": "Xisco Vikingo Trading",
+  "symbol": "XAUUSD",
+  "created_at": "2026-02-22",
+  "status": "testing",
+
+  "entry": {
+    "initial_lots": 0.02,
+    "num_positions": 2,
+    "tp_fixed_entry_1": 20,
+    "runner_trailing_start": 35
+  },
+
+  "trailing_sl": {
+    "activation_pips": 35,
+    "initial_sl_offset": 25,
+    "only_favorable": true,
+    "description": "SL a +10 pips desde activación, solo sube nunca baja"
+  },
+
+  "pyramiding": {
+    "max_levels": 40,
+    "levels": [
+      { "from": 0, "to": 50, "spacing": 10, "lots": 0.03, "entries": 1 },
+      { "from": 50, "to": 100, "spacing": 10, "lots": 0.03, "entries": 2 },
+      { "from": 100, "to": 160, "spacing": 20, "lots": 0.03, "entries": 2 },
+      { "from": 160, "to": 250, "spacing": 30, "lots": 0.03, "entries": 2 },
+      { "from": 250, "to": 99999, "spacing": 50, "lots": 0.03, "entries": 4 }
+    ],
+    "note": "A partir de 50 pips doblamos CANTIDAD de entradas, no lotaje"
+  },
+
+  "progressive_close": [
+    { "range": [400, 250], "close_every": 25, "quantity": 2, "reopen_if_up": true },
+    { "range": [250, 160], "close_every": 20, "quantity": 1, "reopen_if_up": true },
+    { "range": [160, 100], "close_every": 20, "quantity": 1, "reopen_if_up": true },
+    { "range": [100, 40], "close_every": 10, "quantity": "all", "reopen_if_up": true },
+    { "range": [40, 0], "close_every": 20, "quantity": "all", "reopen_if_up": true }
+  ],
+
+  "close_order": "LIFO",
+
+  "risk_management": {
+    "global_stop_loss": null,
+    "max_drawdown_percent": null,
+    "note": "Pendiente implementar sistema de gestión de riesgo"
+  },
+
+  "conditions": {
+    "avoid_market_open": true,
+    "avoid_news_release": true,
+    "wait_for_good_entry": true
+  }
+}

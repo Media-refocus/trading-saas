@@ -1,0 +1,59 @@
+{
+  "id": "xisco-hibrida-v2",
+  "name": "Xisco Hibrida (Propuesta)",
+  "version": "2.0",
+  "author": "Refocus + Xisco",
+  "symbol": "XAUUSD",
+  "created_at": "2026-02-22",
+  "status": "proposal",
+
+  "base_strategy": "xisco-progressive-v1",
+
+  "new_features": {
+    "smart_pyramiding": {
+      "enabled": true,
+      "description": "Promedios en zonas de liquidez, no distancias fijas",
+      "max_averages": 12,
+      "analysis_pips": 1500,
+      "timeframes": ["15m", "1H", "4H"],
+      "looks_for": ["liquidity_zones", "reversal_levels"]
+    },
+
+    "dynamic_trailing": {
+      "enabled": true,
+      "mode": "percentage",
+      "distance_percent": 20,
+      "description": "Trailing adapta distancia según volatilidad"
+    },
+
+    "position_activation": {
+      "levels": [40, 70, 130, 200],
+      "description": "Posiciones se activan en niveles específicos de pips"
+    }
+  },
+
+  "entry": {
+    "initial_lots": 0.02,
+    "num_positions": 4,
+    "activation_pips": [40, 70, 130, 200]
+  },
+
+  "pyramiding": {
+    "max_averages": 12,
+    "mode": "smart",
+    "distribute_in": "liquidity_zones"
+  },
+
+  "trailing_sl": {
+    "mode": "dynamic",
+    "distance_percent": 20
+  },
+
+  "close_on_toni_signal": true,
+
+  "notes": [
+    "Basado en análisis de otro bot que usa zonas de liquidez",
+    "Menos promedios pero mejor colocados",
+    "Pendiente validación con backtester"
+  ]
+}
