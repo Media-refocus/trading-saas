@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import SimpleCandleChart from "@/components/simple-candle-chart";
+import { CHART_THEMES, getPreferredTheme, savePreferredTheme } from "@/lib/chart-themes";
 
 interface BacktestFilters {
   dateFrom?: string;
@@ -52,6 +53,12 @@ const defaultConfig: BacktestConfig = {
 export default function BacktesterPage() {
   const [config, setConfig] = useState<BacktestConfig>(defaultConfig);
   const [signalLimit, setSignalLimit] = useState(100);
+  const [chartTheme, setChartTheme] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return getPreferredTheme();
+    }
+    return "mt5";
+  });
 
   // tRPC hooks
   const signalsInfo = trpc.backtester.getSignalsInfo.useQuery({ source: config.signalsSource });
@@ -1260,14 +1267,33 @@ export default function BacktesterPage() {
 
             {/* Gráfico */}
             {selectedTradeIndex !== null && results.tradeDetails[selectedTradeIndex] && (
-              <TradeChartWrapper
-                trade={results.tradeDetails[selectedTradeIndex]}
-                config={{
-                  takeProfitPips: config.takeProfitPips,
-                  pipsDistance: config.pipsDistance,
-                  maxLevels: config.maxLevels,
-                }}
-              />
+              <>
+                {/* Selector de tema */}
+                <div className="flex items-center gap-2 mb-4">
+                  <Label className="text-sm text-gray-400">Tema:</Label>
+                  <select
+                    value={chartTheme}
+                    onChange={(e) => {
+                      setChartTheme(e.target.value);
+                      savePreferredTheme(e.target.value);
+                    }}
+                    className="px-3 py-1.5 bg-slate-700 rounded text-sm text-white border border-slate-600"
+                  >
+                    {CHART_THEMES.map((theme) => (
+                      <option key={theme.id} value={theme.id}>{theme.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <TradeChartWrapper
+                  trade={results.tradeDetails[selectedTradeIndex]}
+                  config={{
+                    takeProfitPips: config.takeProfitPips,
+                    pipsDistance: config.pipsDistance,
+                    maxLevels: config.maxLevels,
+                  }}
+                  themeId={chartTheme}
+                />
+              </>
             )}
           </CardContent>
         </Card>
@@ -1403,9 +1429,11 @@ function isValidTradeForChart(trade: any): boolean {
 function TradeChartWrapper({
   trade,
   config,
+  themeId = "mt5",
 }: {
   trade: any;
   config: { takeProfitPips: number; pipsDistance: number; maxLevels: number };
+  themeId?: string;
 }) {
   // Validar que el trade tiene todos los datos necesarios ANTES de hacer cualquier cosa
   if (!isValidTradeForChart(trade)) {
@@ -1459,6 +1487,7 @@ function TradeChartWrapper({
       trade={trade}
       config={config}
       hasRealTicks={tradeTicks.data?.hasRealTicks ?? false}
+      themeId={themeId}
     />
   );
 }

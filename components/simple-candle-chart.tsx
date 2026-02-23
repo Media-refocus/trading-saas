@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { getThemeColors } from "@/lib/chart-themes";
 
 // ==================== INTERFACES ====================
 
@@ -70,21 +71,6 @@ type Timeframe = "1" | "5" | "15" | "60";
 const PIP_VALUE = 0.10;
 const LOT_VALUE = 10; // 1 lote = $10 por pip aproximado en XAUUSD
 const LEVERAGE = 100; // Apalancamiento 1:100
-const COLORS = {
-  background: "#1a1a2e",
-  grid: "#2a2a4a",
-  text: "#e0e0e0",
-  candleUp: "#00c853",
-  candleDown: "#ff1744",
-  wickUp: "#00c853",
-  wickDown: "#ff1744",
-  entryLine: "#2196f3",
-  tpLine: "#00e676",
-  slLine: "#ff5252",
-  levelColors: ["#ab47bc", "#ff9100", "#76ff03", "#e91e63"],
-  crosshair: "#64b5f6",
-  currentPrice: "#ffd700",
-};
 
 // ==================== COMPONENTE PRINCIPAL ====================
 
@@ -104,6 +90,7 @@ export default function SimpleCandleChart({
   trade,
   config,
   hasRealTicks = true,
+  themeId = "mt5",
 }: {
   ticks: Tick[];
   trade: TradeDetail | null;
@@ -113,7 +100,11 @@ export default function SimpleCandleChart({
     maxLevels: number;
   };
   hasRealTicks?: boolean;
+  themeId?: string;
 }) {
+  // Obtener colores del tema seleccionado
+  const colors = getThemeColors(themeId);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -553,12 +544,12 @@ export default function SimpleCandleChart({
       const chartHeight = height - padding.top - padding.bottom;
 
       // Limpiar
-      ctx.fillStyle = COLORS.background;
+      ctx.fillStyle = colors.background;
       ctx.fillRect(0, 0, width, height);
 
       // Si no hay velas
       if (!candles || candles.length === 0) {
-        ctx.fillStyle = COLORS.text;
+        ctx.fillStyle = colors.text;
         ctx.font = "14px sans-serif";
         ctx.textAlign = "center";
         ctx.fillText("Presiona Play para iniciar la simulación", width / 2, height / 2);
@@ -597,7 +588,7 @@ export default function SimpleCandleChart({
       padding.top + chartHeight - ((price - minPrice) / (maxPrice - minPrice)) * chartHeight;
 
     // Grid horizontal
-    ctx.strokeStyle = COLORS.grid;
+    ctx.strokeStyle = colors.grid;
     ctx.lineWidth = 0.5;
     const priceStep = (maxPrice - minPrice) / 6;
     for (let i = 0; i <= 6; i++) {
@@ -608,7 +599,7 @@ export default function SimpleCandleChart({
       ctx.lineTo(width - padding.right, y);
       ctx.stroke();
 
-      ctx.fillStyle = COLORS.text;
+      ctx.fillStyle = colors.text;
       ctx.font = "10px monospace";
       ctx.textAlign = "left";
       ctx.fillText(price.toFixed(2), width - padding.right + 5, y + 4);
@@ -620,7 +611,7 @@ export default function SimpleCandleChart({
 
       // Entry
       const entryY = priceToY(trade.entryPrice);
-      ctx.strokeStyle = COLORS.entryLine;
+      ctx.strokeStyle = colors.entryLine;
       ctx.lineWidth = 1.5;
       ctx.setLineDash([5, 5]);
       ctx.beginPath();
@@ -628,7 +619,7 @@ export default function SimpleCandleChart({
       ctx.lineTo(width - padding.right, entryY);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = COLORS.entryLine;
+      ctx.fillStyle = colors.entryLine;
       ctx.font = "bold 10px sans-serif";
       ctx.fillText(`Entry: ${trade.entryPrice.toFixed(2)}`, padding.left + 5, entryY - 5);
 
@@ -638,27 +629,27 @@ export default function SimpleCandleChart({
         ? trade.entryPrice + takeProfitPips * PIP_VALUE
         : trade.entryPrice - takeProfitPips * PIP_VALUE;
       const tpY = priceToY(tpPrice);
-      ctx.strokeStyle = COLORS.tpLine;
+      ctx.strokeStyle = colors.tpLine;
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
       ctx.moveTo(padding.left, tpY);
       ctx.lineTo(width - padding.right, tpY);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = COLORS.tpLine;
+      ctx.fillStyle = colors.tpLine;
       ctx.fillText(`TP: ${tpPrice.toFixed(2)}`, padding.left + 5, tpY - 5);
 
       // SL (si hay posición)
       if (position?.stopLoss) {
         const slY = priceToY(position.stopLoss);
-        ctx.strokeStyle = COLORS.slLine;
+        ctx.strokeStyle = colors.slLine;
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
         ctx.moveTo(padding.left, slY);
         ctx.lineTo(width - padding.right, slY);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = COLORS.slLine;
+        ctx.fillStyle = colors.slLine;
         ctx.fillText(`SL: ${position.stopLoss.toFixed(2)}`, padding.left + 5, slY + 12);
       }
     }
@@ -672,7 +663,7 @@ export default function SimpleCandleChart({
       const isUp = candle.close >= candle.open;
 
       // Mecha
-      ctx.strokeStyle = isUp ? COLORS.wickUp : COLORS.wickDown;
+      ctx.strokeStyle = isUp ? colors.wickUp : colors.wickDown;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(x, priceToY(candle.high));
@@ -684,12 +675,12 @@ export default function SimpleCandleChart({
       const bodyBottom = priceToY(Math.min(candle.open, candle.close));
       const bodyHeight = Math.max(1, bodyBottom - bodyTop);
 
-      ctx.fillStyle = isUp ? COLORS.candleUp : COLORS.candleDown;
+      ctx.fillStyle = isUp ? colors.candleUp : colors.candleDown;
       ctx.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
 
       // Indicador en vela actual (última)
       if (i === candles.length - 1) {
-        ctx.strokeStyle = COLORS.currentPrice;
+        ctx.strokeStyle = colors.currentPrice;
         ctx.lineWidth = 2;
         ctx.strokeRect(x - bodyWidth / 2 - 2, bodyTop - 2, bodyWidth + 4, bodyHeight + 4);
       }
@@ -701,7 +692,7 @@ export default function SimpleCandleChart({
       const x = padding.left + 0.5 * (chartWidth / candles.length);
       const y = priceToY(trade.entryPrice);
 
-      ctx.fillStyle = isBuy ? COLORS.candleUp : COLORS.candleDown;
+      ctx.fillStyle = isBuy ? colors.candleUp : colors.candleDown;
       ctx.beginPath();
 
       if (isBuy) {
@@ -723,7 +714,7 @@ export default function SimpleCandleChart({
     // Línea de precio actual
     if (currentPrice !== null && candles.length > 0) {
       const currentY = priceToY(currentPrice);
-      ctx.strokeStyle = COLORS.currentPrice;
+      ctx.strokeStyle = colors.currentPrice;
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
@@ -732,7 +723,7 @@ export default function SimpleCandleChart({
       ctx.stroke();
       ctx.setLineDash([]);
 
-      ctx.fillStyle = COLORS.currentPrice;
+      ctx.fillStyle = colors.currentPrice;
       ctx.font = "bold 11px monospace";
       ctx.textAlign = "right";
       ctx.fillText(currentPrice.toFixed(2), width - 5, currentY - 5);

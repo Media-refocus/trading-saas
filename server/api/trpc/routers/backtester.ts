@@ -35,6 +35,15 @@ import {
   clearTicksCache,
 } from "@/lib/ticks-db";
 import {
+  preloadTicksForSignals,
+  getMarketPriceFromCache,
+  getTicksForSignal as getTicksForSignalFromBatch,
+  getDaysNeededForSignals,
+  loadTicksByDayGrouped,
+  clearBatchCache,
+  getBatchCacheStats,
+} from "@/lib/ticks-batch-loader";
+import {
   getCachedResult,
   cacheResult,
   hashConfig,
@@ -122,8 +131,13 @@ function generateSyntheticTicksForSignal(
 
 export const backtesterRouter = router({
   /**
-   * Ejecuta un backtest síncrono (rápido, para pocas señales)
+   * Ejecuta un backtest sincrono (rapido, para pocas senales)
    * Usa SQLite para ticks y cache de resultados
+   *
+   * OPTIMIZACION v2: Batch loading de ticks
+   * - Agrupa senales por dia y carga ticks en batch
+   * - Reduce de ~3 consultas/senal a ~1 consulta/dia
+   * - Tiempo esperado: de 45 min a ~5-8 min
    */
   execute: procedure
     .input(
@@ -156,7 +170,7 @@ export const backtesterRouter = router({
         const dbReady = await isTicksDBReady();
         const wantsRealPrices = input.config.useRealPrices === true;
 
-        // Cargar señales
+        // Cargar senales
         const signalsPath = path.join(process.cwd(), signalsSource);
         let signals = await loadSignalsFromFile(signalsPath);
 
@@ -164,19 +178,38 @@ export const backtesterRouter = router({
         if (input.config.filters) {
           const beforeFilter = signals.length;
           signals = filterSignals(signals, input.config.filters as any);
-          console.log(`[Backtester] Filtros aplicados: ${beforeFilter} -> ${signals.length} señales`);
+          console.log(`[Backtester] Filtros aplicados: ${beforeFilter} -> ${signals.length} senales`);
         }
 
         if (input.signalLimit) {
           signals = signals.slice(0, input.signalLimit);
         }
 
-        // Enriquecer con precios de SQLite si está disponible
-        if (wantsRealPrices && dbReady) {
+        // ==================== OPTIMIZACION: BATCH LOADING ====================
+        // Precargar todos los ticks necesarios ANTES del loop
+        // Esto reduce de N consultas (3 por senal) a ~1 consulta por dia
+        let ticksByDay: Map<string, any[]> = new Map();
+
+        if (wantsRealPrices && dbReady && signals.length > 0) {
+          const preloadStart = Date.now();
+          console.log(`[Backtester] Iniciando batch loading para ${signals.length} senales...`);
+
+          // Obtener dias necesarios
+          const daysNeeded = getDaysNeededForSignals(signals);
+          console.log(`[Backtester] Dias necesarios: ${daysNeeded.size}`);
+
+          // Cargar ticks en batch (1 consulta SQL por grupo de dias)
+          ticksByDay = await loadTicksByDayGrouped(daysNeeded);
+
+          const preloadTime = Date.now() - preloadStart;
+          console.log(`[Backtester] Batch loading completado en ${preloadTime}ms`);
+
+          // Enriquecer senales con precios reales usando el cache
           const enrichedSignals: TradingSignal[] = [];
 
           for (const signal of signals) {
-            const marketPrice = await getMarketPrice(signal.timestamp);
+            // Obtener precio de entrada desde cache (sin consulta adicional)
+            const marketPrice = getMarketPriceFromCache(ticksByDay, signal.timestamp);
 
             if (marketPrice) {
               const entryPrice = (marketPrice.bid + marketPrice.ask) / 2;
@@ -191,42 +224,42 @@ export const backtesterRouter = router({
 
           if (enrichedSignals.length > 0) {
             signals = enrichedSignals;
-            console.log(`[Backtester] Enriquecidas ${enrichedSignals.length}/${signals.length} señales con precios reales`);
+            console.log(`[Backtester] Enriquecidas ${enrichedSignals.length} senales con precios reales`);
           }
         }
+        // ==================== FIN BATCH LOADING ====================
 
         // Crear motor
         const engine = new BacktestEngine(input.config as BacktestConfig);
 
-        // Procesar cada señal
+        // Procesar cada senal
         for (let i = 0; i < signals.length; i++) {
           const signal = signals[i];
 
           engine.startSignal(signal.side, signal.entryPrice, i, signal.timestamp);
 
-          // Obtener primer tick para el timestamp de entrada
+          // Obtener timestamp de entrada
           let entryTimestamp = signal.timestamp;
-          if (wantsRealPrices && dbReady) {
-            const firstTick = await getMarketPrice(signal.timestamp, "XAUUSD", 5 * 60 * 1000);
+
+          if (wantsRealPrices && dbReady && ticksByDay.size > 0) {
+            // Usar el cache para obtener el tick mas cercano (sin consulta adicional)
+            const firstTick = getMarketPriceFromCache(ticksByDay, signal.timestamp);
             if (firstTick) {
-              // Usar el timestamp del tick más cercano
+              entryTimestamp = firstTick.timestamp;
             }
           }
 
           engine.openInitialOrders(signal.entryPrice, entryTimestamp);
 
-          // Obtener ticks desde SQLite o generar sintéticos
+          // Obtener ticks desde cache o generar sinteticos
           let ticks: { timestamp: Date; bid: number; ask: number; spread: number }[] = [];
 
-          if (wantsRealPrices && dbReady) {
-            const endTime = signal.closeTimestamp
-              ? new Date(Math.min(signal.closeTimestamp.getTime(), signal.timestamp.getTime() + 24 * 60 * 60 * 1000))
-              : new Date(signal.timestamp.getTime() + 24 * 60 * 60 * 1000);
-
-            ticks = await getTicksFromDB(signal.timestamp, endTime);
+          if (wantsRealPrices && dbReady && ticksByDay.size > 0) {
+            // Usar el cache para obtener ticks (sin consulta adicional)
+            ticks = getTicksForSignalFromBatch(ticksByDay, signal);
           }
 
-          // Si no hay ticks reales, usar sintéticos
+          // Si no hay ticks reales, usar sinteticos
           if (ticks.length === 0 || input.config.useRealPrices === false) {
             ticks = generateSyntheticTicksForSignal(signal, input.config);
           }
@@ -238,7 +271,7 @@ export const backtesterRouter = router({
 
         const results = engine.getResults();
 
-        // Calcular estadísticas de segmentación
+        // Calcular estadisticas de segmentacion
         const profits = results.tradeDetails.map(d => d.totalProfit);
         const segmentation = getSegmentationStats(
           signals.filter((_, i) => i < results.tradeDetails.length),
@@ -587,7 +620,7 @@ export const backtesterRouter = router({
   }),
 
   /**
-   * Obtiene los ticks para un trade específico (para el gráfico)
+   * Obtiene los ticks para un trade especifico (para el grafico)
    */
   getTradeTicks: procedure
     .input(z.object({
@@ -608,4 +641,22 @@ export const backtesterRouter = router({
         hasRealTicks: ticks.length > 0,
       };
     }),
+
+  /**
+   * Limpia el cache de batch loading
+   */
+  clearBatchCache: procedure.mutation(() => {
+    clearBatchCache();
+    return {
+      success: true,
+      message: "Cache de batch loading limpiado",
+    };
+  }),
+
+  /**
+   * Obtiene estadisticas del cache de batch loading
+   */
+  getBatchCacheStats: procedure.query(() => {
+    return getBatchCacheStats();
+  }),
 });
