@@ -3,7 +3,7 @@
 
 $ResultsDir = "backtest_results_intradia"
 $LogFile = "backtests-intradia.log"
-$BaseUrl = "http://localhost:3000"
+$BaseUrl = "http://localhost:3010"
 $SignalFile = "signals_intradia.csv"
 
 # Crear directorio de resultados
@@ -67,6 +67,7 @@ function Run-Backtest {
     $body = @{
         json = @{
             config = $Config
+            signalLimit = 50  # Limitar a 50 señales para evitar crash
         }
     } | ConvertTo-Json -Depth 10
 

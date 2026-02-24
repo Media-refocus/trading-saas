@@ -1,101 +1,86 @@
 # Contexto de Sesión - Trading Bot SaaS
 
-**Última actualización:** 2026-02-22
+**Última actualización:** 2026-02-24 (Post-testing)
 
 ---
 
 ## Estado Actual del Backtester
 
-### Fix del Crash del Gráfico (YA APLICADO)
+### ✅ Mejoras de UX y Diseño (2026-02-23)
+- **Commits pendientes:** Cambios en `page.tsx`
+- **Mejoras implementadas:**
+  - Header con config summary en gradient box
+  - Indicadores de estado con colores (señales B/S, ticks cacheados)
+  - Panel de configuración con iconos emoji (📏 📊 🎯)
+  - Parámetros Grid destacados con gradient
+  - Trailing SL y ticks reales con feedback visual
+  - Botón ejecutar con animación de loading
+  - Métricas con iconos, colores y subtextos
+  - Segmentación por sesión más visual
+  - Tabla de trades con badges y pills
+  - Curva de equity interactiva con hover y tooltip
+  - Animaciones fade-in, slide-up, hover scale
+  - Optimizador y comparador mejorados
+
+### ✅ Fix de Infinite Loop en Gráfico (2026-02-23)
+- **Commit:** `841f992`
+- **Problema:** Error "Maximum update depth exceeded" al terminar la simulación del gráfico
+- **Causa:** Al cerrar la posición, la reproducción seguía corriendo y causaba múltiples actualizaciones de estado
+- **Solución:**
+  - Añadido `positionClosedRef` para prevenir cierres duplicados
+  - Detener reproducción (`setIsPlaying(false)`) al cerrar posición
+  - Resetear ref en `handleReset` y al cargar nuevo trade
+- **Testeado:** Simulación completa de 5776 ticks terminó sin errores
+
+### ✅ Ticks Sintéticos Realistas (2026-02-22)
+- **Commit:** `aac5dc0`
+- **Mejoras basadas en análisis de ticks reales MT5:**
+  - Spread realista: 15-22 pips (era 1 pip fijo)
+  - Random walk acumulativo en lugar de curva suave
+  - Saltos bruscos ocasionales (2% probabilidad, ~20 pips)
+  - Mean reversion suave para evitar derivas extremas
+  - Más ticks: 200-2000 (era 10-100) para mejor visualización
+  - Movimiento por tick: ~0.2 pips (realista)
+
+### ✅ Fix de Timestamps en Ticks Sintéticos (2026-02-22)
+- **Commit:** `f28752f`
+- **Problema:** Al seleccionar un trade, el gráfico crasheaba porque `exitTime` era la fecha actual
+- **Solución:** Añadido parámetro `startTimestamp` y pasado desde `generateSyntheticTicksForSignal`
+
+### ✅ Fix del Crash del Gráfico (2026-02-22)
 - **Commit:** `f5c7c16`
-- **Problema:** Al seleccionar un trade para visualizar, el gráfico crasheaba
-- **Causa:** `TradeChartWrapper` ejecutaba `new Date(trade.entryTime)` sin validar que el dato existía y era válido
-- **Solución:** Añadida función `isValidTradeForChart()` que valida TODAS las propiedades antes de renderizar:
-  - `entryPrice` y `exitPrice` existen y son números válidos
-  - `entryTime` y `exitTime` existen
-  - Las fechas son válidas (no `Invalid Date`)
-  - `signalSide` existe
+- **Solución:** Añadida función `isValidTradeForChart()` que valida todas las propiedades
 
 ### Archivos Modificados
-- `app/(dashboard)/backtester/page.tsx` - Función `isValidTradeForChart()` y `TradeChartWrapper`
-- `components/simple-candle-chart.tsx` - Validaciones y null checks
+- `components/simple-candle-chart.tsx` - Fix de infinite loop, validaciones
+- `lib/parsers/signals-csv.ts` - Función `generateSyntheticTicks()` mejorada
+- `server/api/trpc/routers/backtester.ts` - Pasa `signal.timestamp` a ticks sintéticos
+- `app/(dashboard)/backtester/page.tsx` - Función `isValidTradeForChart()`
 
 ---
 
 ## Playwright MCP - TESTING DE NAVEGADOR
 
-### Estado de Instalación
-- ✅ `@playwright/mcp` instalado globalmente (`npm install -g @playwright/mcp`)
-- ✅ `.mcp.json` creado en el proyecto con configuración del servidor
-- ⏳ **PENDIENTE:** Reiniciar Claude Code para activar el MCP
+### Estado
+- ✅ **Activo y funcionando**
+- ✅ Tests completados exitosamente
 
-### Cómo Reiniciar Claude Code
-1. Escribe `/exit` o cierra esta terminal
-2. Abre una nueva terminal en el proyecto:
-   ```powershell
-   cd C:\Users\guill\Projects\trading-bot-saas
-   claude
-   ```
-3. El MCP de Playwright se cargará automáticamente
+### Tests Realizados (2026-02-23)
+1. ✅ Navegación a `/backtester`
+2. ✅ Limpiar cache
+3. ✅ Ejecutar backtest (2 operaciones, +0.24% retorno)
+4. ✅ Seleccionar trade del dropdown
+5. ✅ Reproducción completa de 5776 ticks sin errores
+6. ✅ Verificación de consola (sin errores críticos)
 
-### Qué Permite Playwright MCP
-- Abrir navegador y navegar a `http://localhost:3000/backtester`
-- Interactuar con formularios, botones, selects
-- Tomar screenshots y analizarlos visualmente
-- Ver el contenido del DOM
-- Testear si el gráfico se renderiza correctamente
-- Hacer clicks en Play, Reset, cambiar timeframes
-
-### Comandos Playwright MCP (una vez activo)
+### Comandos Playwright MCP Usados
 ```
-# Navegar a una URL
-playwright_navigate url="http://localhost:3000/backtester"
-
-# Tomar screenshot
-playwright_screenshot
-
-# Click en elemento
-playwright_click selector="button"
-
-# Escribir en input
-playwright_type selector="input" text="10"
-
-# Obtener contenido
-playwright_evaluate script="document.body.innerHTML"
+browser_navigate url="http://localhost:3000/backtester"
+browser_click element="Ejecutar Backtest"
+browser_select_option element="Trade selector" values=["#1..."]
+browser_take_screenshot filename="backtester-final-success.png"
+browser_console_messages level="error"
 ```
-
----
-
-## Tests a Realizar con Playwright
-
-### 1. Test Básico de Carga
-1. Navegar a `http://localhost:3000/backtester`
-2. Verificar que la página carga sin errores
-3. Tomar screenshot
-
-### 2. Test de Backtest
-1. Seleccionar archivo de señales (`signals_simple.csv`)
-2. Configurar parámetros:
-   - Lot Size: 0.1
-   - Take Profit Pips: 20
-   - Pips Distance: 10
-   - Max Levels: 3
-3. Click en "Ejecutar Backtest"
-4. Esperar resultados
-5. Verificar que aparecen métricas
-
-### 3. Test del Gráfico de Trade
-1. Después de ejecutar backtest
-2. Seleccionar un trade del dropdown
-3. Verificar que el gráfico aparece sin crashear
-4. Click en "Play" para simular
-5. Verificar que las velas se forman
-6. Cambiar timeframe (M1, M5, M15, H1)
-7. Click en "Reset"
-
-### 4. Test de Validación
-1. Intentar seleccionar trade sin ejecutar backtest
-2. Verificar mensaje de "Datos incompletos" si aplica
 
 ---
 
@@ -113,8 +98,7 @@ trading-bot-saas/
 │   └── parsers/              # Parsers de señales
 ├── server/api/trpc/routers/
 │   └── backtester.ts         # Endpoints tRPC
-├── .mcp.json                 # Configuración Playwright MCP
-└── CLAUDE.md                 # Instrucciones del proyecto
+└── .mcp.json                 # Configuración Playwright MCP
 ```
 
 ---
@@ -126,17 +110,11 @@ trading-bot-saas/
 cd C:\Users\guill\Projects\trading-bot-saas
 npm run dev
 
-# Verificar TypeScript
-npx tsc --noEmit
-
-# Git status
-git status
-
-# Git pull (desde openclaw)
-git pull origin master
-
 # Ver commits recientes
-git log --oneline -10
+git log --oneline -5
+
+# Push a GitHub
+git push origin master
 ```
 
 ---
@@ -144,22 +122,21 @@ git log --oneline -10
 ## Issues Conocidos
 
 1. **Ticks reales limitados:** Solo hay ticks de enero 2024, el resto son sintéticos
-2. **Señales intradía:** 1516 señales pero sin ticks completos para todas
+2. **Favicon 404:** Error menor, no afecta funcionalidad
+3. **Limite de señales:** Con 116M ticks, más de 100 señales crashea el servidor (OOM)
 
 ---
 
-## Próximos Pasos
+## Próximos Pasos Sugeridos
 
-1. **Reiniciar Claude Code** para activar Playwright MCP
-2. **Arrancar servidor:** `npm run dev`
-3. **Testear backtester** con Playwright
-4. **Fixear cualquier issue** que aparezca
-5. **Commit y push** los cambios
+1. **Descargar más ticks reales** de MT5 (Jun 2024 - Feb 2026)
+2. **Mejorar estilo visual** del gráfico (simular MT5: fondo negro, velas verdes/rojas)
+3. **Probar con 1516 señales** de `signals_intradia.csv`
 
 ---
 
-## Contacto / Repositorio
+## Repositorio
 
 - **GitHub:** https://github.com/Media-refocus/trading-saas
 - **Branch:** master
-- **Último commit:** `f5c7c16` - fix: validación completa de trade
+- **Último commit:** `841f992` - fix: prevenir infinite loop al cerrar posición
