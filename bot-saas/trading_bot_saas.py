@@ -184,6 +184,24 @@ class SaaSClient:
             log.error(f"Error enviando heartbeat: {e}")
             return None
 
+    def get_config(self) -> Optional[dict]:
+        """Obtiene la configuración actualizada del SaaS"""
+        try:
+            resp = self.session.get(
+                f"{self.base_url}/api/bot/config",
+                timeout=10
+            )
+
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("success"):
+                    return data.get("config")
+            return None
+
+        except Exception as e:
+            log.error(f"Error obteniendo config: {e}")
+            return None
+
 
 # ───────────────────────── AccountBot ─────────────────────────────
 class AccountBot:
@@ -254,6 +272,50 @@ class AccountBot:
 
     def _save_state(self) -> None:
         self.state_file.write_text(json.dumps(self.state, ensure_ascii=False))
+
+    def update_config(self, config_dict: dict) -> None:
+        """Actualiza los parámetros de trading desde el SaaS"""
+        updated = []
+
+        if "lotSize" in config_dict and config_dict["lotSize"] != self.lot_size:
+            self.lot_size = config_dict["lotSize"]
+            self.config.lot_size = self.lot_size
+            updated.append(f"lot={self.lot_size}")
+
+        if "maxLevels" in config_dict and config_dict["maxLevels"] != self.max_levels:
+            self.max_levels = config_dict["maxLevels"]
+            self.config.max_levels = self.max_levels
+            updated.append(f"levels={self.max_levels}")
+
+        if "gridDistance" in config_dict:
+            new_dist = config_dict["gridDistance"] * self.DIST_PIP
+            if new_dist != self.grid_distance:
+                self.grid_distance = new_dist
+                self.HALF_GRID = self.grid_distance / 2
+                self.config.grid_distance = config_dict["gridDistance"]
+                updated.append(f"grid={config_dict['gridDistance']}")
+
+        if "takeProfit" in config_dict:
+            new_tp = config_dict["takeProfit"] * self.DIST_PIP
+            if new_tp != self.take_profit:
+                self.take_profit = new_tp
+                self.config.take_profit = config_dict["takeProfit"]
+                updated.append(f"TP={config_dict['takeProfit']}")
+
+        if "trailingActivate" in config_dict:
+            self.config.trailing_activate = config_dict["trailingActivate"]
+            updated.append(f"trail_act={config_dict['trailingActivate']}")
+
+        if "trailingStep" in config_dict:
+            self.config.trailing_step = config_dict["trailingStep"]
+            updated.append(f"trail_step={config_dict['trailingStep']}")
+
+        if "trailingBack" in config_dict:
+            self.config.trailing_back = config_dict["trailingBack"]
+            updated.append(f"trail_back={config_dict['trailingBack']}")
+
+        if updated:
+            self.log.info(f"📋 Config actualizada desde SaaS: {', '.join(updated)}")
 
     def _mt5(self) -> bool:
         if self._mt5_ready and mt.terminal_info():
@@ -574,8 +636,10 @@ async def main_loop(config: BotConfig):
 
     last_signal_check = 0
     last_heartbeat = 0
+    last_config_refresh = 0
     SIGNAL_INTERVAL = 2  # segundos entre chequeos de señales
     HEARTBEAT_INTERVAL = 30  # segundos entre heartbeats
+    CONFIG_REFRESH_INTERVAL = 60  # segundos entre refresco de config
 
     log.info("🤖 Bot iniciado. Esperando señales...")
 
@@ -603,6 +667,13 @@ async def main_loop(config: BotConfig):
                 if result:
                     log.debug("💚 Heartbeat enviado OK")
                 last_heartbeat = now
+
+            # Refrescar configuración desde SaaS
+            if saas and (now - last_config_refresh) >= CONFIG_REFRESH_INTERVAL:
+                remote_config = saas.get_config()
+                if remote_config:
+                    bot.update_config(remote_config)
+                last_config_refresh = now
 
             await asyncio.sleep(0.5)
 
