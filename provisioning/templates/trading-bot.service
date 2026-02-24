@@ -1,0 +1,17 @@
+[Unit]
+Description=Trading Bot SaaS - Auto-arranque
+After=network.target
+
+[Service]
+Type=simple
+User=trading
+WorkingDirectory=/opt/tradingbot/bot-saas
+Environment="MT5_LOGIN=YOUR_LOGIN"
+Environment="MT5_PASSWORD=YOUR_PASSWORD"
+Environment="MT5_SERVER=YOUR_SERVER"
+ExecStart=/opt/tradingbot/venv/bin/python trading_bot_saas.py --api-key YOUR_API_KEY --saas-url YOUR_SAAS_URL
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
