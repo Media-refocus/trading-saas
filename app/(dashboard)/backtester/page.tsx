@@ -430,7 +430,7 @@ export default function BacktesterPage() {
                 {executeBacktest.isPending ? (
                   <span className="flex items-center gap-2">
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Ejecutando...
+                    Ejecutando backtest...
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
@@ -450,6 +450,21 @@ export default function BacktesterPage() {
               </Button>
             </div>
 
+            {/* Resumen de configuracion activa */}
+            <div className="flex items-center justify-center gap-4 pt-2 text-[10px] text-muted-foreground font-mono">
+              <span>Grid: {config.pipsDistance}p x {config.maxLevels}L</span>
+              <span>•</span>
+              <span>TP: {config.takeProfitPips}p</span>
+              {config.useTrailingSL && (
+                <>
+                  <span>•</span>
+                  <span>Trail: {config.trailingSLPercent}%</span>
+                </>
+              )}
+              <span>•</span>
+              <span>Lote: {config.lotajeBase}</span>
+            </div>
+
             {executeBacktest.isError && (
               <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-lg text-xs animate-fade-in">
                 <div className="font-medium mb-1">Error</div>
@@ -462,53 +477,88 @@ export default function BacktesterPage() {
         {/* Panel de resultados mejorado */}
         <Card className="lg:col-span-2 border-border/50 shadow-sm">
           <CardHeader className="pb-2 pt-3 bg-gradient-to-r from-card to-muted/20">
-            <CardTitle className="text-base flex items-center gap-2">
-              <span className="w-1.5 h-4 bg-green-500 rounded-full" />
-              Resultados
-              {results && (
-                <span className="text-xs font-normal text-muted-foreground ml-2">
-                  {results.totalTrades} trades procesados
-                </span>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <span className="w-1.5 h-4 bg-green-500 rounded-full" />
+                Resultados
+                {results && (
+                  <span className="text-xs font-normal text-muted-foreground ml-2">
+                    {results.totalTrades} trades procesados
+                  </span>
+                )}
+              </CardTitle>
+              {executeBacktest.data?.elapsedMs && (
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  {executeBacktest.data.fromCache && (
+                    <span className="px-2 py-0.5 bg-blue-500/10 text-blue-600 rounded-full">Desde cache</span>
+                  )}
+                  <span className="font-mono">
+                    Tiempo: {(executeBacktest.data.elapsedMs / 1000).toFixed(2)}s
+                  </span>
+                </div>
               )}
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="pt-3">
             {results ? (
               <div className="space-y-4 animate-fade-in">
-                {/* Métricas principales con diseño mejorado */}
-                <div className="grid grid-cols-6 gap-2">
+                {/* Métricas principales con diseño mejorado - 2 filas */}
+                <div className="grid grid-cols-4 gap-2">
                   <MetricBox
-                    label="Profit"
+                    label="Profit Total"
                     value={`${results.totalProfit >= 0 ? "+" : ""}${results.totalProfit?.toFixed(2)}€`}
                     positive={results.totalProfit >= 0}
                     highlight
                     icon={results.totalProfit >= 0 ? "📈" : "📉"}
+                    subtitle={results.profitPercent ? `${results.profitPercent >= 0 ? "+" : ""}${results.profitPercent.toFixed(1)}%` : undefined}
                   />
                   <MetricBox
-                    label="Pips"
+                    label="Win Rate"
+                    value={`${results.winRate?.toFixed(0)}%`}
+                    positive={results.winRate >= 50}
+                    subtitle={results.totalTrades ? `${Math.round(results.totalTrades * results.winRate / 100)}W / ${results.totalTrades - Math.round(results.totalTrades * results.winRate / 100)}L` : undefined}
+                  />
+                  <MetricBox
+                    label="Profit Factor"
+                    value={results.profitFactor === Infinity ? "∞" : (results.profitFactor?.toFixed(2) || "-")}
+                    positive={(results.profitFactor ?? 0) >= 1.5}
+                    warning={(results.profitFactor ?? 0) >= 1 && (results.profitFactor ?? 0) < 1.5}
+                  />
+                  <MetricBox
+                    label="Max Drawdown"
+                    value={`${results.maxDrawdownPercent?.toFixed(1)}%`}
+                    positive={results.maxDrawdownPercent < 15}
+                    warning={results.maxDrawdownPercent >= 15 && results.maxDrawdownPercent < 25}
+                    subtitle={results.maxDrawdown ? `€${results.maxDrawdown.toFixed(0)}` : undefined}
+                  />
+                </div>
+
+                {/* Segunda fila de métricas */}
+                <div className="grid grid-cols-5 gap-2">
+                  <MetricBox
+                    label="Total Pips"
                     value={`${results.totalProfitPips >= 0 ? "+" : ""}${results.totalProfitPips?.toFixed(1)}`}
                     positive={results.totalProfitPips >= 0}
                   />
                   <MetricBox
-                    label="WinRate"
-                    value={`${results.winRate?.toFixed(0)}%`}
-                    positive={results.winRate >= 50}
-                    subtitle={results.totalTrades ? `${Math.round(results.totalTrades * results.winRate / 100)}W` : undefined}
-                  />
-                  <MetricBox
                     label="Trades"
                     value={results.totalTrades?.toString()}
-                  />
-                  <MetricBox
-                    label="DD Max"
-                    value={`${results.maxDrawdownPercent?.toFixed(1)}%`}
-                    positive={results.maxDrawdownPercent < 20}
-                    warning={results.maxDrawdownPercent >= 20}
+                    subtitle={results.avgWin ? `Avg: €${results.avgWin.toFixed(0)}` : undefined}
                   />
                   <MetricBox
                     label="Sharpe"
                     value={results.sharpeRatio?.toFixed(2) || "-"}
                     positive={(results.sharpeRatio ?? 0) >= 1}
+                  />
+                  <MetricBox
+                    label="Expectancy"
+                    value={`€${results.expectancy?.toFixed(2) || "0.00"}`}
+                    positive={(results.expectancy ?? 0) >= 0}
+                  />
+                  <MetricBox
+                    label="Calmar"
+                    value={results.calmarRatio?.toFixed(2) || "-"}
+                    positive={(results.calmarRatio ?? 0) >= 3}
                   />
                 </div>
 
@@ -550,13 +600,18 @@ export default function BacktesterPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        Trades Detalle
+                        Historial de Trades
                       </h4>
-                      <span className="text-[10px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded">
-                        Click para ver gráfico
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded">
+                          Click para ver gráfico
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground">
+                          {results.tradeDetails.filter((t: any) => t.totalProfit >= 0).length}W / {results.tradeDetails.filter((t: any) => t.totalProfit < 0).length}L
+                        </span>
+                      </div>
                     </div>
-                    <div className="max-h-52 overflow-y-auto border rounded-lg overflow-hidden">
+                    <div className="max-h-64 overflow-y-auto border rounded-lg overflow-hidden">
                       <table className="w-full text-xs">
                         <thead className="sticky top-0 bg-gradient-to-r from-muted to-muted/80 z-10">
                           <tr>
@@ -565,6 +620,7 @@ export default function BacktesterPage() {
                             <th className="text-left p-2 font-medium">Side</th>
                             <th className="text-right p-2 font-medium">Entry</th>
                             <th className="text-right p-2 font-medium">Exit</th>
+                            <th className="text-center p-2 font-medium">Lvls</th>
                             <th className="text-right p-2 font-medium">Pips</th>
                             <th className="text-right p-2 font-medium">Profit</th>
                             <th className="text-center p-2 font-medium">Close</th>
@@ -584,7 +640,12 @@ export default function BacktesterPage() {
                               }`}
                             >
                               <td className="p-2 font-mono text-muted-foreground">{i + 1}</td>
-                              <td className="p-2">{new Date(trade.signalTimestamp).toLocaleDateString()}</td>
+                              <td className="p-2">
+                                <div className="flex flex-col">
+                                  <span className="font-mono">{new Date(trade.signalTimestamp).toLocaleDateString()}</span>
+                                  <span className="text-[10px] text-muted-foreground">{new Date(trade.signalTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                              </td>
                               <td className="p-2">
                                 <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                   trade.signalSide === "BUY"
@@ -596,6 +657,15 @@ export default function BacktesterPage() {
                               </td>
                               <td className="p-2 text-right font-mono">{trade.entryPrice?.toFixed(2)}</td>
                               <td className="p-2 text-right font-mono">{trade.exitPrice?.toFixed(2)}</td>
+                              <td className="p-2 text-center">
+                                <span className={`inline-flex items-center justify-center w-6 h-5 rounded text-[10px] font-mono ${
+                                  trade.maxLevels > 1
+                                    ? "bg-amber-500/20 text-amber-600"
+                                    : "bg-muted text-muted-foreground"
+                                }`}>
+                                  {trade.maxLevels || 1}
+                                </span>
+                              </td>
                               <td className={`p-2 text-right font-mono font-medium ${
                                 trade.totalProfitPips >= 0 ? "text-green-600" : "text-red-600"
                               }`}>
@@ -614,7 +684,7 @@ export default function BacktesterPage() {
                                       ? "bg-amber-500/20 text-amber-700 dark:text-amber-400"
                                       : "bg-red-500/20 text-red-700 dark:text-red-400"
                                 }`}>
-                                  {trade.exitReason === "TAKE_PROFIT" ? "🎯 TP" : trade.exitReason === "TRAILING_SL" ? "📍 Trail" : "⛔ SL"}
+                                  {trade.exitReason === "TAKE_PROFIT" ? "TP" : trade.exitReason === "TRAILING_SL" ? "Trail" : "SL"}
                                 </span>
                               </td>
                             </tr>
@@ -677,6 +747,36 @@ export default function BacktesterPage() {
                       config={{ takeProfitPips: config.takeProfitPips, pipsDistance: config.pipsDistance, maxLevels: config.maxLevels }}
                       themeId={chartTheme}
                     />
+                  </div>
+                )}
+
+                {/* Estadisticas adicionales de trades */}
+                {results.tradeDetails && results.tradeDetails.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2 p-2 bg-muted/20 rounded-lg border border-border/30">
+                    <div className="text-center">
+                      <div className="text-[10px] text-muted-foreground uppercase">Mejor Trade</div>
+                      <div className="text-sm font-bold text-green-500 font-mono">
+                        +{Math.max(...results.tradeDetails.map((t: any) => t.totalProfit || 0)).toFixed(2)}€
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[10px] text-muted-foreground uppercase">Peor Trade</div>
+                      <div className="text-sm font-bold text-red-500 font-mono">
+                        {Math.min(...results.tradeDetails.map((t: any) => t.totalProfit || 0)).toFixed(2)}€
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[10px] text-muted-foreground uppercase">Racha Max W</div>
+                      <div className="text-sm font-bold text-green-500 font-mono">
+                        {results.maxConsecutiveWins || 0}
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[10px] text-muted-foreground uppercase">Racha Max L</div>
+                      <div className="text-sm font-bold text-red-500 font-mono">
+                        {results.maxConsecutiveLosses || 0}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -934,26 +1034,26 @@ function MetricBox({
   subtitle?: string;
 }) {
   return (
-    <div className={`p-3 rounded-lg text-center transition-all hover:scale-[1.02] ${
+    <div className={`p-2.5 rounded-lg text-center transition-all hover:scale-[1.02] cursor-default ${
       highlight
         ? positive
           ? "bg-gradient-to-br from-green-500/20 to-green-500/5 border border-green-500/30"
           : "bg-gradient-to-br from-red-500/20 to-red-500/5 border border-red-500/30"
         : warning
           ? "bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/20"
-          : "bg-muted/30 hover:bg-muted/50"
+          : "bg-muted/30 hover:bg-muted/50 border border-transparent"
     }`}>
-      <div className="flex items-center justify-center gap-1 mb-1">
+      <div className="flex items-center justify-center gap-1 mb-0.5">
         {icon && <span className="text-xs">{icon}</span>}
         <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</span>
       </div>
-      <div className={`text-sm font-bold metric-value ${
+      <div className={`text-base font-bold metric-value ${
         positive === true ? "text-green-500" : positive === false ? "text-red-500" : ""
       }`}>
         {value}
       </div>
       {subtitle && (
-        <div className="text-[9px] text-muted-foreground mt-0.5">{subtitle}</div>
+        <div className="text-[9px] text-muted-foreground mt-0.5 font-mono">{subtitle}</div>
       )}
     </div>
   );
