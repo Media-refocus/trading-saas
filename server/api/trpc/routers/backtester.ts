@@ -354,11 +354,68 @@ export const backtesterRouter = router({
             totalTicksProcessed,
             firstSignal: firstSignalDebug,
           },
+          // Config usada (para poder guardar como estrategia)
+          config: input.config,
         };
       } catch (error) {
         console.error(`[Backtester] Error:`, error);
         throw error;
       }
+    }),
+
+  /**
+   * Guarda el resultado de un backtest como estrategia
+   */
+  saveAsStrategy: procedure
+    .input(z.object({
+      name: z.string().min(1).max(100),
+      description: z.string().max(500).optional(),
+      config: BacktestConfigSchema,
+      results: z.object({
+        totalTrades: z.number(),
+        totalProfit: z.number(),
+        winRate: z.number(),
+        maxDrawdown: z.number(),
+      }),
+    }))
+    .mutation(async ({ input }) => {
+      const { prisma } = await import("@/lib/prisma");
+
+      let tenant = await prisma.tenant.findFirst();
+      if (!tenant) {
+        tenant = await prisma.tenant.create({
+          data: {
+            name: "Default Tenant",
+            email: "default@example.com",
+          },
+        });
+      }
+
+      const strategy = await prisma.strategy.create({
+        data: {
+          tenantId: tenant.id,
+          name: input.name,
+          description: input.description,
+          strategyName: input.config.strategyName,
+          lotajeBase: input.config.lotajeBase,
+          numOrders: input.config.numOrders,
+          pipsDistance: input.config.pipsDistance,
+          maxLevels: input.config.maxLevels,
+          takeProfitPips: input.config.takeProfitPips,
+          stopLossPips: input.config.stopLossPips,
+          useStopLoss: input.config.useStopLoss,
+          useTrailingSL: input.config.useTrailingSL,
+          trailingSLPercent: input.config.trailingSLPercent,
+          restrictionType: input.config.restrictionType,
+          lastTotalTrades: input.results.totalTrades,
+          lastTotalProfit: input.results.totalProfit,
+          lastWinRate: input.results.winRate,
+          lastMaxDrawdown: input.results.maxDrawdown,
+          lastTestedAt: new Date(),
+        },
+      });
+
+      return strategy;
     }),
 
   /**
