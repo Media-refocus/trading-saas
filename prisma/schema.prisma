@@ -10,6 +10,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// PLANES DE PRECIOS
+// ============================================
+model Plan {
+  id              String   @id @default(cuid())
+  name            String              // "Basic", "Pro", "Enterprise"
+  price           Float               // 49, 99, 249
+  currency        String              @default("USD")
+
+  // Límites del plan
+  maxPositions    Int                 @default(1)    // Operaciones simultáneas
+  maxBrokers      Int                 @default(1)    // Brokers permitidos
+  maxLevels       Int                 @default(3)    // Niveles de promedio
+
+  // Features
+  hasTrailingSL   Boolean  @default(true)
+  hasAdvancedGrid Boolean  @default(false)
+  hasPriority     Boolean  @default(false)  // Soporte prioritario
+
+  stripePriceId   String?  @unique
+
+  tenants         Tenant[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 // Multi-tenancy: Cada cliente tiene su tenant
 model Tenant {
   id              String         @id @default(cuid())
@@ -19,13 +45,20 @@ model Tenant {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
+  // Plan asignado
+  planId          String?
+  plan            Plan?          @relation(fields: [planId], references: [id])
+
   users           User[]
   tradingAccounts TradingAccount[]
   signals         Signal[]
   positions       Position[]
   subscriptions   Subscription[]
   backtests       Backtest[]
-  simulatedTrades  SimulatedTrade[]
+  simulatedTrades SimulatedTrade[]
+  botConfigs      BotConfig[]
+  botHeartbeats   BotHeartbeat[]
+  signalDeliveries SignalDelivery[]
 }
 
 model User {
@@ -263,4 +296,129 @@ model TickData {
   // Índice compuesto para consultas rápidas por rango de fechas
   @@index([symbol, timestamp])
   @@index([timestamp])
+}
+
+// ============================================
+// BOT SYSTEM - Configuración y Telemetry
+// ============================================
+
+/// Configuración del bot por tenant (generada al suscribirse)
+model BotConfig {
+  id              String   @id @default(cuid())
+  tenantId        String   @unique
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // API Key para autenticación del bot
+  apiKey          String   @unique    // Hash del API key
+  apiKeyPlain     String?             // Solo visible al generar (no se guarda en producción)
+
+  // Configuración de trading (sobreescrita por plan)
+  lotSize         Float    @default(0.01)
+  maxLevels       Int      @default(3)
+  gridDistance    Float    @default(10.0)    // Pips entre niveles
+  takeProfit      Float    @default(20.0)    // Pips de TP
+
+  // Trailing SL
+  trailingActivate Float?  // Pips para activar trailing
+  trailingStep     Float?  // Pips de paso del trailing
+  trailingBack     Float?  // Pips de "back" del trailing
+
+  // Restricciones por defecto
+  defaultRestriction String?  // "RIESGO", "SIN_PROMEDIOS", null
+
+  // Estado
+  isActive        Boolean  @default(true)
+  lastHeartbeat   DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+/// Heartbeat/Telemetry del bot
+model BotHeartbeat {
+  id              String   @id @default(cuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Estado del bot
+  status          String              // "RUNNING", "STOPPED", "ERROR", "WAITING_SIGNAL"
+  mt5Connected    Boolean  @default(false)
+  telegramOk      Boolean  @default(true)  // Siempre true si usa SaaS
+
+  // Posiciones actuales
+  openPositions   Int      @default(0)
+  currentLevel    Int      @default(0)
+  currentSide     String?             // "BUY", "SELL", null
+
+  // Métricas
+  totalTrades     Int      @default(0)
+  totalProfit     Float    @default(0)
+
+  // Info del sistema
+  version         String?
+  platform        String?             // "Windows", "Linux"
+  error           String?
+
+  receivedAt      DateTime @default(now())
+
+  @@index([tenantId, receivedAt])
+}
+
+// ============================================
+// SEÑALES GLOBALES - Distribuidas a todos los tenants
+// ============================================
+
+/// Señal recibida de Telegram (global, no por tenant)
+model GlobalSignal {
+  id              String   @id @default(cuid())
+
+  // Tipo de señal
+  type            String              // "ENTRY", "CLOSE_RANGE", "SL_MODIFY", "TP_MODIFY"
+
+  // Datos de la señal
+  side            String?             // "BUY", "SELL" (null para CLOSE_RANGE)
+  price           Float?
+  symbol          String              @default("XAUUSD")
+
+  // Restricciones del canal
+  restriction     String?             // "RIESGO", "SIN_PROMEDIOS", "SOLO_1_PROMEDIO", null
+
+  // Mensaje original
+  messageText     String
+  telegramMsgId   Int?                // ID del mensaje en Telegram
+
+  // Estado de distribución
+  distributedAt   DateTime?           // Cuándo se distribuyó a los bots
+
+  receivedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  // Señales entregadas a cada tenant
+  deliveries      SignalDelivery[]
+
+  @@index([receivedAt])
+  @@index([type, distributedAt])
+}
+
+/// Entrega de señal a un tenant específico
+model SignalDelivery {
+  id              String   @id @default(cuid())
+
+  globalSignalId  String
+  globalSignal    GlobalSignal @relation(fields: [globalSignalId], references: [id], onDelete: Cascade)
+
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Estado de la entrega
+  status          String   @default("PENDING")  // "PENDING", "DELIVERED", "EXECUTED", "FAILED"
+  deliveredAt     DateTime?
+  executedAt      DateTime?
+  error           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([globalSignalId, tenantId])
+  @@index([tenantId, status])
 }
