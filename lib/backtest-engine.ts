@@ -307,6 +307,11 @@ export class BacktestEngine {
     this.currentTick++;
     const newTrades: any[] = [];
 
+    // Debug: Log del primer tick de cada señal
+    if (this.currentTick === 1) {
+      console.log(`[Engine] Primera tick - side: ${this.side}, entryPrice: ${this.entryPrice}, positions: ${this.positions.size}, entryOpen: ${this.entryOpen}`);
+    }
+
     const isBuy = this.side === "BUY";
     const closePrice = isBuy ? tick.bid : tick.ask;
     const spread = tick.spread;
@@ -319,6 +324,24 @@ export class BacktestEngine {
     if (entrySLHit) {
       newTrades.push(...this.closeAllPositions(closePrice, "STOP_LOSS", tick.timestamp));
       return newTrades;
+    }
+
+    // 2b. Verificar Stop Loss fijo de emergencia (si está configurado)
+    if (this.config.stopLossPips && this.config.stopLossPips > 0) {
+      const lossPips = isBuy
+        ? (this.entryPrice! - closePrice) / PIP_VALUE
+        : (closePrice - this.entryPrice!) / PIP_VALUE;
+
+      // Debug: log cada 1000 ticks
+      if (this.currentTick % 1000 === 0 && lossPips > 0) {
+        console.log(`[Engine] Tick ${this.currentTick}: lossPips=${lossPips.toFixed(1)}, SL=${this.config.stopLossPips}, entryOpen=${this.entryOpen}`);
+      }
+
+      if (lossPips >= this.config.stopLossPips && this.entryOpen) {
+        console.log(`[Engine] SL HIT! Cerrando trade - lossPips: ${lossPips.toFixed(1)}`);
+        newTrades.push(...this.closeAllPositions(closePrice, "STOP_LOSS", tick.timestamp));
+        return newTrades;
+      }
     }
 
     // 3. Calcular precio promedio actual de todas las operaciones

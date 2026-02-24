@@ -122,8 +122,8 @@ export async function loadTicksByDayGrouped(
   ticksLRUCache.pruneOldEntries(30 * 60 * 1000); // 30 min
 
   // Cargar dias en batches para evitar consultas muy grandes
-  // Cada batch cubre ~5 dias max
-  const BATCH_SIZE_DAYS = 5;
+  // Cada batch cubre ~1 dia (reducido para evitar OOM con 116M ticks)
+  const BATCH_SIZE_DAYS = 1;
   const sortedDays = daysToLoad.sort();
 
   let totalTicksLoaded = 0;

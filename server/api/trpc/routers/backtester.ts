@@ -173,6 +173,11 @@ export const backtesterRouter = router({
         // Cargar senales
         const signalsPath = path.join(process.cwd(), signalsSource);
         let signals = await loadSignalsFromFile(signalsPath);
+        console.log(`[Backtester] Cargadas ${signals.length} senales desde ${signalsSource}`);
+        if (signals.length > 0) {
+          console.log(`[Backtester] Primera senal: ${signals[0].timestamp.toISOString()}, side: ${signals[0].side}`);
+          console.log(`[Backtester] Ultima senal: ${signals[signals.length-1].timestamp.toISOString()}, side: ${signals[signals.length-1].side}`);
+        }
 
         // Aplicar filtros
         if (input.config.filters) {
@@ -207,18 +212,38 @@ export const backtesterRouter = router({
           // Enriquecer senales con precios reales usando el cache
           const enrichedSignals: TradingSignal[] = [];
 
+          // Precios de referencia XAUUSD por mes (cuando no hay tick real)
+          const XAUUSD_REFERENCE_PRICES: Record<string, number> = {
+            "2024-05": 2350, "2024-06": 2330, "2024-07": 2400, "2024-08": 2470,
+            "2024-09": 2560, "2024-10": 2650, "2024-11": 2620, "2024-12": 2630,
+            "2025-01": 2720, "2025-02": 2850, "2025-03": 2950, "2025-04": 3200,
+            "2025-05": 3300, "2025-06": 3350, "2025-07": 3400, "2025-08": 3450,
+            "2025-09": 3500, "2025-10": 3550, "2025-11": 3600, "2025-12": 3650,
+            "2026-01": 2700, "2026-02": 2750,
+          };
+
           for (const signal of signals) {
             // Obtener precio de entrada desde cache (sin consulta adicional)
             const marketPrice = getMarketPriceFromCache(ticksByDay, signal.timestamp);
 
             if (marketPrice) {
+              // 1. Precio real del tick
               const entryPrice = (marketPrice.bid + marketPrice.ask) / 2;
               enrichedSignals.push({
                 ...signal,
                 entryPrice,
               });
             } else if (signal.entryPrice > 0) {
+              // 2. Usar priceHint del CSV
               enrichedSignals.push(signal);
+            } else {
+              // 3. Usar precio de referencia por fecha
+              const monthKey = signal.timestamp.toISOString().slice(0, 7); // "2024-08"
+              const refPrice = XAUUSD_REFERENCE_PRICES[monthKey] || 2500; // fallback
+              enrichedSignals.push({
+                ...signal,
+                entryPrice: refPrice,
+              });
             }
           }
 
@@ -231,6 +256,11 @@ export const backtesterRouter = router({
 
         // Crear motor
         const engine = new BacktestEngine(input.config as BacktestConfig);
+
+        // Debug info
+        let totalTicksProcessed = 0;
+        let signalsProcessed = 0;
+        let firstSignalDebug: any = null;
 
         // Procesar cada senal
         for (let i = 0; i < signals.length; i++) {
@@ -264,10 +294,26 @@ export const backtesterRouter = router({
             ticks = generateSyntheticTicksForSignal(signal, input.config);
           }
 
+          signalsProcessed++;
+          totalTicksProcessed += ticks.length;
+
+          // Debug: capturar estado de la primera señal
+          if (i === 0) {
+            firstSignalDebug = {
+              side: signal.side,
+              entryPrice: signal.entryPrice,
+              timestamp: signal.timestamp,
+              ticksCount: ticks.length,
+              firstTick: ticks[0] ? { bid: ticks[0].bid, ask: ticks[0].ask } : null,
+            };
+          }
+
           for (const tick of ticks) {
             engine.processTick(tick);
           }
         }
+
+        console.log(`[Backtester] Procesadas ${signalsProcessed} senales, ${totalTicksProcessed} ticks`);
 
         const results = engine.getResults();
 
@@ -293,6 +339,13 @@ export const backtesterRouter = router({
           },
           fromCache: false,
           elapsedMs,
+          // Debug info
+          debug: {
+            signalsLoaded: signals.length,
+            signalsProcessed,
+            totalTicksProcessed,
+            firstSignal: firstSignalDebug,
+          },
         };
       } catch (error) {
         console.error(`[Backtester] Error:`, error);

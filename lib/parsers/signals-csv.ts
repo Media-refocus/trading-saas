@@ -126,6 +126,10 @@ export async function loadSignalsFromFile(
  * Genera ticks sintéticos para simular movimiento de precio realista
  * (Se usa cuando no hay datos reales de ticks)
  *
+ * NOTA: Los ticks son NEUTRALES - no favorecen ninguna dirección.
+ * El movimiento es un random walk con drift aleatorio, simulando
+ * condiciones reales de mercado donde el resultado es incierto.
+ *
  * Características del XAUUSD real (basado en ticks de MT5):
  * - Spread típico: 15-22 pips (0.15-0.22 en precio)
  * - Movimiento por tick: 0.1-0.3 pips normalmente, con saltos de 1-2 pips
@@ -133,7 +137,7 @@ export async function loadSignalsFromFile(
  */
 export function generateSyntheticTicks(
   entryPrice: number,
-  exitPrice: number,
+  _exitPrice: number, // Ignorado - el resultado es incierto
   durationMs: number,
   volatilityPips: number = 100,
   startTimestamp?: Date
@@ -154,53 +158,52 @@ export function generateSyntheticTicks(
   // Timestamp de inicio
   const startTs = startTimestamp ? startTimestamp.getTime() : Date.now() - durationMs;
 
-  // Diferencia de precio objetivo
-  const priceDiff = exitPrice - entryPrice;
-
   // Volatilidad en precio (100 pips = 10.0 en precio)
   const volatility = volatilityPips * PIP_VALUE;
-
-  // Random walk acumulativo para movimiento natural
-  let currentPrice = entryPrice;
-  let accumulatedNoise = 0;
 
   // Parámetros de movimiento realista
   const tickNoise = volatility / 50; // ~0.2 pips por tick (realista)
   const jumpChance = 0.02; // 2% de probabilidad de salto brusco
   const jumpSize = volatility / 5; // Saltos de ~20 pips
 
+  // Drift aleatorio: simula la tendencia del mercado (independiente de la señal)
+  // Puede ser a favor o en contra con igual probabilidad
+  const driftDirection = Math.random() > 0.5 ? 1 : -1;
+  const driftStrength = (Math.random() * 0.3 + 0.1) * volatility; // 10-40% de volatilidad
+
+  // Random walk acumulativo para movimiento natural
+  let currentPrice = entryPrice;
+
   for (let i = 0; i <= numTicks; i++) {
     const progress = i / numTicks;
 
-    // Tendencia base hacia el precio objetivo
-    const trendPrice = entryPrice + priceDiff * progress;
+    // Paso base del random walk
+    const randomStep = (Math.random() - 0.5) * 2 * tickNoise;
 
-    // Random walk: acumular ruido gradualmente
-    const noiseStep = (Math.random() - 0.5) * 2 * tickNoise;
-    accumulatedNoise += noiseStep;
+    // Drift suave (tendencia del mercado, no de la señal)
+    const drift = driftDirection * driftStrength * (1 / numTicks);
 
     // Salto brusco ocasional (noticias, liquidez)
+    let jump = 0;
     if (Math.random() < jumpChance) {
-      const jump = (Math.random() - 0.5) * 2 * jumpSize;
-      accumulatedNoise += jump;
+      jump = (Math.random() - 0.5) * 2 * jumpSize;
     }
 
-    // Mean reversion suave: el ruido no debe alejarse demasiado
-    accumulatedNoise *= 0.995;
+    // Actualizar precio acumulando todos los efectos
+    currentPrice += randomStep + drift + jump;
 
-    // Combinar tendencia + ruido acumulado
-    // Aumentar peso del ruido hacia la mitad, reducir hacia los extremos
-    const noiseWeight = Math.sin(progress * Math.PI);
-    let finalPrice = trendPrice + accumulatedNoise * (0.5 + noiseWeight * 0.5);
+    // Mean reversion suave: evitar que se aleje demasiado del precio inicial
+    const deviation = currentPrice - entryPrice;
+    currentPrice -= deviation * 0.001; // Muy suave
 
     // Spread variable (15-22 pips, más ancho en movimientos bruscos)
     const spreadVariation = (Math.random() - 0.5) * 0.04;
-    const spread = baseSpread + spreadVariation + (Math.abs(noiseStep) > tickNoise ? 0.03 : 0);
+    const spread = baseSpread + spreadVariation + (Math.abs(jump) > tickNoise ? 0.03 : 0);
 
     ticks.push({
       timestamp: new Date(startTs + (durationMs * i) / numTicks),
-      bid: finalPrice,
-      ask: finalPrice + spread,
+      bid: currentPrice,
+      ask: currentPrice + spread,
       spread,
     });
   }

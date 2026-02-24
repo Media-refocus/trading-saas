@@ -196,5 +196,5 @@ export class TicksLRUCache {
   }
 }
 
-// Instancia global con limite de 100MB
-export const ticksLRUCache = new TicksLRUCache(100);
+// Instancia global con limite de 500MB para backtests completos
+export const ticksLRUCache = new TicksLRUCache(500);
