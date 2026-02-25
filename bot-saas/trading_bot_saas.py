@@ -89,8 +89,30 @@ class BotConfig:
 
 
 # ───────────────────────── SaaS Client ─────────────────────────────
+class AuthenticationError(Exception):
+    """Error de autenticación que requiere detener el bot"""
+    def __init__(self, message: str, code: str, should_stop: bool = False):
+        super().__init__(message)
+        self.code = code
+        self.should_stop = should_stop
+
+
 class SaaSClient:
     """Cliente para comunicarse con el SaaS"""
+
+    # Códigos de error que requieren detener el bot
+    CRITICAL_ERRORS = {
+        "KEY_REVOKED",
+        "SUBSCRIPTION_REQUIRED",
+        "SUBSCRIPTION_EXPIRED",
+        "GRACE_PERIOD_EXPIRED",
+    }
+
+    # Códigos de error temporales
+    TEMPORARY_ERRORS = {
+        "RATE_LIMIT_EXCEEDED",
+        "INVALID_API_KEY",  # Podría ser temporal si se está rotando
+    }
 
     def __init__(self, config: BotConfig):
         self.config = config
@@ -102,10 +124,53 @@ class SaaSClient:
         self.base_url = config.saas_url.rstrip("/")
         self.last_auth = None
         self.is_authenticated = False
+        self.last_error_code: Optional[str] = None
+        self.consecutive_errors = 0
+        self.backoff_until: Optional[float] = None
+
+    def _handle_error_response(self, resp) -> Optional[AuthenticationError]:
+        """Maneja respuestas de error del SaaS"""
+        try:
+            data = resp.json()
+            error_code = data.get("code", "UNKNOWN")
+            error_msg = data.get("error", "Error desconocido")
+            self.last_error_code = error_code
+
+            # Error crítico - detener bot
+            if error_code in self.CRITICAL_ERRORS:
+                log.error(f"🚨 ERROR CRÍTICO [{error_code}]: {error_msg}")
+                return AuthenticationError(error_msg, error_code, should_stop=True)
+
+            # Rate limit - backoff
+            if error_code == "RATE_LIMIT_EXCEEDED" or resp.status_code == 429:
+                log.warning(f"⏳ Rate limit excedido. Esperando...")
+                self.backoff_until = time.time() + 60  # Backoff 1 minuto
+                return None
+
+            # Error temporal - continuar con último config conocido
+            if error_code in self.TEMPORARY_ERRORS:
+                log.warning(f"⚠️ Error temporal [{error_code}]: {error_msg}")
+                return None
+
+            # Otros errores de autenticación
+            if resp.status_code in (401, 403):
+                log.error(f"❌ Error de autenticación [{error_code}]: {error_msg}")
+                return AuthenticationError(error_msg, error_code, should_stop=False)
+
+            return None
+
+        except Exception as e:
+            log.error(f"Error parseando respuesta de error: {e}")
+            return None
 
     def authenticate(self) -> tuple[bool, Optional[dict]]:
         """Autentica con el SaaS y obtiene configuración"""
         try:
+            # Verificar si estamos en backoff
+            if self.backoff_until and time.time() < self.backoff_until:
+                log.debug("En backoff, saltando autenticación")
+                return False, None
+
             resp = self.session.post(
                 f"{self.base_url}/api/bot/auth",
                 json={"apiKey": self.config.api_key},
@@ -117,22 +182,34 @@ class SaaSClient:
                 if data.get("success"):
                     self.is_authenticated = True
                     self.last_auth = datetime.now()
+                    self.consecutive_errors = 0
+                    self.last_error_code = None
                     log.info(f"✅ Autenticado con SaaS. Tenant: {data.get('tenantId', 'unknown')}")
                     return True, data.get("config", {})
                 else:
                     log.error(f"❌ Error de autenticación: {data.get('error')}")
                     return False, None
             else:
-                log.error(f"❌ Error HTTP {resp.status_code}")
+                # Manejar errores HTTP
+                auth_error = self._handle_error_response(resp)
+                if auth_error and auth_error.should_stop:
+                    raise auth_error
                 return False, None
 
+        except AuthenticationError:
+            raise
         except Exception as e:
             log.error(f"❌ Error conectando al SaaS: {e}")
+            self.consecutive_errors += 1
             return False, None
 
     def get_signals(self, since: Optional[str] = None) -> list[dict]:
         """Obtiene señales pendientes del SaaS"""
         try:
+            # Verificar backoff
+            if self.backoff_until and time.time() < self.backoff_until:
+                return []
+
             url = f"{self.base_url}/api/bot/signals"
             if since:
                 url += f"?since={since}"
@@ -146,8 +223,15 @@ class SaaSClient:
                     if signals:
                         log.info(f"📩 Recibidas {len(signals)} señales pendientes")
                     return signals
+            elif resp.status_code in (401, 403, 429):
+                auth_error = self._handle_error_response(resp)
+                if auth_error and auth_error.should_stop:
+                    raise auth_error
+
             return []
 
+        except AuthenticationError:
+            raise
         except Exception as e:
             log.error(f"Error obteniendo señales: {e}")
             return []
@@ -155,12 +239,23 @@ class SaaSClient:
     def mark_signal(self, delivery_id: str, status: str, error: Optional[str] = None) -> bool:
         """Marca una señal como ejecutada o fallida"""
         try:
+            if self.backoff_until and time.time() < self.backoff_until:
+                return False
+
             resp = self.session.post(
                 f"{self.base_url}/api/bot/signals",
                 json={"deliveryId": delivery_id, "status": status, "error": error},
                 timeout=10
             )
+
+            if resp.status_code in (401, 403, 429):
+                auth_error = self._handle_error_response(resp)
+                if auth_error and auth_error.should_stop:
+                    raise auth_error
+
             return resp.status_code == 200
+        except AuthenticationError:
+            raise
         except Exception as e:
             log.error(f"Error marcando señal: {e}")
             return False
@@ -168,6 +263,9 @@ class SaaSClient:
     def send_heartbeat(self, data: dict) -> Optional[dict]:
         """Envía heartbeat al SaaS"""
         try:
+            if self.backoff_until and time.time() < self.backoff_until:
+                return None
+
             resp = self.session.post(
                 f"{self.base_url}/api/bot/heartbeat",
                 json=data,
@@ -177,9 +275,21 @@ class SaaSClient:
             if resp.status_code == 200:
                 result = resp.json()
                 if result.get("success"):
+                    self.consecutive_errors = 0
+                    # Verificar si hay comando pendiente
+                    command = result.get("command")
+                    if command:
+                        log.info(f"📋 Comando recibido del SaaS: {command}")
                     return result
+            elif resp.status_code in (401, 403, 429):
+                auth_error = self._handle_error_response(resp)
+                if auth_error and auth_error.should_stop:
+                    raise auth_error
+
             return None
 
+        except AuthenticationError:
+            raise
         except Exception as e:
             log.error(f"Error enviando heartbeat: {e}")
             return None
@@ -187,6 +297,9 @@ class SaaSClient:
     def get_config(self) -> Optional[dict]:
         """Obtiene la configuración actualizada del SaaS"""
         try:
+            if self.backoff_until and time.time() < self.backoff_until:
+                return None
+
             resp = self.session.get(
                 f"{self.base_url}/api/bot/config",
                 timeout=10
@@ -196,8 +309,15 @@ class SaaSClient:
                 data = resp.json()
                 if data.get("success"):
                     return data.get("config")
+            elif resp.status_code in (401, 403, 429):
+                auth_error = self._handle_error_response(resp)
+                if auth_error and auth_error.should_stop:
+                    raise auth_error
+
             return None
 
+        except AuthenticationError:
+            raise
         except Exception as e:
             log.error(f"Error obteniendo config: {e}")
             return None
@@ -613,21 +733,33 @@ async def main_loop(config: BotConfig):
     """Loop principal del bot"""
     bot: Optional[AccountBot] = None
     saas: Optional[SaaSClient] = None
+    should_stop = False
 
     if config.is_saas_mode and config.api_key:
         saas = SaaSClient(config)
-        success, remote_config = saas.authenticate()
-        if success and remote_config:
-            # Actualizar config con valores del SaaS
-            config.lot_size = remote_config.get("lotSize", config.lot_size)
-            config.max_levels = remote_config.get("maxLevels", config.max_levels)
-            config.grid_distance = remote_config.get("gridDistance", config.grid_distance)
-            config.take_profit = remote_config.get("takeProfit", config.take_profit)
-            config.trailing_activate = remote_config.get("trailingActivate")
-            config.trailing_step = remote_config.get("trailingStep")
-            config.trailing_back = remote_config.get("trailingBack")
-            config.has_trailing_sl = remote_config.get("hasTrailingSL", True)
-            log.info(f"📋 Configuración cargada desde SaaS: lot={config.lot_size}, levels={config.max_levels}")
+        try:
+            success, remote_config = saas.authenticate()
+            if success and remote_config:
+                # Actualizar config con valores del SaaS
+                config.lot_size = remote_config.get("lotSize", config.lot_size)
+                config.max_levels = remote_config.get("maxLevels", config.max_levels)
+                config.grid_distance = remote_config.get("gridDistance", config.grid_distance)
+                config.take_profit = remote_config.get("takeProfit", config.take_profit)
+                config.trailing_activate = remote_config.get("trailingActivate")
+                config.trailing_step = remote_config.get("trailingStep")
+                config.trailing_back = remote_config.get("trailingBack")
+                config.has_trailing_sl = remote_config.get("hasTrailingSL", True)
+                log.info(f"📋 Configuración cargada desde SaaS: lot={config.lot_size}, levels={config.max_levels}")
+            elif not success:
+                log.warning("⚠️ No se pudo autenticar con SaaS. Usando configuración local.")
+        except AuthenticationError as e:
+            if e.should_stop:
+                log.error(f"🛑 DETENIENDO BOT: {e}")
+                log.error("️  Razón: La API key está revocada o la suscripción ha expirado.")
+                log.error("  Contacta a soporte o renueva tu suscripción.")
+                return
+            else:
+                log.warning(f"⚠️ Error de autenticación temporal: {e}")
     else:
         log.info("📋 Usando configuración local (modo legacy)")
 
@@ -643,36 +775,62 @@ async def main_loop(config: BotConfig):
 
     log.info("🤖 Bot iniciado. Esperando señales...")
 
-    while True:
+    while not should_stop:
         try:
             now = time.time()
 
             # Chequear señales
             if saas and (now - last_signal_check) >= SIGNAL_INTERVAL:
-                signals = saas.get_signals()
-                for signal in signals:
-                    try:
-                        bot.handle_signal(signal)
-                    except Exception as e:
-                        log.error(f"Error procesando señal: {e}")
+                try:
+                    signals = saas.get_signals()
+                    for signal in signals:
+                        try:
+                            bot.handle_signal(signal)
+                        except Exception as e:
+                            log.error(f"Error procesando señal: {e}")
+                except AuthenticationError as e:
+                    if e.should_stop:
+                        log.error(f"🛑 DETENIENDO BOT: {e}")
+                        should_stop = True
+                        break
                 last_signal_check = now
 
-            # Gestionar grid
-            bot.manage_grid()
+            # Gestionar grid (siempre, incluso si SaaS no disponible)
+            if not should_stop:
+                bot.manage_grid()
 
             # Enviar heartbeat
-            if saas and (now - last_heartbeat) >= HEARTBEAT_INTERVAL:
-                heartbeat_data = bot.get_heartbeat_data()
-                result = saas.send_heartbeat(heartbeat_data)
-                if result:
-                    log.debug("💚 Heartbeat enviado OK")
+            if saas and (now - last_heartbeat) >= HEARTBEAT_INTERVAL and not should_stop:
+                try:
+                    heartbeat_data = bot.get_heartbeat_data()
+                    result = saas.send_heartbeat(heartbeat_data)
+                    if result:
+                        log.debug("💚 Heartbeat enviado OK")
+                        # Verificar comandos del SaaS
+                        command = result.get("command")
+                        if command == "STOP":
+                            log.info("🛑 Comando STOP recibido del SaaS")
+                            should_stop = True
+                        elif command == "RESTART":
+                            log.info("🔄 Comando RESTART recibido - no implementado")
+                except AuthenticationError as e:
+                    if e.should_stop:
+                        log.error(f"🛑 DETENIENDO BOT: {e}")
+                        should_stop = True
+                        break
                 last_heartbeat = now
 
             # Refrescar configuración desde SaaS
-            if saas and (now - last_config_refresh) >= CONFIG_REFRESH_INTERVAL:
-                remote_config = saas.get_config()
-                if remote_config:
-                    bot.update_config(remote_config)
+            if saas and (now - last_config_refresh) >= CONFIG_REFRESH_INTERVAL and not should_stop:
+                try:
+                    remote_config = saas.get_config()
+                    if remote_config:
+                        bot.update_config(remote_config)
+                except AuthenticationError as e:
+                    if e.should_stop:
+                        log.error(f"🛑 DETENIENDO BOT: {e}")
+                        should_stop = True
+                        break
                 last_config_refresh = now
 
             await asyncio.sleep(0.5)
@@ -680,9 +838,22 @@ async def main_loop(config: BotConfig):
         except KeyboardInterrupt:
             log.info("⏹️ Deteniendo bot...")
             break
+        except AuthenticationError as e:
+            if e.should_stop:
+                log.error(f"🛑 Error crítico de autenticación: {e}")
+                should_stop = True
+            else:
+                log.warning(f"⚠️ Error temporal: {e}")
+                await asyncio.sleep(5)
         except Exception as e:
             log.error(f"Error en loop principal: {e}")
             await asyncio.sleep(5)
+
+    # Cerrar posiciones antes de salir si es necesario
+    if should_stop and bot:
+        log.info("🔒 Cerrando posiciones abiertas antes de detener...")
+        bot.close_all()
+        log.info("👋 Bot detenido correctamente")
 
 
 # ───────────────────────── Config Loading ─────────────────────────
