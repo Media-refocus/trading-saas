@@ -48,3 +48,6 @@ prisma/migrations/*_*/migration.sql
 # OS
 .DS_Store
 Thumbs.db
+
+# Tick data files (too large for GitHub)
+data/ticks/*.csv.gz
