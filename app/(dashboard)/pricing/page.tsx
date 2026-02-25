@@ -62,24 +62,27 @@ export default function PricingPage() {
   async function handleUpgrade(planId: string) {
     setUpgrading(planId);
     try {
-      const res = await fetch("/api/plans", {
+      // Crear sesión de checkout con Stripe
+      const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planId }),
       });
       const data = await res.json();
-      if (data.success) {
-        await fetchPlans();
-        alert(`Plan ${data.plan.name} activado correctamente`);
+
+      if (data.success && data.url) {
+        // Redirigir a Stripe Checkout
+        window.location.href = data.url;
       } else {
-        alert(data.error || "Error al cambiar de plan");
+        alert(data.error || "Error al crear sesión de pago");
+        setUpgrading(null);
       }
     } catch (error) {
       console.error("Error upgrading:", error);
-      alert("Error al cambiar de plan");
-    } finally {
+      alert("Error al procesar el pago");
       setUpgrading(null);
     }
+    // No quitamos upgrading aquí porque vamos a redirigir
   }
 
   function getPlanIcon(name: string) {
