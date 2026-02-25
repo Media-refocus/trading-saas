@@ -203,7 +203,7 @@ export default function SetupPage() {
                 <ol className="text-sm space-y-2 list-decimal list-inside text-muted-foreground">
                   <li>Descarga el script</li>
                   <li>Abre PowerShell como Administrador</li>
-                  <li>Ejecuta: <code className="bg-background px-1 rounded">.\install-trading-bot.ps1 -ApiKey "tu_api_key"</code></li>
+                  <li>Ejecuta: <code className="bg-background px-1 rounded">.\install-trading-bot.ps1 -ApiKey &quot;tu_api_key&quot;</code></li>
                 </ol>
               </div>
               <Button onClick={() => downloadScript("windows")} className="w-full">
