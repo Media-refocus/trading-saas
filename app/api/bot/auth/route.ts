@@ -96,6 +96,9 @@ export async function POST(request: NextRequest) {
         // Restricciones
         defaultRestriction: botConfig?.defaultRestriction,
 
+        // Paper Trading
+        paperTradingMode: botConfig?.paperTradingMode ?? false,
+
         // Features del plan
         hasTrailingSL: validation.hasTrailingSL ?? true,
 

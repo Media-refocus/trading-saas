@@ -57,6 +57,7 @@ export async function GET() {
         trailingStep: botConfig.trailingStep,
         trailingBack: botConfig.trailingBack,
         defaultRestriction: botConfig.defaultRestriction,
+        paperTradingMode: botConfig.paperTradingMode,
         isActive: botConfig.isActive,
       },
       planLimits: {
@@ -97,6 +98,7 @@ export async function PUT(request: Request) {
       trailingStep,
       trailingBack,
       defaultRestriction,
+      paperTradingMode,
     } = body;
 
     const user = await prisma.user.findUnique({
@@ -148,6 +150,9 @@ export async function PUT(request: Request) {
       ? defaultRestriction
       : null;
 
+    // Validar paperTradingMode (booleano)
+    const validatedPaperTradingMode = typeof paperTradingMode === "boolean" ? paperTradingMode : false;
+
     const botConfig = user.tenant.botConfigs[0];
 
     if (!botConfig) {
@@ -169,6 +174,7 @@ export async function PUT(request: Request) {
         trailingStep: validatedTrailingStep,
         trailingBack: validatedTrailingBack,
         defaultRestriction: validatedRestriction,
+        paperTradingMode: validatedPaperTradingMode,
       },
     });
 
@@ -183,6 +189,7 @@ export async function PUT(request: Request) {
         trailingStep: updated.trailingStep,
         trailingBack: updated.trailingBack,
         defaultRestriction: updated.defaultRestriction,
+        paperTradingMode: updated.paperTradingMode,
       },
       message: "Configuracion actualizada. El bot aplicara los cambios automaticamente.",
     });

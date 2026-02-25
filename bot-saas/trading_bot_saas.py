@@ -73,6 +73,9 @@ class BotConfig:
     # Restricciones
     default_restriction: Optional[str] = None  # "RIESGO", "SIN_PROMEDIOS"
 
+    # Paper Trading
+    paper_trading_mode: bool = False
+
     # MT5
     mt5_login: int = 0
     mt5_password: str = ""
@@ -323,6 +326,123 @@ class SaaSClient:
             return None
 
 
+# ───────────────────────── Paper Trading ─────────────────────────────
+@dataclass
+class PaperPosition:
+    """Posición simulada para paper trading"""
+    ticket: int
+    side: str  # "BUY" o "SELL"
+    symbol: str
+    volume: float
+    price_open: float
+    level: int = 0
+    opened_at: datetime = field(default_factory=datetime.now)
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+
+
+class PaperTradingManager:
+    """Gestor de posiciones virtuales para paper trading"""
+
+    def __init__(self, initial_balance: float = 10000.0):
+        self.initial_balance = initial_balance
+        self.balance = initial_balance
+        self.positions: list[PaperPosition] = []
+        self._next_ticket = 100000
+        self._closed_trades: list[dict] = []
+        self.total_trades = 0
+        self.total_profit = 0.0
+
+    def _generate_ticket(self) -> int:
+        self._next_ticket += 1
+        return self._next_ticket
+
+    def open_position(self, side: str, symbol: str, volume: float, price: float, level: int = 0) -> PaperPosition:
+        """Abre una posición virtual"""
+        pos = PaperPosition(
+            ticket=self._generate_ticket(),
+            side=side,
+            symbol=symbol,
+            volume=volume,
+            price_open=price,
+            level=level,
+        )
+        self.positions.append(pos)
+        self.total_trades += 1
+        log.info(f"[PAPER] 📈 Posicion abierta: {side} {volume:.2f} {symbol} @ {price:.5f} (ticket #{pos.ticket})")
+        return pos
+
+    def close_position(self, ticket: int, close_price: float) -> Optional[dict]:
+        """Cierra una posición virtual y calcula P&L"""
+        for i, pos in enumerate(self.positions):
+            if pos.ticket == ticket:
+                # Calcular profit (para XAUUSD, 1 lote = 100 oz)
+                if pos.side == "BUY":
+                    profit = (close_price - pos.price_open) * pos.volume * 100
+                else:
+                    profit = (pos.price_open - close_price) * pos.volume * 100
+
+                self.balance += profit
+                self.total_profit += profit
+
+                closed = {
+                    "ticket": pos.ticket,
+                    "side": pos.side,
+                    "volume": pos.volume,
+                    "open_price": pos.price_open,
+                    "close_price": close_price,
+                    "profit": profit,
+                    "level": pos.level,
+                    "closed_at": datetime.now(),
+                }
+                self._closed_trades.append(closed)
+                self.positions.pop(i)
+                log.info(f"[PAPER] 💰 Posicion cerrada: {pos.side} #{pos.ticket} @ {close_price:.5f} | P&L: ${profit:+.2f}")
+                return closed
+        return None
+
+    def close_all_positions(self, current_price: float) -> list[dict]:
+        """Cierra todas las posiciones virtuales"""
+        closed = []
+        for pos in self.positions[:]:  # Copia para iterar
+            result = self.close_position(pos.ticket, current_price)
+            if result:
+                closed.append(result)
+        return closed
+
+    def get_positions_by_level(self, entry_price: float, grid_distance: float) -> dict[int, list[PaperPosition]]:
+        """Agrupa posiciones por nivel de grid"""
+        levels: dict[int, list[PaperPosition]] = {}
+        half_grid = grid_distance / 2
+        for pos in self.positions:
+            diff = abs(pos.price_open - entry_price)
+            level = int((diff + half_grid) // grid_distance)
+            levels.setdefault(level, []).append(pos)
+        return levels
+
+    def get_total_profit_at_price(self, current_price: float) -> float:
+        """Calcula el P&L flotante actual"""
+        total = 0.0
+        for pos in self.positions:
+            if pos.side == "BUY":
+                total += (current_price - pos.price_open) * pos.volume * 100
+            else:
+                total += (pos.price_open - current_price) * pos.volume * 100
+        return total
+
+    def get_stats(self) -> dict:
+        """Estadísticas del paper trading"""
+        return {
+            "initial_balance": self.initial_balance,
+            "current_balance": self.balance,
+            "unrealized_pnl": 0.0,  # Se calcula dinámicamente
+            "total_trades": self.total_trades,
+            "total_profit": self.total_profit,
+            "open_positions": len(self.positions),
+            "win_rate": sum(1 for t in self._closed_trades if t["profit"] > 0) / max(1, len(self._closed_trades)) * 100,
+        }
+
+
 # ───────────────────────── AccountBot ─────────────────────────────
 class AccountBot:
     """Gestor de una única cuenta MT5 (grid infinita sin duplicados)."""
@@ -351,6 +471,12 @@ class AccountBot:
         # Geometría grilla
         self.HALF_GRID = self.grid_distance / 2
         self.EPS = 1e-6
+
+        # Paper Trading
+        self.paper_trading_mode = config.paper_trading_mode
+        self.paper_manager = PaperTradingManager() if self.paper_trading_mode else None
+        if self.paper_trading_mode:
+            log.info("🎮 MODO PAPER TRADING ACTIVADO - No se ejecutaran ordenes reales")
 
         # Estado persistente
         self.state_file = Path(f"state_{self.login}.json")
@@ -434,6 +560,21 @@ class AccountBot:
             self.config.trailing_back = config_dict["trailingBack"]
             updated.append(f"trail_back={config_dict['trailingBack']}")
 
+        # Actualizar paper trading mode
+        if "paperTradingMode" in config_dict:
+            new_paper_mode = config_dict["paperTradingMode"]
+            if new_paper_mode != self.paper_trading_mode:
+                self.paper_trading_mode = new_paper_mode
+                self.config.paper_trading_mode = new_paper_mode
+                if new_paper_mode:
+                    if not self.paper_manager:
+                        self.paper_manager = PaperTradingManager()
+                    self.log.info("🎮 Paper Trading ACTIVADO dinámicamente")
+                    updated.append("paper_mode=ON")
+                else:
+                    self.log.info("📋 Paper Trading DESACTIVADO - volviendo a modo real")
+                    updated.append("paper_mode=OFF")
+
         if updated:
             self.log.info(f"📋 Config actualizada desde SaaS: {', '.join(updated)}")
 
@@ -466,6 +607,27 @@ class AccountBot:
         px = self._price(side)
         if px is None:
             return False
+
+        # MODO PAPER TRADING - No ejecutar ordenes reales
+        if self.paper_trading_mode and self.paper_manager:
+            success = True
+            for i in range(n):
+                # Simular apertura de posicion
+                self.paper_manager.open_position(
+                    side=side,
+                    symbol=self.SYMBOL,
+                    volume=lot,
+                    price=px,
+                    level=0 if set_entry else len(self.state.get("pending_levels", [])),
+                )
+                self.total_trades += 1
+                self.log.info("[PAPER] 🚀 %s %.2f lot #%d @ %.5f", side, lot, i+1, px)
+            if set_entry and self.state["entry"] is None:
+                self.state["entry"] = px
+                self._save_state()
+            return success
+
+        # MODO REAL - Ejecutar en MT5
         base = {
             "action": mt.TRADE_ACTION_DEAL,
             "symbol": self.SYMBOL,
@@ -498,6 +660,19 @@ class AccountBot:
         px = self._price("BUY" if op == mt.ORDER_TYPE_BUY else "SELL")
         if px is None:
             return
+
+        # MODO PAPER TRADING
+        if self.paper_trading_mode and self.paper_manager:
+            # Buscar la posicion en el paper manager
+            for paper_pos in self.paper_manager.positions:
+                if paper_pos.side == side and abs(paper_pos.price_open - pos.price_open) < self.EPS:
+                    result = self.paper_manager.close_position(paper_pos.ticket, px)
+                    if result:
+                        self.total_profit += result["profit"]
+                    return
+            return
+
+        # MODO REAL
         req = {
             "action": mt.TRADE_ACTION_DEAL,
             "symbol": self.SYMBOL,
@@ -524,6 +699,28 @@ class AccountBot:
 
     def close_all(self):
         self.is_closing = True
+
+        # MODO PAPER TRADING
+        if self.paper_trading_mode and self.paper_manager:
+            # Obtener precio actual
+            tick = None
+            with AccountBot.mt_lock:
+                if self._mt5():
+                    tick = mt.symbol_info_tick(self.SYMBOL)
+            if tick:
+                close_price = tick.bid if self.state["side"] == "BUY" else tick.ask
+                self.paper_manager.close_all_positions(close_price)
+                self.total_profit = self.paper_manager.total_profit
+            self.log.info("[PAPER] 🛑 Todas las posiciones cerradas (login %s)", self.login)
+            self.state.update({
+                "side": None, "entry": None, "entry_open": False,
+                "entry_sl": None, "pending_levels": [], "restriction": None
+            })
+            self._save_state()
+            self.is_closing = False
+            return
+
+        # MODO REAL
         with AccountBot.mt_lock:
             if self._mt5():
                 while True:
@@ -651,14 +848,23 @@ class AccountBot:
 
         # Posiciones vivas agrupadas por nivel
         niveles: dict[int, list] = {}
-        with AccountBot.mt_lock:
-            poss = mt.positions_get(symbol=self.SYMBOL) or []
-        for pos in poss:
-            if pos.magic != self.MAGIC:
-                continue
-            diff = abs(pos.price_open - p0)
-            lvl = int((diff + self.HALF_GRID) // self.grid_distance)
-            niveles.setdefault(lvl, []).append(pos)
+
+        # MODO PAPER TRADING
+        if self.paper_trading_mode and self.paper_manager:
+            # Usar posiciones virtuales
+            paper_niveles = self.paper_manager.get_positions_by_level(p0, self.grid_distance)
+            for lvl, positions in paper_niveles.items():
+                niveles[lvl] = positions
+        else:
+            # MODO REAL - Obtener posiciones de MT5
+            with AccountBot.mt_lock:
+                poss = mt.positions_get(symbol=self.SYMBOL) or []
+            for pos in poss:
+                if pos.magic != self.MAGIC:
+                    continue
+                diff = abs(pos.price_open - p0)
+                lvl = int((diff + self.HALF_GRID) // self.grid_distance)
+                niveles.setdefault(lvl, []).append(pos)
 
         # Revisar SL virtual
         self._check_entry_sl_hit(p_close, niveles)
@@ -676,7 +882,12 @@ class AccountBot:
             if lvl == 0:
                 continue
             lst = niveles[lvl]
-            gain = (p_close - lst[0].price_open) if side == "BUY" else (lst[0].price_open - p_close)
+            # Obtener precio de apertura segun el tipo de posicion
+            if self.paper_trading_mode and lst:
+                open_price = lst[0].price_open
+            else:
+                open_price = lst[0].price_open
+            gain = (p_close - open_price) if side == "BUY" else (open_price - p_close)
             if gain >= self.grid_distance - self.EPS:
                 for pos in lst:
                     self._close_ticket(pos, side)
@@ -715,17 +926,40 @@ class AccountBot:
             poss = mt.positions_get(symbol=self.SYMBOL) if mt5_ok else []
             positions = [p for p in (poss or []) if p.magic == self.MAGIC]
 
-        return {
+        # En modo paper, usar posiciones virtuales
+        if self.paper_trading_mode and self.paper_manager:
+            open_positions = len(self.paper_manager.positions)
+            current_level = max([0] + [pos.level for pos in self.paper_manager.positions]) if self.paper_manager.positions else 0
+            total_profit = self.paper_manager.total_profit
+            paper_stats = self.paper_manager.get_stats()
+        else:
+            open_positions = len(positions)
+            current_level = max([0] + [int((abs(p.price_open - (self.state["entry"] or 0)) + self.HALF_GRID) // self.grid_distance) for p in positions])
+            total_profit = self.total_profit
+            paper_stats = None
+
+        heartbeat = {
             "status": "RUNNING" if not self.is_closing else "STOPPING",
             "mt5Connected": mt5_ok,
-            "openPositions": len(positions),
-            "currentLevel": max([0] + [int((abs(p.price_open - (self.state["entry"] or 0)) + self.HALF_GRID) // self.grid_distance) for p in positions]),
+            "openPositions": open_positions,
+            "currentLevel": current_level,
             "currentSide": self.state["side"],
             "totalTrades": self.total_trades,
-            "totalProfit": round(self.total_profit, 2),
+            "totalProfit": round(total_profit, 2),
             "version": "1.0.0-saas",
             "platform": sys.platform,
+            "paperTradingMode": self.paper_trading_mode,
         }
+
+        # Incluir estadísticas adicionales de paper trading
+        if paper_stats:
+            heartbeat["paperStats"] = {
+                "initialBalance": paper_stats["initial_balance"],
+                "currentBalance": paper_stats["current_balance"],
+                "winRate": round(paper_stats["win_rate"], 2),
+            }
+
+        return heartbeat
 
 
 # ───────────────────────── Main Loop ──────────────────────────────
@@ -749,6 +983,10 @@ async def main_loop(config: BotConfig):
                 config.trailing_step = remote_config.get("trailingStep")
                 config.trailing_back = remote_config.get("trailingBack")
                 config.has_trailing_sl = remote_config.get("hasTrailingSL", True)
+                # Paper Trading Mode
+                config.paper_trading_mode = remote_config.get("paperTradingMode", False)
+                if config.paper_trading_mode:
+                    log.info("🎮 MODO PAPER TRADING ACTIVADO desde SaaS")
                 log.info(f"📋 Configuración cargada desde SaaS: lot={config.lot_size}, levels={config.max_levels}")
             elif not success:
                 log.warning("⚠️ No se pudo autenticar con SaaS. Usando configuración local.")

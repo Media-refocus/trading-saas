@@ -60,6 +60,7 @@ model Tenant {
   botHeartbeats   BotHeartbeat[]
   signalDeliveries SignalDelivery[]
   securityEvents  SecurityEvent[]
+  alerts          Alert[]
 }
 
 model User {
@@ -331,6 +332,9 @@ model BotConfig {
   // Restricciones por defecto
   defaultRestriction String?  // "RIESGO", "SIN_PROMEDIOS", null
 
+  // Paper Trading
+  paperTradingMode Boolean  @default(false)  // Si true, no ejecuta ordenes reales
+
   // Estado
   isActive        Boolean  @default(true)
   lastHeartbeat   DateTime?
@@ -485,4 +489,31 @@ model SignalDelivery {
 
   @@unique([globalSignalId, tenantId])
   @@index([tenantId, status])
+}
+
+// ============================================
+// ALERTAS - Notificaciones para usuarios
+// ============================================
+
+/// Alertas del sistema para notificar a usuarios
+model Alert {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Tipo de alerta
+  type        String              // "BOT_OFFLINE", "BOT_ERROR", "HIGH_DRAWDOWN", "SUBSCRIPTION_EXPIRING"
+
+  // Mensaje y estado
+  message     String
+  read        Boolean  @default(false)
+
+  // Metadata adicional (opcional)
+  metadata    Json?
+
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
+
+  @@index([tenantId, read])
+  @@index([tenantId, createdAt])
 }
