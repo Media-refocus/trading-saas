@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
 import SimpleCandleChart from "@/components/simple-candle-chart";
 import { CHART_THEMES, getPreferredTheme, savePreferredTheme } from "@/lib/chart-themes";
@@ -101,6 +103,12 @@ export default function BacktesterPage() {
   const cacheStatus = trpc.backtester.getCacheStatus.useQuery();
   const executeBacktest = trpc.backtester.execute.useMutation();
   const clearCache = trpc.backtester.clearCache.useMutation();
+  const saveAsStrategy = trpc.backtester.saveAsStrategy.useMutation();
+
+  // Estado para guardar estrategia
+  const [strategyName, setStrategyName] = useState("");
+  const [strategyDescription, setStrategyDescription] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Optimizer
   const optimizationPresets = trpc.backtester.getOptimizationPresets.useQuery();
@@ -160,8 +168,53 @@ export default function BacktesterPage() {
       };
       await executeBacktest.mutateAsync({ config: processedConfig, signalLimit });
       setSelectedTradeIndex(null);
+      setSaveSuccess(false);
     } catch (error) {
       console.error("Error ejecutando backtest:", error);
+    }
+  };
+
+  const handleSaveStrategy = async () => {
+    if (!results || !strategyName.trim()) return;
+
+    try {
+      await saveAsStrategy.mutateAsync({
+        name: strategyName,
+        description: strategyDescription || undefined,
+        config: {
+          strategyName: config.strategyName,
+          lotajeBase: config.lotajeBase,
+          numOrders: config.numOrders,
+          pipsDistance: config.pipsDistance,
+          maxLevels: config.maxLevels,
+          takeProfitPips: config.takeProfitPips,
+          stopLossPips: config.stopLossPips,
+          useStopLoss: config.useStopLoss,
+          useTrailingSL: config.useTrailingSL,
+          trailingSLPercent: config.trailingSLPercent,
+          restrictionType: config.restrictionType,
+          signalsSource: config.signalsSource,
+          initialCapital: config.initialCapital,
+          useRealPrices: config.useRealPrices,
+          filters: config.filters ? {
+            ...config.filters,
+            dateFrom: config.filters.dateFrom ? new Date(config.filters.dateFrom) : undefined,
+            dateTo: config.filters.dateTo ? new Date(config.filters.dateTo) : undefined,
+          } : undefined,
+        },
+        results: {
+          totalTrades: results.totalTrades || 0,
+          totalProfit: results.totalProfit || 0,
+          winRate: results.winRate || 0,
+          maxDrawdown: results.maxDrawdownPercent || 0,
+        },
+      });
+      setSaveSuccess(true);
+      setStrategyName("");
+      setStrategyDescription("");
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error("Error guardando estrategia:", error);
     }
   };
 
@@ -227,7 +280,7 @@ export default function BacktesterPage() {
               Configuración
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 pt-3">
+          <CardContent className="space-y-4 pt-3">
             {/* Fila 1: Fuente + Estrategia */}
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
@@ -256,112 +309,126 @@ export default function BacktesterPage() {
               </div>
             </div>
 
-            {/* Fila 2: Capital + Lotes + Órdenes */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Capital €</Label>
-                <Input
-                  type="number"
-                  className="h-9 text-xs font-mono bg-background/50 hover:bg-background transition-colors"
-                  value={config.initialCapital}
-                  onChange={(e) => updateConfig("initialCapital", parseFloat(e.target.value))}
-                />
+            {/* Grid Spacing Slider */}
+            <div className="space-y-2 p-3 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-lg border border-blue-500/10">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium text-blue-600 dark:text-blue-400">Grid Spacing (pips)</Label>
+                <span className="text-sm font-mono font-bold text-blue-600">{config.pipsDistance}</span>
               </div>
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Lote</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  className="h-9 text-xs font-mono bg-background/50 hover:bg-background transition-colors"
-                  value={config.lotajeBase}
-                  onChange={(e) => updateConfig("lotajeBase", parseFloat(e.target.value))}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Órdenes</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="5"
-                  className="h-9 text-xs font-mono bg-background/50 hover:bg-background transition-colors"
-                  value={config.numOrders}
-                  onChange={(e) => updateConfig("numOrders", parseInt(e.target.value))}
-                />
-              </div>
-            </div>
-
-            {/* Fila 3: Grid params con iconos */}
-            <div className="p-2.5 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-lg border border-blue-500/10">
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Parámetros Grid</div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-[11px] text-blue-600 dark:text-blue-400">📏 Pips</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="100"
-                    className="h-8 text-xs font-mono"
-                    value={config.pipsDistance}
-                    onChange={(e) => updateConfig("pipsDistance", parseInt(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] text-purple-600 dark:text-purple-400">📊 Niveles</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="40"
-                    className="h-8 text-xs font-mono"
-                    value={config.maxLevels}
-                    onChange={(e) => updateConfig("maxLevels", parseInt(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] text-green-600 dark:text-green-400">🎯 TP</Label>
-                  <Input
-                    type="number"
-                    min="5"
-                    max="100"
-                    className="h-8 text-xs font-mono"
-                    value={config.takeProfitPips}
-                    onChange={(e) => updateConfig("takeProfitPips", parseInt(e.target.value))}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Fila 4: Trailing SL mejorado */}
-            <div className={`flex items-center gap-3 p-2.5 rounded-lg transition-all ${
-              config.useTrailingSL
-                ? "bg-amber-500/10 border border-amber-500/20"
-                : "bg-muted/30 border border-transparent"
-            }`}>
-              <input
-                type="checkbox"
-                id="useTrailingSL"
-                checked={config.useTrailingSL}
-                onChange={(e) => updateConfig("useTrailingSL", e.target.checked)}
-                className="w-4 h-4 rounded accent-amber-500"
+              <Slider
+                min={5}
+                max={50}
+                step={1}
+                value={[config.pipsDistance]}
+                onValueChange={(value) => updateConfig("pipsDistance", value[0])}
+                className="w-full"
               />
-              <Label htmlFor="useTrailingSL" className="text-xs cursor-pointer flex-1 font-medium">
-                Trailing SL
-              </Label>
-              {config.useTrailingSL && (
-                <>
-                  <Input
-                    type="number"
-                    min="10"
-                    max="90"
-                    className="w-16 h-7 text-xs font-mono"
-                    value={config.trailingSLPercent}
-                    onChange={(e) => updateConfig("trailingSLPercent", parseInt(e.target.value))}
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>5</span>
+                <span>50</span>
+              </div>
+            </div>
+
+            {/* Max Levels Slider */}
+            <div className="space-y-2 p-3 bg-gradient-to-r from-purple-500/5 to-pink-500/5 rounded-lg border border-purple-500/10">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium text-purple-600 dark:text-purple-400">Max Levels</Label>
+                <span className="text-sm font-mono font-bold text-purple-600">{config.maxLevels}</span>
+              </div>
+              <Slider
+                min={1}
+                max={30}
+                step={1}
+                value={[config.maxLevels]}
+                onValueChange={(value) => updateConfig("maxLevels", value[0])}
+                className="w-full"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>1</span>
+                <span>30</span>
+              </div>
+            </div>
+
+            {/* Take Profit Slider */}
+            <div className="space-y-2 p-3 bg-gradient-to-r from-green-500/5 to-emerald-500/5 rounded-lg border border-green-500/10">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium text-green-600 dark:text-green-400">Take Profit (pips)</Label>
+                <span className="text-sm font-mono font-bold text-green-600">{config.takeProfitPips}</span>
+              </div>
+              <Slider
+                min={5}
+                max={50}
+                step={1}
+                value={[config.takeProfitPips]}
+                onValueChange={(value) => updateConfig("takeProfitPips", value[0])}
+                className="w-full"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>5</span>
+                <span>50</span>
+              </div>
+            </div>
+
+            {/* Stop Loss Section */}
+            <div className="space-y-2 p-3 rounded-lg border border-border/50 bg-muted/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={config.useStopLoss}
+                    onCheckedChange={(checked) => updateConfig("useStopLoss", checked)}
                   />
-                  <span className="text-xs text-muted-foreground">%</span>
-                </>
+                  <Label className="text-xs font-medium cursor-pointer">Use Stop Loss</Label>
+                </div>
+              </div>
+
+              {config.useStopLoss && (
+                <div className="space-y-2 mt-2 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-red-600 dark:text-red-400">Stop Loss (pips)</Label>
+                    <span className="text-sm font-mono font-bold text-red-600">{config.stopLossPips || 100}</span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={200}
+                    step={5}
+                    value={[config.stopLossPips || 100]}
+                    onValueChange={(value) => updateConfig("stopLossPips", value[0])}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>0</span>
+                    <span>200</span>
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* Fila 5: Filtros */}
+            {/* Lot Size Input */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Lot Size</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max="1.0"
+                  className="h-9 text-sm font-mono"
+                  value={config.lotajeBase}
+                  onChange={(e) => updateConfig("lotajeBase", parseFloat(e.target.value) || 0.1)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Capital €</Label>
+                <Input
+                  type="number"
+                  className="h-9 text-sm font-mono"
+                  value={config.initialCapital}
+                  onChange={(e) => updateConfig("initialCapital", parseFloat(e.target.value) || 10000)}
+                />
+              </div>
+            </div>
+
+            {/* Filtros */}
             <div className="grid grid-cols-3 gap-2">
               <div className="space-y-1">
                 <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Sesión</Label>
@@ -371,9 +438,9 @@ export default function BacktesterPage() {
                   onChange={(e) => updateConfig("filters", { ...config.filters, session: e.target.value as any || undefined })}
                 >
                   <option value="">Todas</option>
-                  <option value="ASIAN">🌏 Asia</option>
-                  <option value="EUROPEAN">🇪🇺 Europa</option>
-                  <option value="US">🇺🇸 US</option>
+                  <option value="ASIAN">Asia</option>
+                  <option value="EUROPEAN">Europa</option>
+                  <option value="US">US</option>
                 </select>
               </div>
               <div className="space-y-1">
@@ -384,8 +451,8 @@ export default function BacktesterPage() {
                   onChange={(e) => updateConfig("filters", { ...config.filters, side: e.target.value as any || undefined })}
                 >
                   <option value="">Ambas</option>
-                  <option value="BUY">📈 BUY</option>
-                  <option value="SELL">📉 SELL</option>
+                  <option value="BUY">BUY</option>
+                  <option value="SELL">SELL</option>
                 </select>
               </div>
               <div className="space-y-1">
@@ -400,61 +467,82 @@ export default function BacktesterPage() {
               </div>
             </div>
 
+            {/* Toggle: Trailing SL */}
+            <div className={`flex items-center gap-3 p-2.5 rounded-lg transition-all ${
+              config.useTrailingSL
+                ? "bg-amber-500/10 border border-amber-500/20"
+                : "bg-muted/30 border border-transparent"
+            }`}>
+              <Switch
+                checked={config.useTrailingSL}
+                onCheckedChange={(checked) => updateConfig("useTrailingSL", checked)}
+              />
+              <Label className="text-xs cursor-pointer flex-1 font-medium">
+                Trailing SL
+              </Label>
+              {config.useTrailingSL && (
+                <>
+                  <Input
+                    type="number"
+                    min="10"
+                    max="90"
+                    className="w-16 h-7 text-xs font-mono"
+                    value={config.trailingSLPercent}
+                    onChange={(e) => updateConfig("trailingSLPercent", parseInt(e.target.value) || 50)}
+                  />
+                  <span className="text-xs text-muted-foreground">%</span>
+                </>
+              )}
+            </div>
+
             {/* Toggle: Ticks reales */}
             <div className={`flex items-center gap-2 p-2.5 rounded-lg transition-all ${
               config.useRealPrices
                 ? "bg-blue-500/10 border border-blue-500/20"
                 : "bg-muted/30 border border-transparent"
             }`}>
-              <input
-                type="checkbox"
-                id="useRealPrices"
+              <Switch
                 checked={config.useRealPrices}
-                onChange={(e) => updateConfig("useRealPrices", e.target.checked)}
-                className="w-4 h-4 rounded accent-blue-500"
+                onCheckedChange={(checked) => updateConfig("useRealPrices", checked)}
               />
-              <Label htmlFor="useRealPrices" className="text-xs cursor-pointer">
+              <Label className="text-xs cursor-pointer">
                 Usar ticks reales <span className="text-muted-foreground">(lento)</span>
               </Label>
             </div>
 
-            {/* Botones mejorados */}
-            <div className="flex gap-2 pt-1">
-              <Button
-                className={`flex-1 h-10 btn-execute font-medium ${
-                  executeBacktest.isPending ? "animate-pulse" : ""
-                }`}
-                onClick={handleExecute}
-                disabled={executeBacktest.isPending}
-              >
-                {executeBacktest.isPending ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Ejecutando backtest...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <span>▶</span>
-                    Ejecutar Backtest
-                  </span>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                className="h-10 px-3 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/50"
-                onClick={() => { clearCache.mutate(); executeBacktest.reset(); }}
-                disabled={clearCache.isPending}
-                title="Limpiar caché"
-              >
-                {clearCache.isPending ? "⏳" : "🗑️"}
-              </Button>
-            </div>
+            {/* Botón Ejecutar Backtest - GRANDE */}
+            <Button
+              className={`w-full h-14 text-base font-semibold btn-execute ${
+                executeBacktest.isPending ? "animate-pulse" : ""
+              }`}
+              onClick={handleExecute}
+              disabled={executeBacktest.isPending}
+              size="lg"
+            >
+              {executeBacktest.isPending ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Procesando {signalLimit} señales...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <span className="text-lg">▶</span>
+                  Ejecutar Backtest
+                </span>
+              )}
+            </Button>
 
             {/* Resumen de configuracion activa */}
-            <div className="flex items-center justify-center gap-4 pt-2 text-[10px] text-muted-foreground font-mono">
+            <div className="flex items-center justify-center gap-3 pt-1 text-[10px] text-muted-foreground font-mono flex-wrap">
               <span>Grid: {config.pipsDistance}p x {config.maxLevels}L</span>
               <span>•</span>
               <span>TP: {config.takeProfitPips}p</span>
+              {config.useStopLoss && (
+                <>
+                  <span>•</span>
+                  <span className="text-red-500">SL: {config.stopLossPips}p</span>
+                </>
+              )}
               {config.useTrailingSL && (
                 <>
                   <span>•</span>
@@ -464,6 +552,26 @@ export default function BacktesterPage() {
               <span>•</span>
               <span>Lote: {config.lotajeBase}</span>
             </div>
+
+            {/* Botón limpiar cache */}
+            <Button
+              variant="outline"
+              className="w-full h-9 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/50"
+              onClick={() => { clearCache.mutate(); executeBacktest.reset(); setSaveSuccess(false); }}
+              disabled={clearCache.isPending}
+            >
+              {clearCache.isPending ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-3 h-3 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+                  Limpiando...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <span>🗑️</span>
+                  Limpiar caché
+                </span>
+              )}
+            </Button>
 
             {executeBacktest.isError && (
               <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-lg text-xs animate-fade-in">
@@ -780,26 +888,75 @@ export default function BacktesterPage() {
                   </div>
                 )}
 
-                {/* Botón guardar resultado */}
-                <div className="flex items-center justify-between pt-2 border-t border-border/30">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={saveCurrentResult}
-                    className="gap-2 hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500/50"
-                  >
-                    💾 Guardar para comparar
-                  </Button>
-                  {results.totalTrades > 0 && (
-                    <div className="text-xs text-muted-foreground">
-                      Rentabilidad: <span className={`font-bold ${
-                        results.totalProfit >= 0 ? "text-green-600" : "text-red-600"
-                      }`}>
-                        {((results.totalProfit / (config.initialCapital || 10000)) * 100).toFixed(2)}%
-                      </span>
+                {/* Guardar estrategia */}
+                <div className="p-4 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-lg border border-border/50 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">💾</span>
+                    <h4 className="text-sm font-semibold">Guardar como Estrategia</h4>
+                  </div>
+                  <div className="grid gap-2">
+                    <Input
+                      placeholder="Nombre de la estrategia"
+                      value={strategyName}
+                      onChange={(e) => setStrategyName(e.target.value)}
+                      className="h-9"
+                    />
+                    <Input
+                      placeholder="Descripcion (opcional)"
+                      value={strategyDescription}
+                      onChange={(e) => setStrategyDescription(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleSaveStrategy}
+                      disabled={!strategyName.trim() || saveAsStrategy.isPending}
+                      className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                    >
+                      {saveAsStrategy.isPending ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Guardando...
+                        </span>
+                      ) : (
+                        "Guardar Estrategia"
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={saveCurrentResult}
+                      className="hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500/50"
+                    >
+                      Comparar
+                    </Button>
+                  </div>
+                  {saveSuccess && (
+                    <div className="p-2 bg-green-500/10 border border-green-500/20 text-green-600 rounded-lg text-xs animate-fade-in flex items-center gap-2">
+                      <span>+</span>
+                      Estrategia guardada correctamente
+                    </div>
+                  )}
+                  {saveAsStrategy.isError && (
+                    <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs animate-fade-in flex items-center gap-2">
+                      <span>x</span>
+                      Error al guardar: {saveAsStrategy.error.message}
                     </div>
                   )}
                 </div>
+
+                {/* Rentabilidad */}
+                {results.totalTrades > 0 && (
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <span>Rentabilidad:</span>
+                    <span className={`font-bold text-base ${
+                      results.totalProfit >= 0 ? "text-green-600" : "text-red-600"
+                    }`}>
+                      {((results.totalProfit / (config.initialCapital || 10000)) * 100).toFixed(2)}%
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-16 animate-fade-in">

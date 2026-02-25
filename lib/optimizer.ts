@@ -3,11 +3,21 @@
  *
  * Encuentra la mejor configuración automáticamente probando
  * múltiples combinaciones de parámetros.
+ *
+ * v2: Integración con cache de backtest y batch loading
  */
 
 import { BacktestEngine, BacktestConfig, BacktestResult, Side } from "./backtest-engine";
-import { TradingSignal, loadSignalsFromFile } from "./parsers/signals-csv";
+import { TradingSignal, loadSignalsFromFile, generateSyntheticTicks } from "./parsers/signals-csv";
 import { getTicksFromDB, isTicksDBReady, getMarketPrice } from "./ticks-db";
+import { getCachedResult, cacheResult, hashConfig } from "./backtest-cache";
+import {
+  preloadTicksForSignals,
+  getMarketPriceFromCache,
+  getTicksForSignal as getTicksForSignalFromBatch,
+  getDaysNeededForSignals,
+  loadTicksByDayGrouped,
+} from "./ticks-batch-loader";
 import path from "path";
 
 // ==================== TIPOS ====================
@@ -153,91 +163,135 @@ export function calculateScore(
 
 /**
  * Ejecuta un backtest para una configuración específica
+ * v2: Usa cache de resultados y batch loading
  */
 export async function runSingleBacktest(
   config: BacktestConfig,
   signals: TradingSignal[],
-  useRealPrices: boolean = true
-): Promise<BacktestResult> {
+  useRealPrices: boolean = true,
+  signalsSource: string = "signals_simple.csv",
+  ticksByDay?: Map<string, any[]>
+): Promise<{ result: BacktestResult; fromCache: boolean }> {
+  // 1. Verificar cache primero
+  const cachedResult = getCachedResult(config, signalsSource);
+  if (cachedResult) {
+    return { result: cachedResult, fromCache: true };
+  }
+
   const dbReady = useRealPrices && await isTicksDBReady();
   const engine = new BacktestEngine(config);
+
+  // Usar el cache de ticks si está disponible, si no, cargarlo
+  let localTicksByDay = ticksByDay;
+  if (dbReady && !localTicksByDay && signals.length > 0) {
+    const daysNeeded = getDaysNeededForSignals(signals);
+    localTicksByDay = await loadTicksByDayGrouped(daysNeeded);
+  }
+
+  // Precios de referencia XAUUSD por mes (fallback)
+  const XAUUSD_REFERENCE_PRICES: Record<string, number> = {
+    "2024-05": 2350, "2024-06": 2330, "2024-07": 2400, "2024-08": 2470,
+    "2024-09": 2560, "2024-10": 2650, "2024-11": 2620, "2024-12": 2630,
+    "2025-01": 2720, "2025-02": 2850, "2025-03": 2950, "2025-04": 3200,
+    "2025-05": 3300, "2025-06": 3350, "2025-07": 3400, "2025-08": 3450,
+    "2025-09": 3500, "2025-10": 3550, "2025-11": 3600, "2025-12": 3650,
+    "2026-01": 2700, "2026-02": 2750,
+  };
 
   for (let i = 0; i < signals.length; i++) {
     const signal = signals[i];
 
     // Enriquecer con precio real si está disponible
     let entryPrice = signal.entryPrice;
-    if (dbReady) {
-      const marketPrice = await getMarketPrice(signal.timestamp);
+
+    if (dbReady && localTicksByDay && localTicksByDay.size > 0) {
+      const marketPrice = getMarketPriceFromCache(localTicksByDay, signal.timestamp);
       if (marketPrice) {
         entryPrice = (marketPrice.bid + marketPrice.ask) / 2;
+      } else if (signal.entryPrice <= 0) {
+        // Usar precio de referencia
+        const monthKey = signal.timestamp.toISOString().slice(0, 7);
+        entryPrice = XAUUSD_REFERENCE_PRICES[monthKey] || 2500;
       }
+    } else if (signal.entryPrice <= 0) {
+      const monthKey = signal.timestamp.toISOString().slice(0, 7);
+      entryPrice = XAUUSD_REFERENCE_PRICES[monthKey] || 2500;
     }
 
     engine.startSignal(signal.side, entryPrice, i, signal.timestamp);
-    engine.openInitialOrders(entryPrice, signal.timestamp);
+
+    // Obtener timestamp de entrada
+    let entryTimestamp = signal.timestamp;
+    if (dbReady && localTicksByDay && localTicksByDay.size > 0) {
+      const firstTick = getMarketPriceFromCache(localTicksByDay, signal.timestamp);
+      if (firstTick) {
+        entryTimestamp = firstTick.timestamp;
+      }
+    }
+
+    engine.openInitialOrders(entryPrice, entryTimestamp);
 
     // Obtener ticks
-    const endTime = signal.closeTimestamp
-      ? new Date(Math.min(signal.closeTimestamp.getTime(), signal.timestamp.getTime() + 24 * 60 * 60 * 1000))
-      : new Date(signal.timestamp.getTime() + 24 * 60 * 60 * 1000);
+    let ticks: { timestamp: Date; bid: number; ask: number; spread: number }[] = [];
 
-    let ticks = dbReady
-      ? await getTicksFromDB(signal.timestamp, endTime)
-      : [];
+    if (dbReady && localTicksByDay && localTicksByDay.size > 0) {
+      ticks = getTicksForSignalFromBatch(localTicksByDay, signal);
+    }
 
     // Si no hay ticks reales, generar sintéticos
     if (ticks.length === 0) {
-      ticks = generateSyntheticTicks(signal, config);
+      ticks = generateSyntheticTicksForSignal(signal, config);
     }
 
     for (const tick of ticks) {
       engine.processTick(tick);
     }
+
+    // Cerrar posiciones pendientes
+    if (engine.hasOpenPositions() && ticks.length > 0) {
+      const lastTick = ticks[ticks.length - 1];
+      const closePrice = signal.side === "BUY" ? lastTick.bid : lastTick.ask;
+      engine.closeRemainingPositions(closePrice, signal.closeTimestamp || lastTick.timestamp);
+    }
   }
 
-  return engine.getResults();
+  const result = engine.getResults();
+
+  // Guardar en cache
+  cacheResult(config, signalsSource, result);
+
+  return { result, fromCache: false };
 }
 
 /**
- * Genera ticks sintéticos simples para una señal
+ * Genera ticks sintéticos para una señal (usado en optimización)
  */
-function generateSyntheticTicks(
+function generateSyntheticTicksForSignal(
   signal: TradingSignal,
   config: BacktestConfig
 ): { timestamp: Date; bid: number; ask: number; spread: number }[] {
-  const ticks: { timestamp: Date; bid: number; ask: number; spread: number }[] = [];
   const durationMs = signal.closeTimestamp
     ? signal.closeTimestamp.getTime() - signal.timestamp.getTime()
     : 30 * 60 * 1000;
 
-  const numTicks = Math.min(100, Math.floor(durationMs / 60000));
-  const step = durationMs / numTicks;
+  const exitPrice =
+    signal.side === "BUY"
+      ? signal.entryPrice + config.takeProfitPips * 0.1
+      : signal.entryPrice - config.takeProfitPips * 0.1;
 
-  const isBuy = signal.side === "BUY";
-  const exitPrice = isBuy
-    ? signal.entryPrice + config.takeProfitPips * 0.1
-    : signal.entryPrice - config.takeProfitPips * 0.1;
-
-  for (let i = 0; i <= numTicks; i++) {
-    const progress = i / numTicks;
-    // Simular movimiento con algo de ruido
-    const noise = (Math.random() - 0.5) * 2;
-    const price = signal.entryPrice + (exitPrice - signal.entryPrice) * progress + noise;
-
-    ticks.push({
-      timestamp: new Date(signal.timestamp.getTime() + i * step),
-      bid: price,
-      ask: price + 0.02,
-      spread: 0.02,
-    });
-  }
-
-  return ticks;
+  return generateSyntheticTicks(
+    signal.entryPrice,
+    exitPrice,
+    durationMs,
+    config.pipsDistance * 2,
+    signal.timestamp
+  );
 }
+
 
 /**
  * Ejecuta la optimización completa
+ * v2: Usa batch loading para cargar ticks una sola vez
  */
 export async function runOptimization(
   params: OptimizationParams,
@@ -247,6 +301,12 @@ export async function runOptimization(
   const combinations = generateCombinations(params);
   const results: OptimizationResult[] = [];
 
+  // Limitar a 50 combinaciones máximo para evitar timeout
+  const limitedCombinations = combinations.slice(0, 50);
+  if (combinations.length > 50) {
+    console.log(`[Optimizer] Limitando de ${combinations.length} a 50 combinaciones`);
+  }
+
   // Cargar señales
   const signalsPath = path.join(process.cwd(), options.signalsSource);
   let signals = await loadSignalsFromFile(signalsPath);
@@ -254,14 +314,42 @@ export async function runOptimization(
     signals = signals.slice(0, options.signalLimit);
   }
 
+  console.log(`[Optimizer] Cargadas ${signals.length} señales desde ${options.signalsSource}`);
+  console.log(`[Optimizer] Evaluando ${limitedCombinations.length} combinaciones`);
+
   const metric = options.metric || "totalProfit";
   let bestSoFar: OptimizationResult | null = null;
 
-  for (let i = 0; i < combinations.length; i++) {
-    const config = combinations[i];
+  // Precargar ticks en batch (una sola vez para todas las combinaciones)
+  const dbReady = await isTicksDBReady();
+  let ticksByDay: Map<string, any[]> = new Map();
+
+  if (dbReady && signals.length > 0) {
+    const preloadStart = Date.now();
+    const daysNeeded = getDaysNeededForSignals(signals);
+    console.log(`[Optimizer] Días necesarios: ${daysNeeded.size}`);
+    ticksByDay = await loadTicksByDayGrouped(daysNeeded);
+    console.log(`[Optimizer] Batch loading completado en ${Date.now() - preloadStart}ms`);
+  }
+
+  let cacheHits = 0;
+
+  for (let i = 0; i < limitedCombinations.length; i++) {
+    const config = limitedCombinations[i];
 
     try {
-      const result = await runSingleBacktest(config, signals, true);
+      const { result, fromCache } = await runSingleBacktest(
+        config,
+        signals,
+        true,
+        options.signalsSource,
+        ticksByDay
+      );
+
+      if (fromCache) {
+        cacheHits++;
+      }
+
       const score = calculateScore(result, metric, options.maxDrawdownPercent);
 
       const optResult: OptimizationResult = {
@@ -277,18 +365,23 @@ export async function runOptimization(
         bestSoFar = optResult;
       }
 
+      // Log de progreso cada 5 combinaciones
+      if ((i + 1) % 5 === 0) {
+        console.log(`[Optimizer] Progreso: ${i + 1}/${limitedCombinations.length} - Cache hits: ${cacheHits} - Best score: ${bestSoFar?.score.toFixed(2) || 'N/A'}`);
+      }
+
       // Callback de progreso
       if (options.onProgress) {
         options.onProgress({
           current: i + 1,
-          total: combinations.length,
+          total: limitedCombinations.length,
           currentConfig: config,
           bestSoFar,
           elapsedMs: Date.now() - startTime,
         });
       }
     } catch (error) {
-      console.error(`Error en configuración ${config.strategyName}:`, error);
+      console.error(`[Optimizer] Error en configuración ${config.strategyName}:`, error);
     }
   }
 
@@ -297,6 +390,8 @@ export async function runOptimization(
   results.forEach((r, i) => {
     r.rank = i + 1;
   });
+
+  console.log(`[Optimizer] Completado en ${Date.now() - startTime}ms - Cache hits: ${cacheHits}/${limitedCombinations.length}`);
 
   return results;
 }

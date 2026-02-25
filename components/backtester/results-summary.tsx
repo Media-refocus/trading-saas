@@ -152,7 +152,7 @@ export function ResultsSummary({ results }: ResultsSummaryProps) {
         <table className="w-full text-xs">
           <tbody>
             {stats.map((stat, i) => {
-              if ("section" in stat) {
+              if ("section" in stat && stat.section) {
                 currentSection = stat.section;
                 return (
                   <tr key={i} className="bg-[#2D2D2D]">
@@ -162,14 +162,17 @@ export function ResultsSummary({ results }: ResultsSummaryProps) {
                   </tr>
                 );
               }
-              return (
-                <tr key={i} className="border-b border-[#333333]">
-                  <td className="py-2 px-3 text-[#888888]">{stat.label}</td>
-                  <td className={cn("py-2 px-3 text-right font-mono", stat.color || "text-white")}>
-                    {stat.value}
-                  </td>
-                </tr>
-              );
+              if (!("section" in stat)) {
+                return (
+                  <tr key={i} className="border-b border-[#333333]">
+                    <td className="py-2 px-3 text-[#888888]">{stat.label}</td>
+                    <td className={cn("py-2 px-3 text-right font-mono", stat.color || "text-white")}>
+                      {stat.value}
+                    </td>
+                  </tr>
+                );
+              }
+              return null;
             })}
           </tbody>
         </table>
