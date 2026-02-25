@@ -10,6 +10,29 @@ import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
 import SimpleCandleChart from "@/components/simple-candle-chart";
 import { CHART_THEMES, getPreferredTheme, savePreferredTheme } from "@/lib/chart-themes";
+import {
+  Play,
+  Trash2,
+  Save,
+  Scale,
+  Moon,
+  Sun,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  Settings,
+  Zap,
+  Target,
+  Shield,
+  Activity,
+  ChevronUp,
+  ChevronDown,
+  AlertCircle,
+  CheckCircle2,
+  Database,
+  Signal,
+  RefreshCw,
+} from "lucide-react";
 
 interface BacktestFilters {
   dateFrom?: string;
@@ -52,42 +75,39 @@ const defaultConfig: BacktestConfig = {
   useRealPrices: false,
 };
 
-// Estilos en línea para animaciones y transiciones suaves
-const styles = `
-  @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
-    50% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+// Dark mode toggle helper
+function toggleDarkMode() {
+  const html = document.documentElement;
+  if (html.classList.contains("dark")) {
+    html.classList.remove("dark");
+    localStorage.setItem("theme", "light");
+  } else {
+    html.classList.add("dark");
+    localStorage.setItem("theme", "dark");
   }
-  @keyframes fade-in {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes slide-up {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-  .animate-fade-in { animation: fade-in 0.3s ease-out; }
-  .animate-slide-up { animation: slide-up 0.4s ease-out; }
-  .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
-  .animate-shimmer {
-    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-  }
-  .trade-row { transition: all 0.15s ease; }
-  .trade-row:hover { transform: translateX(2px); }
-  .trade-row-selected {
-    box-shadow: inset 3px 0 0 #3b82f6, inset 0 0 0 1px rgba(59, 130, 246, 0.2);
-  }
-  .metric-value { transition: all 0.2s ease; }
-  .btn-execute { transition: all 0.2s ease; }
-  .btn-execute:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
-  .btn-execute:active:not(:disabled) { transform: translateY(0); }
-`;
+}
+
+function useDarkMode() {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const theme = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const shouldBeDark = theme === "dark" || (!theme && prefersDark);
+
+    if (shouldBeDark) {
+      document.documentElement.classList.add("dark");
+    }
+    setIsDark(shouldBeDark);
+  }, []);
+
+  const toggle = () => {
+    toggleDarkMode();
+    setIsDark(!isDark);
+  };
+
+  return { isDark, toggle };
+}
 
 export default function BacktesterPage() {
   const [config, setConfig] = useState<BacktestConfig>(defaultConfig);
@@ -96,6 +116,7 @@ export default function BacktesterPage() {
     if (typeof window !== "undefined") return getPreferredTheme();
     return "mt5";
   });
+  const { isDark, toggle: toggleDark } = useDarkMode();
 
   // tRPC hooks
   const signalsInfo = trpc.backtester.getSignalsInfo.useQuery({ source: config.signalsSource });
@@ -228,45 +249,56 @@ export default function BacktesterPage() {
   const configSummary = `${config.pipsDistance}p × ${config.maxLevels}L × ${config.takeProfitPips}TP × ${config.trailingSLPercent}%Trail`;
 
   return (
-    <div className="space-y-4 p-4 max-w-[1600px] mx-auto">
-      {/* Inject styles */}
-      <style>{styles}</style>
-
+    <div className="space-y-4 p-4 max-w-[1600px] mx-auto font-sans">
       {/* Header mejorado */}
       <div className="flex items-center justify-between pb-3 border-b border-border/50">
         <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Backtester</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Grid con promedios y trailing SL
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <BarChart3 className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Backtester</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Grid con promedios y trailing SL
+              </p>
+            </div>
           </div>
-          <div className="hidden md:flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20">
-            <span className="text-xs text-muted-foreground">Config:</span>
+          <div className="hidden md:flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg border border-primary/20">
+            <Settings className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground ml-1">Config:</span>
             <span className="text-xs font-mono font-medium text-foreground">{configSummary}</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
           {signalsInfo.data && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-lg text-xs">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <Signal className="w-3.5 h-3.5 text-green-500" />
               <span className="font-medium">{signalsInfo.data.total}</span>
               <span className="text-muted-foreground">señales</span>
               <span className="text-muted-foreground">•</span>
-              <span className="text-green-500 font-medium">{signalsInfo.data.bySide.buy}B</span>
+              <span className="text-success font-medium">{signalsInfo.data.bySide.buy}B</span>
               <span className="text-muted-foreground">/</span>
-              <span className="text-red-500 font-medium">{signalsInfo.data.bySide.sell}S</span>
+              <span className="text-destructive font-medium">{signalsInfo.data.bySide.sell}S</span>
             </div>
           )}
           {cacheStatus.data && (
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${
-              cacheStatus.data.isLoaded ? "bg-green-500/10 text-green-600" : "bg-yellow-500/10 text-yellow-600"
+              cacheStatus.data.isLoaded ? "bg-success/10 text-success" : "bg-amber-500/10 text-amber-600"
             }`}>
-              <span>{cacheStatus.data.isLoaded ? "✓" : "⏳"}</span>
+              <Database className="w-3.5 h-3.5" />
               <span className="font-medium">{(cacheStatus.data.totalTicks / 1000000).toFixed(1)}M</span>
               <span className="opacity-70">ticks</span>
             </div>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleDark}
+            className="ml-2"
+          >
+            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </Button>
         </div>
       </div>
 
@@ -310,10 +342,13 @@ export default function BacktesterPage() {
             </div>
 
             {/* Grid Spacing Slider */}
-            <div className="space-y-2 p-3 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-lg border border-blue-500/10">
+            <div className="space-y-2 p-3 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/10">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-medium text-blue-600 dark:text-blue-400">Grid Spacing (pips)</Label>
-                <span className="text-sm font-mono font-bold text-blue-600">{config.pipsDistance}</span>
+                <div className="flex items-center gap-2">
+                  <Scale className="w-3.5 h-3.5 text-primary" />
+                  <Label className="text-xs font-medium text-primary">Grid Spacing (pips)</Label>
+                </div>
+                <span className="text-sm font-mono font-bold text-primary">{config.pipsDistance}</span>
               </div>
               <Slider
                 min={5}
@@ -330,9 +365,12 @@ export default function BacktesterPage() {
             </div>
 
             {/* Max Levels Slider */}
-            <div className="space-y-2 p-3 bg-gradient-to-r from-purple-500/5 to-pink-500/5 rounded-lg border border-purple-500/10">
+            <div className="space-y-2 p-3 bg-gradient-to-r from-purple-500/5 to-purple-500/10 rounded-lg border border-purple-500/10">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-medium text-purple-600 dark:text-purple-400">Max Levels</Label>
+                <div className="flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-purple-500" />
+                  <Label className="text-xs font-medium text-purple-600 dark:text-purple-400">Max Levels</Label>
+                </div>
                 <span className="text-sm font-mono font-bold text-purple-600">{config.maxLevels}</span>
               </div>
               <Slider
@@ -350,10 +388,13 @@ export default function BacktesterPage() {
             </div>
 
             {/* Take Profit Slider */}
-            <div className="space-y-2 p-3 bg-gradient-to-r from-green-500/5 to-emerald-500/5 rounded-lg border border-green-500/10">
+            <div className="space-y-2 p-3 bg-gradient-to-r from-success/5 to-success/10 rounded-lg border border-success/10">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-medium text-green-600 dark:text-green-400">Take Profit (pips)</Label>
-                <span className="text-sm font-mono font-bold text-green-600">{config.takeProfitPips}</span>
+                <div className="flex items-center gap-2">
+                  <Target className="w-3.5 h-3.5 text-success" />
+                  <Label className="text-xs font-medium text-success">Take Profit (pips)</Label>
+                </div>
+                <span className="text-sm font-mono font-bold text-success">{config.takeProfitPips}</span>
               </div>
               <Slider
                 min={5}
@@ -377,6 +418,7 @@ export default function BacktesterPage() {
                     checked={config.useStopLoss}
                     onCheckedChange={(checked) => updateConfig("useStopLoss", checked)}
                   />
+                  <Shield className="w-3.5 h-3.5 text-muted-foreground" />
                   <Label className="text-xs font-medium cursor-pointer">Use Stop Loss</Label>
                 </div>
               </div>
@@ -384,8 +426,8 @@ export default function BacktesterPage() {
               {config.useStopLoss && (
                 <div className="space-y-2 mt-2 animate-fade-in">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-red-600 dark:text-red-400">Stop Loss (pips)</Label>
-                    <span className="text-sm font-mono font-bold text-red-600">{config.stopLossPips || 100}</span>
+                    <Label className="text-xs text-destructive">Stop Loss (pips)</Label>
+                    <span className="text-sm font-mono font-bold text-destructive">{config.stopLossPips || 100}</span>
                   </div>
                   <Slider
                     min={0}
@@ -512,8 +554,8 @@ export default function BacktesterPage() {
 
             {/* Botón Ejecutar Backtest - GRANDE */}
             <Button
-              className={`w-full h-14 text-base font-semibold btn-execute ${
-                executeBacktest.isPending ? "animate-pulse" : ""
+              className={`w-full h-14 text-base font-semibold transition-all duration-200 ${
+                executeBacktest.isPending ? "animate-pulse" : "hover:translate-y-[-1px] hover:shadow-lg hover:shadow-primary/40"
               }`}
               onClick={handleExecute}
               disabled={executeBacktest.isPending}
@@ -521,12 +563,12 @@ export default function BacktesterPage() {
             >
               {executeBacktest.isPending ? (
                 <span className="flex items-center gap-2">
-                  <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <RefreshCw className="w-5 h-5 animate-spin" />
                   Procesando {signalLimit} señales...
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  <span className="text-lg">▶</span>
+                  <Play className="w-5 h-5" />
                   Ejecutar Backtest
                 </span>
               )}
@@ -556,18 +598,18 @@ export default function BacktesterPage() {
             {/* Botón limpiar cache */}
             <Button
               variant="outline"
-              className="w-full h-9 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/50"
+              className="w-full h-9 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50"
               onClick={() => { clearCache.mutate(); executeBacktest.reset(); setSaveSuccess(false); }}
               disabled={clearCache.isPending}
             >
               {clearCache.isPending ? (
                 <span className="flex items-center gap-2">
-                  <span className="w-3 h-3 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+                  <RefreshCw className="w-3 h-3 animate-spin" />
                   Limpiando...
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  <span>🗑️</span>
+                  <Trash2 className="w-3.5 h-3.5" />
                   Limpiar caché
                 </span>
               )}
@@ -617,13 +659,14 @@ export default function BacktesterPage() {
                     value={`${results.totalProfit >= 0 ? "+" : ""}${results.totalProfit?.toFixed(2)}€`}
                     positive={results.totalProfit >= 0}
                     highlight
-                    icon={results.totalProfit >= 0 ? "📈" : "📉"}
+                    icon={results.totalProfit >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                     subtitle={results.profitPercent ? `${results.profitPercent >= 0 ? "+" : ""}${results.profitPercent.toFixed(1)}%` : undefined}
                   />
                   <MetricBox
                     label="Win Rate"
                     value={`${results.winRate?.toFixed(0)}%`}
                     positive={results.winRate >= 50}
+                    icon={<Target className="w-3.5 h-3.5" />}
                     subtitle={results.totalTrades ? `${Math.round(results.totalTrades * results.winRate / 100)}W / ${results.totalTrades - Math.round(results.totalTrades * results.winRate / 100)}L` : undefined}
                   />
                   <MetricBox
@@ -631,12 +674,14 @@ export default function BacktesterPage() {
                     value={results.profitFactor === Infinity ? "∞" : (results.profitFactor?.toFixed(2) || "-")}
                     positive={(results.profitFactor ?? 0) >= 1.5}
                     warning={(results.profitFactor ?? 0) >= 1 && (results.profitFactor ?? 0) < 1.5}
+                    icon={<Scale className="w-3.5 h-3.5" />}
                   />
                   <MetricBox
                     label="Max Drawdown"
                     value={`${results.maxDrawdownPercent?.toFixed(1)}%`}
                     positive={results.maxDrawdownPercent < 15}
                     warning={results.maxDrawdownPercent >= 15 && results.maxDrawdownPercent < 25}
+                    icon={<Shield className="w-3.5 h-3.5" />}
                     subtitle={results.maxDrawdown ? `€${results.maxDrawdown.toFixed(0)}` : undefined}
                   />
                 </div>
@@ -806,24 +851,27 @@ export default function BacktesterPage() {
                 {/* Gráfico de velas del trade seleccionado */}
                 {selectedTradeIndex !== null && results.tradeDetails[selectedTradeIndex] && (
                   <div className="border rounded-lg overflow-hidden animate-slide-up shadow-lg">
-                    <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-b">
+                    <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-primary/10 to-accent/10 border-b">
                       <div className="flex items-center gap-3">
-                        <span className="text-lg">📊</span>
+                        <BarChart3 className="w-5 h-5 text-primary" />
                         <div>
                           <h4 className="text-sm font-semibold">
                             Trade #{selectedTradeIndex + 1}
                           </h4>
-                          <span className={`text-xs font-medium ${
+                          <span className={`text-xs font-medium flex items-center gap-1 ${
                             results.tradeDetails[selectedTradeIndex].signalSide === "BUY"
-                              ? "text-green-600"
-                              : "text-red-600"
+                              ? "text-success"
+                              : "text-destructive"
                           }`}>
-                            {results.tradeDetails[selectedTradeIndex].signalSide === "BUY" ? "📈 LONG" : "📉 SHORT"}
+                            {results.tradeDetails[selectedTradeIndex].signalSide === "BUY"
+                              ? <><ChevronUp className="w-3.5 h-3.5" /> LONG</>
+                              : <><ChevronDown className="w-3.5 h-3.5" /> SHORT</>
+                            }
                           </span>
-                          <span className={`ml-2 text-xs font-bold ${
+                          <span className={`ml-2 text-xs font-bold font-mono ${
                             results.tradeDetails[selectedTradeIndex].totalProfit >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
+                              ? "text-success"
+                              : "text-destructive"
                           }`}>
                             {results.tradeDetails[selectedTradeIndex].totalProfit >= 0 ? "+" : ""}
                             {results.tradeDetails[selectedTradeIndex].totalProfit?.toFixed(2)}€
@@ -889,9 +937,9 @@ export default function BacktesterPage() {
                 )}
 
                 {/* Guardar estrategia */}
-                <div className="p-4 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-lg border border-border/50 space-y-3">
+                <div className="p-4 bg-gradient-to-r from-primary/5 to-accent/5 rounded-lg border border-border/50 space-y-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">💾</span>
+                    <Save className="w-4 h-4 text-primary" />
                     <h4 className="text-sm font-semibold">Guardar como Estrategia</h4>
                   </div>
                   <div className="grid gap-2">
@@ -912,35 +960,39 @@ export default function BacktesterPage() {
                     <Button
                       onClick={handleSaveStrategy}
                       disabled={!strategyName.trim() || saveAsStrategy.isPending}
-                      className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                      className="flex-1 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                     >
                       {saveAsStrategy.isPending ? (
                         <span className="flex items-center gap-2">
-                          <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <RefreshCw className="w-3 h-3 animate-spin" />
                           Guardando...
                         </span>
                       ) : (
-                        "Guardar Estrategia"
+                        <span className="flex items-center gap-2">
+                          <Save className="w-3.5 h-3.5" />
+                          Guardar Estrategia
+                        </span>
                       )}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={saveCurrentResult}
-                      className="hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500/50"
+                      className="hover:bg-primary/10 hover:text-primary hover:border-primary/50"
                     >
+                      <Scale className="w-3.5 h-3.5 mr-1" />
                       Comparar
                     </Button>
                   </div>
                   {saveSuccess && (
-                    <div className="p-2 bg-green-500/10 border border-green-500/20 text-green-600 rounded-lg text-xs animate-fade-in flex items-center gap-2">
-                      <span>+</span>
+                    <div className="p-2 bg-success/10 border border-success/20 text-success rounded-lg text-xs animate-fade-in flex items-center gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
                       Estrategia guardada correctamente
                     </div>
                   )}
                   {saveAsStrategy.isError && (
-                    <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs animate-fade-in flex items-center gap-2">
-                      <span>x</span>
+                    <div className="p-2 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-xs animate-fade-in flex items-center gap-2">
+                      <AlertCircle className="w-3.5 h-3.5" />
                       Error al guardar: {saveAsStrategy.error.message}
                     </div>
                   )}
@@ -960,8 +1012,8 @@ export default function BacktesterPage() {
               </div>
             ) : (
               <div className="text-center py-16 animate-fade-in">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 mb-4">
-                  <span className="text-3xl">📊</span>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-accent/10 mb-4">
+                  <BarChart3 className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-lg font-medium mb-1">Sin resultados</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto">
@@ -977,7 +1029,7 @@ export default function BacktesterPage() {
       <Card className="border-border/50 shadow-sm">
         <CardHeader className="pb-2 pt-3 bg-gradient-to-r from-card to-muted/20">
           <CardTitle className="text-base flex items-center gap-2">
-            <span className="w-1.5 h-4 bg-purple-500 rounded-full" />
+            <Zap className="w-4 h-4 text-purple-500" />
             Optimizador
           </CardTitle>
         </CardHeader>
@@ -1015,11 +1067,14 @@ export default function BacktesterPage() {
             >
               {runOptimization.isPending ? (
                 <span className="flex items-center gap-2">
-                  <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <RefreshCw className="w-3 h-3 animate-spin" />
                   Optimizando...
                 </span>
               ) : (
-                "▶ Optimizar"
+                <span className="flex items-center gap-2">
+                  <Zap className="w-3.5 h-3.5" />
+                  Optimizar
+                </span>
               )}
             </Button>
           </div>
@@ -1092,7 +1147,7 @@ export default function BacktesterPage() {
         <Card className="border-border/50 shadow-sm">
           <CardHeader className="pb-2 pt-3 bg-gradient-to-r from-card to-muted/20">
             <CardTitle className="text-base flex items-center gap-2">
-              <span className="w-1.5 h-4 bg-amber-500 rounded-full" />
+              <Scale className="w-4 h-4 text-accent" />
               Comparador
               <span className="text-xs font-normal text-muted-foreground">
                 {savedResults.length} guardados
@@ -1156,7 +1211,7 @@ export default function BacktesterPage() {
         <Card className="border-border/50 shadow-sm">
           <CardHeader className="pb-2 pt-3 bg-gradient-to-r from-card to-muted/20">
             <CardTitle className="text-base flex items-center gap-2">
-              <span className="w-1.5 h-4 bg-blue-500 rounded-full" />
+              <TrendingUp className="w-4 h-4 text-primary" />
               Curva de Equity
               <span className="text-xs font-normal text-muted-foreground ml-auto">
                 Hover para ver detalles
@@ -1187,25 +1242,25 @@ function MetricBox({
   positive?: boolean;
   warning?: boolean;
   highlight?: boolean;
-  icon?: string;
+  icon?: React.ReactNode;
   subtitle?: string;
 }) {
   return (
     <div className={`p-2.5 rounded-lg text-center transition-all hover:scale-[1.02] cursor-default ${
       highlight
         ? positive
-          ? "bg-gradient-to-br from-green-500/20 to-green-500/5 border border-green-500/30"
-          : "bg-gradient-to-br from-red-500/20 to-red-500/5 border border-red-500/30"
+          ? "bg-gradient-to-br from-success/20 to-success/5 border border-success/30"
+          : "bg-gradient-to-br from-destructive/20 to-destructive/5 border border-destructive/30"
         : warning
-          ? "bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/20"
+          ? "bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20"
           : "bg-muted/30 hover:bg-muted/50 border border-transparent"
     }`}>
       <div className="flex items-center justify-center gap-1 mb-0.5">
-        {icon && <span className="text-xs">{icon}</span>}
+        {icon && <span className="text-muted-foreground">{icon}</span>}
         <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</span>
       </div>
-      <div className={`text-base font-bold metric-value ${
-        positive === true ? "text-green-500" : positive === false ? "text-red-500" : ""
+      <div className={`text-base font-bold font-mono transition-all ${
+        positive === true ? "text-success" : positive === false ? "text-destructive" : ""
       }`}>
         {value}
       </div>
@@ -1356,7 +1411,7 @@ function TradeChartWrapper({ trade, config, themeId = "mt5" }: { trade: any; con
   if (!isValidTradeForChart(trade)) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-        <span className="text-3xl mb-2">⚠️</span>
+        <AlertCircle className="w-8 h-8 mb-2" />
         <span className="text-sm">Datos del trade incompletos</span>
       </div>
     );
@@ -1371,7 +1426,7 @@ function TradeChartWrapper({ trade, config, themeId = "mt5" }: { trade: any; con
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <div className="relative">
-          <div className="w-10 h-10 border-4 border-muted border-t-blue-500 rounded-full animate-spin" />
+          <RefreshCw className="w-10 h-10 text-primary animate-spin" />
         </div>
         <span className="text-sm text-muted-foreground mt-3 animate-pulse">Cargando gráfico...</span>
       </div>
@@ -1380,8 +1435,8 @@ function TradeChartWrapper({ trade, config, themeId = "mt5" }: { trade: any; con
 
   if (tradeTicks.isError) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-red-500">
-        <span className="text-3xl mb-2">❌</span>
+      <div className="flex flex-col items-center justify-center py-12 text-destructive">
+        <AlertCircle className="w-8 h-8 mb-2" />
         <span className="text-sm">Error: {tradeTicks.error?.message}</span>
       </div>
     );
