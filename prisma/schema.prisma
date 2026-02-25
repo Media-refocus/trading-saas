@@ -49,6 +49,10 @@ model Tenant {
   planId          String?
   plan            Plan?          @relation(fields: [planId], references: [id])
 
+  // Telegram notifications
+  telegramChatId              String?
+  telegramNotificationsEnabled Boolean @default(false)
+
   users           User[]
   tradingAccounts TradingAccount[]
   signals         Signal[]

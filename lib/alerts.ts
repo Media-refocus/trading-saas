@@ -7,6 +7,10 @@
  *   await createAlert(tenantId, ALERT_TYPES.BOT_OFFLINE, "El bot esta offline");
  */
 import { prisma } from "@/lib/prisma";
+import {
+  sendTelegramMessage,
+  formatAlertMessage,
+} from "@/lib/telegram-notifications";
 
 export const ALERT_TYPES = {
   BOT_OFFLINE: "BOT_OFFLINE",
@@ -80,6 +84,24 @@ export async function createAlert(
     });
 
     console.log(`[Alerts] Alerta creada para tenant ${tenantId}: ${type} - ${message}`);
+
+    // Enviar notificacion por Telegram si esta configurado
+    if (tenant.telegramChatId && tenant.telegramNotificationsEnabled) {
+      try {
+        const telegramMessage = formatAlertMessage(type, message, alert.createdAt);
+        const result = await sendTelegramMessage(tenant.telegramChatId, telegramMessage);
+
+        if (result.success) {
+          console.log(`[Alerts] Notificacion Telegram enviada a tenant ${tenantId}`);
+        } else {
+          console.error(`[Alerts] Error enviando Telegram: ${result.error}`);
+        }
+      } catch (telegramError) {
+        // No fallar la creacion de alerta si Telegram falla
+        console.error(`[Alerts] Error enviando notificacion Telegram:`, telegramError);
+      }
+    }
+
     return alert;
   } catch (error) {
     console.error("[Alerts] Error creando alerta:", error);
