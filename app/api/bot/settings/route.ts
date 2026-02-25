@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { getTenantPlanLimits, applyPlanLimits } from "@/lib/plans";
 
 /**
  * GET /api/bot/settings
@@ -28,7 +29,9 @@ export async function GET() {
     }
 
     const botConfig = user.tenant.botConfigs[0];
-    const plan = user.tenant.plan;
+
+    // Obtener límites del plan usando el nuevo módulo
+    const planLimits = await getTenantPlanLimits(user.tenant.id);
 
     // Si no hay config, devolver defaults
     if (!botConfig) {
@@ -36,12 +39,12 @@ export async function GET() {
         success: true,
         config: null,
         planLimits: {
-          maxLevels: plan?.maxLevels ?? 3,
-          maxPositions: plan?.maxPositions ?? 1,
-          hasTrailingSL: plan?.hasTrailingSL ?? true,
-          hasAdvancedGrid: plan?.hasAdvancedGrid ?? false,
+          maxLevels: planLimits.maxLevels,
+          maxPositions: planLimits.maxPositions,
+          hasTrailingSL: planLimits.hasTrailingSL,
+          hasAdvancedGrid: planLimits.hasAdvancedGrid,
         },
-        planName: plan?.name ?? "Sin plan",
+        planName: planLimits.planName,
       });
     }
 
@@ -61,12 +64,12 @@ export async function GET() {
         isActive: botConfig.isActive,
       },
       planLimits: {
-        maxLevels: plan?.maxLevels ?? 3,
-        maxPositions: plan?.maxPositions ?? 1,
-        hasTrailingSL: plan?.hasTrailingSL ?? true,
-        hasAdvancedGrid: plan?.hasAdvancedGrid ?? false,
+        maxLevels: planLimits.maxLevels,
+        maxPositions: planLimits.maxPositions,
+        hasTrailingSL: planLimits.hasTrailingSL,
+        hasAdvancedGrid: planLimits.hasAdvancedGrid,
       },
-      planName: plan?.name ?? "Sin plan",
+      planName: planLimits.planName,
     });
   } catch (error) {
     console.error("Error obteniendo settings:", error);
@@ -105,7 +108,7 @@ export async function PUT(request: Request) {
       where: { email: session.user.email },
       include: {
         tenant: {
-          include: { botConfigs: true, plan: true }
+          include: { botConfigs: true }
         }
       },
     });
@@ -113,45 +116,6 @@ export async function PUT(request: Request) {
     if (!user?.tenant) {
       return NextResponse.json({ error: "Tenant no encontrado" }, { status: 404 });
     }
-
-    const plan = user.tenant.plan;
-    const planMaxLevels = plan?.maxLevels ?? 3;
-
-    // Validaciones
-    const validatedLotSize = Math.max(0.01, Math.min(lotSize ?? 0.01, 1.0));
-    const validatedMaxLevels = Math.max(1, Math.min(maxLevels ?? 3, planMaxLevels));
-    const validatedGridDistance = Math.max(5, Math.min(gridDistance ?? 10, 100));
-    const validatedTakeProfit = Math.max(5, Math.min(takeProfit ?? 20, 200));
-
-    // Validar trailing según plan
-    let validatedTrailingActivate = trailingActivate;
-    let validatedTrailingStep = trailingStep;
-    let validatedTrailingBack = trailingBack;
-
-    if (plan && !plan.hasTrailingSL) {
-      validatedTrailingActivate = null;
-      validatedTrailingStep = null;
-      validatedTrailingBack = null;
-    } else {
-      if (trailingActivate !== null && trailingActivate !== undefined) {
-        validatedTrailingActivate = Math.max(0, Math.min(trailingActivate, 100));
-      }
-      if (trailingStep !== null && trailingStep !== undefined) {
-        validatedTrailingStep = Math.max(5, Math.min(trailingStep, 50));
-      }
-      if (trailingBack !== null && trailingBack !== undefined) {
-        validatedTrailingBack = Math.max(10, Math.min(trailingBack, 100));
-      }
-    }
-
-    // Validar restricción
-    const validRestrictions = ["RIESGO", "SIN_PROMEDIOS", "SOLO_1_PROMEDIO", null];
-    const validatedRestriction = validRestrictions.includes(defaultRestriction)
-      ? defaultRestriction
-      : null;
-
-    // Validar paperTradingMode (booleano)
-    const validatedPaperTradingMode = typeof paperTradingMode === "boolean" ? paperTradingMode : false;
 
     const botConfig = user.tenant.botConfigs[0];
 
@@ -162,6 +126,32 @@ export async function PUT(request: Request) {
       );
     }
 
+    // Aplicar límites del plan
+    const { config: limitedConfig, warnings, limited } = await applyPlanLimits(
+      user.tenant.id,
+      {
+        maxLevels: maxLevels ?? 3,
+        trailingActivate,
+        trailingStep,
+        trailingBack,
+      }
+    );
+
+    // Validaciones básicas
+    const validatedLotSize = Math.max(0.01, Math.min(lotSize ?? 0.01, 1.0));
+    const validatedMaxLevels = Math.max(1, limitedConfig.maxLevels ?? 3);
+    const validatedGridDistance = Math.max(5, Math.min(gridDistance ?? 10, 100));
+    const validatedTakeProfit = Math.max(5, Math.min(takeProfit ?? 20, 200));
+
+    // Validar restricción
+    const validRestrictions = ["RIESGO", "SIN_PROMEDIOS", "SOLO_1_PROMEDIO", null];
+    const validatedRestriction = validRestrictions.includes(defaultRestriction)
+      ? defaultRestriction
+      : null;
+
+    // Validar paperTradingMode (booleano)
+    const validatedPaperTradingMode = typeof paperTradingMode === "boolean" ? paperTradingMode : false;
+
     // Actualizar config
     const updated = await prisma.botConfig.update({
       where: { id: botConfig.id },
@@ -170,9 +160,9 @@ export async function PUT(request: Request) {
         maxLevels: validatedMaxLevels,
         gridDistance: validatedGridDistance,
         takeProfit: validatedTakeProfit,
-        trailingActivate: validatedTrailingActivate,
-        trailingStep: validatedTrailingStep,
-        trailingBack: validatedTrailingBack,
+        trailingActivate: limitedConfig.trailingActivate ?? null,
+        trailingStep: limitedConfig.trailingStep ?? null,
+        trailingBack: limitedConfig.trailingBack ?? null,
         defaultRestriction: validatedRestriction,
         paperTradingMode: validatedPaperTradingMode,
       },
@@ -191,7 +181,11 @@ export async function PUT(request: Request) {
         defaultRestriction: updated.defaultRestriction,
         paperTradingMode: updated.paperTradingMode,
       },
-      message: "Configuracion actualizada. El bot aplicara los cambios automaticamente.",
+      warnings: warnings.length > 0 ? warnings : undefined,
+      limited,
+      message: limited
+        ? "Configuracion actualizada con ajustes por limites del plan."
+        : "Configuracion actualizada. El bot aplicara los cambios automaticamente.",
     });
   } catch (error) {
     console.error("Error actualizando settings:", error);

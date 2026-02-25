@@ -9,6 +9,7 @@ const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/backtester", label: "Backtester" },
   { href: "/settings", label: "Configuracion" },
+  { href: "/pricing", label: "Planes" },
   { href: "/telegram", label: "Telegram" },
   { href: "/setup", label: "Instalar Bot" },
   { href: "/help", label: "Ayuda" },

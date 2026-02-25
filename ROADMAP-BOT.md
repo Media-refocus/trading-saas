@@ -108,21 +108,25 @@
 
 ## FASE 4: Multi-Tenant y Pagos
 
-### 4.1 Planes y Límites
+### 4.1 Planes y Límites ✅ COMPLETADO
 **Prioridad:** ALTA (para monetizar)
+**Commit:** e189f32+
 
-**Tasks:**
-- [ ] Model Plan en Prisma con límites
-- [ ] Middleware para verificar límites
-- [ ] Bloquear features según plan
-- [ ] Upgrade/downgrade de plan
+**Tasks completadas:**
+- [x] Model Plan en Prisma con límites
+- [x] Seed de planes (Basic, Pro, Enterprise)
+- [x] lib/plans.ts - funciones de verificación de límites
+- [x] Middleware para verificar límites en settings
+- [x] Bloquear features según plan
+- [x] Página /pricing para upgrade/downgrade
+- [x] API /api/plans para listar y cambiar planes
 
-**Planes propuestos:**
+**Planes implementados:**
 | Plan | Precio | Max niveles | Max posiciones | Soporte |
 |------|--------|-------------|----------------|---------|
-| Básico | $49/mes | 3 | 1 | Email |
-| Pro | $99/mes | 5 | 3 | Priority |
-| Enterprise | $249/mes | Ilimitado | Ilimitado | Dedicado |
+| Basic | $49/mes | 2 | 1 | Email |
+| Pro | $99/mes | 4 | 3 | Priority |
+| Enterprise | $249/mes | 10 | 10 | Dedicado |
 
 ### 4.2 Integración Stripe
 **Prioridad:** ALTA
@@ -132,7 +136,6 @@
 - [ ] Checkout para suscripción
 - [ ] Webhooks para eventos de pago
 - [ ] Gestión de suscripciones
-- [ ] Página de pricing
 
 ---
 
