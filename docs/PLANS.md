@@ -5,8 +5,8 @@
 | Plan | Precio | Público objetivo |
 |------|--------|------------------|
 | Básico | €57/mes | Traders individuales |
-| Pro | €147/mes | Traders serios con múltiples cuentas |
-| Enterprise | €347/mes | Profesionales e instituciones |
+| Pro | €147/mes | Traders serios que quieren protección profesional |
+| Enterprise | €347/mes | Profesionales, gestores e instituciones |
 
 ---
 
@@ -14,20 +14,51 @@
 
 | Feature | Básico €57 | Pro €147 | Enterprise €347 |
 |---------|------------|----------|-----------------|
-| **Cuentas MT5** | 1 | 3 | Ilimitadas |
-| **Bot señales XAUUSD** | ✓ | ✓ | ✓ |
-| **Dashboard básico** | ✓ | ✓ | ✓ |
-| **Heartbeat monitoring** | ✓ | ✓ | ✓ |
-| **Soporte email** | ✓ | ✓ | ✓ |
-| **Notificaciones Telegram** | - | ✓ | ✓ |
-| **Dashboard avanzado** | - | ✓ | ✓ |
-| **Exportar CSV/PDF** | - | ✓ | ✓ |
-| **Soporte prioritario 24h** | - | ✓ | ✓ |
-| **Multi-símbolo** | - | - | ✓ |
-| **Backtester integrado** | - | - | ✓ |
-| **API access** | - | - | ✓ |
-| **SLA 99.9% uptime** | - | - | ✓ |
-| **Soporte dedicado + call** | - | - | ✓ |
+| **CUENTAS Y ACCESO** |
+| Cuentas MT5 | 1 | 3 | Ilimitadas |
+| Bot señales XAUUSD | ✓ | ✓ | ✓ |
+| Dashboard básico | ✓ | ✓ | ✓ |
+| Heartbeat monitoring | ✓ | ✓ | ✓ |
+| **PROTECCIÓN DE CAPITAL** |
+| Circuit Breaker | - | ✓ | ✓ |
+| Account Guardian (DD protection) | - | ✓ | ✓ |
+| Límites de pérdida (D/S/M) | - | ✓ | ✓ |
+| Emergency Kill Switch | - | ✓ | ✓ |
+| Position Sizing Auto (Kelly) | - | ✓ | ✓ |
+| **ANALYTICS** |
+| Métricas básicas | ✓ | ✓ | ✓ |
+| Métricas profesionales (Sharpe, Sortino) | - | ✓ | ✓ |
+| Equity curve interactiva | - | ✓ | ✓ |
+| Heatmap rendimiento horario | - | ✓ | ✓ |
+| Análisis de rachas/streaks | - | ✓ | ✓ |
+| Reportes PDF semanales | - | ✓ | ✓ |
+| Benchmark vs Buy & Hold | - | ✓ | ✓ |
+| **AUTOMATIZACIÓN** |
+| Telegram notificaciones | - | ✓ | ✓ |
+| News Filter (pausa en noticias) | - | ✓ | ✓ |
+| Session Trading (horarios) | - | ✓ | ✓ |
+| TradingView Bridge | - | ✓ | ✓ |
+| Discord/Slack Bot | - | ✓ | ✓ |
+| Webhooks personalizados | - | ✓ | ✓ |
+| **TRADING INTELIGENTE** |
+| Grid básico | ✓ | ✓ | ✓ |
+| Smart Entry Filter | - | ✓ | ✓ |
+| Signal Confidence Score | - | ✓ | ✓ |
+| Breakeven + Lock Profit | - | ✓ | ✓ |
+| Smart Trailing (ATR-based) | - | ✓ | ✓ |
+| **FEATURES PREMIUM** |
+| Backtesting Engine | - | - | ✓ |
+| Monte Carlo Simulation | - | - | ✓ |
+| Multi-Timeframe Confirmation | - | - | ✓ |
+| Copy Trading Network | - | - | ✓ |
+| API Pública REST + WebSocket | - | - | ✓ |
+| Multi-Símbolo | - | - | ✓ |
+| Paper Trading | - | - | ✓ |
+| **SOPORTE** |
+| Soporte email | 48h | 24h | 4h |
+| Soporte Telegram | - | ✓ | ✓ |
+| Calls mensuales | - | - | ✓ |
+| Onboarding asistido | - | - | ✓ |
 
 ---
 
@@ -35,74 +66,82 @@
 
 ### 🥉 Básico - €57/mes
 
-**Para:** Traders individuales que quieren automatizar señales de XAUUSD
+**Para:** Traders individuales que quieren automatizar señales de XAUUSD sin complicaciones.
 
 **Incluye:**
 - 1 cuenta MT5
 - Bot de señales XAUUSD
-- Dashboard básico:
-  - Ver trades abiertos y cerrados
-  - P&L total y diario
-  - Win rate básico
-- Monitoreo de estado del bot (online/offline)
+- Dashboard básico (trades, P&L, win rate)
+- Monitoreo de estado del bot
 - Soporte por email (48h respuesta)
 
 **Límites:**
 - Solo XAUUSD
 - Sin Telegram
-- Sin exportación de datos
+- Sin protección avanzada
+- Sin analytics profesionales
 
 ---
 
-### 🥈 Pro - €147/mes
+### 🥈 Pro - €147/mes (+€90/mes)
 
-**Para:** Traders serios que quieren más control y visibilidad
+**Para:** Traders serios que entienden que **proteger el capital es más importante que maximizar ganancias**.
 
-**Incluye todo lo de Básico +:**
-- 3 cuentas MT5
-- Notificaciones Telegram:
-  - Trade abierto/cerrado
-  - Señales recibidas
-  - Alertas del sistema
-  - Comandos: /status, /pause, /resume
-- Dashboard avanzado:
-  - Gráficos de equity
-  - Estadísticas detalladas
-  - Historial completo
-- Exportar datos en CSV y PDF
-- Soporte prioritario (respuesta en 24h)
+**Protección de Capital:**
+- **Circuit Breaker** - Pausa automática en volatilidad extrema o eventos de mercado
+- **Account Guardian** - Reduce exposición cuando drawdown > límite configurado
+- **Límites de Pérdida** - Diario (3%), semanal (6%), mensual (10%) con pausas automáticas
+- **Emergency Kill Switch** - Botón de pánico accesible desde cualquier dispositivo
+- **Position Sizing Auto** - Calcula tamaño óptimo con Kelly Criterion
 
-**Límites:**
-- Solo XAUUSD
-- Máximo 3 cuentas
+**Analytics Profesional:**
+- Métricas institucionales: Sharpe, Sortino, Calmar, Max DD, Recovery Factor
+- Equity curve interactiva con zoom temporal
+- Heatmap de rendimiento por día/hora
+- Análisis de rachas ganadoras/perdedoras
+- Reportes PDF semanales automáticos
+- Comparativa vs Buy & Hold XAUUSD
+
+**Automatización:**
+- Telegram con comandos interactivos
+- News Filter - pausa antes de noticias de alto impacto
+- Session Trading - horarios por sesión (Londres, NY, Asia)
+- TradingView Bridge - ejecuta alertas de TradingView
+- Discord/Slack Bot
+- Webhooks para integraciones (Zapier, n8n, etc.)
+
+**Trading Inteligente:**
+- Smart Entry Filter - verifica spread, volatilidad, hora
+- Signal Confidence Score - score 0-100 por señal
+- Breakeven + Lock Profit - protege ganancias automáticamente
+- Smart Trailing - se adapta a volatilidad actual (ATR)
+
+**Por qué justifica el precio:**
+> Un solo circuit breaker activado puede ahorrar €200-500 en pérdidas evitadas.
+> El position sizing óptimo puede mejorar returns un 15-25% anualmente.
 
 ---
 
-### 🥇 Enterprise - €347/mes
+### 🥇 Enterprise - €347/mes (+€200/mes)
 
-**Para:** Profesionales, gestores de capital e instituciones
+**Para:** Profesionales, gestores de capital e instituciones que necesitan herramientas avanzadas.
 
-**Incluye todo lo de Pro +:**
-- Cuentas MT5 ilimitadas
-- Multi-símbolo:
-  - XAUUSD
-  - EURUSD
-  - GBPUSD
-  - USDJPY
-  - (Más según demanda)
-- Backtester integrado:
-  - Probar estrategias antes de operar
-  - Optimización de parámetros
-  - Reportes de rendimiento
-- API access:
-  - Webhooks para integraciones
-  - Acceso programático a datos
-  - Automatizaciones custom
-- SLA 99.9% uptime garantizado
-- Soporte dedicado:
-  - Respuesta en 4h
-  - Call mensual de revisión
-  - Configuración asistida
+**Todo lo de Pro +:**
+
+**Features Premium:**
+- **Backtesting Engine** - Prueba configuraciones con datos históricos
+- **Monte Carlo Simulation** - 1000 escenarios futuros, probabilidad de outcomes
+- **Multi-Timeframe Confirmation** - Solo entra si H1/H4 confirman dirección
+- **Copy Trading Network** - Comparte o copia señales de otros traders
+- **API Pública** - REST + WebSocket para integraciones
+- **Multi-Símbolo** - XAUUSD, EURUSD, GBPUSD, USDJPY, etc.
+- **Paper Trading** - Testea con dinero ficticio antes de ir live
+
+**Soporte Premium:**
+- Respuesta en 4 horas
+- Call mensual de revisión
+- Onboarding asistido
+- Configuración personalizada
 
 ---
 
@@ -113,13 +152,23 @@
 **Plan durante trial:** PRO completo
 
 **Por qué PRO en trial:**
-- El usuario ve todas las features (Telegram, gráficos, etc.)
-- Genera "hook emocional" - no quiere perder el Telegram
+- El usuario ve todas las features (protección, analytics, automatización)
+- Genera "hook emocional" - no quiere perder el circuit breaker ni Telegram
 - Mayor conversión a planes de pago
 
-**Cuando expira:**
-- Usuario elige plan → continúa con features de ese plan
-- No elige plan → bot pausado, dashboard muestra opciones
+---
+
+## ROI del Plan Pro
+
+| Feature | Valor Mensual Estimado |
+|---------|----------------------|
+| Circuit Breaker (1 activación) | €200-500 ahorrados |
+| Position Sizing Óptimo | 15-25% mejora returns |
+| News Filter (evita slippage) | €50-150 ahorrados |
+| Reportes automáticos | 2-3 horas ahorradas |
+| Smart Entry Filter | 5-10% mejora win rate |
+
+**Total estimado:** €300-600/mes de valor → Plan €147/mes = ROI positivo
 
 ---
 
@@ -130,79 +179,43 @@
 | Trimestral | 10% |
 | Anual | 20% |
 
-**Ejemplo Pro anual:** €147 × 12 × 0.80 = €1,411/año (€235 ahorro)
+**Ejemplo Pro anual:** €147 × 12 × 0.80 = €1,411/año (€353 ahorro)
 
 ---
 
-## Migración de Planes
+## Quick Wins de Implementación
 
-### Upgrade
-- Inmediato
-- Prorrateo automático
-- Nuevas features disponibles al instante
+Primeras features a implementar para justificar el tier PRO:
 
-### Downgrade
-- Efectivo al siguiente período de facturación
-- Features actuales se mantienen hasta entonces
-- Email de confirmación
+| Feature | Días | Impacto |
+|---------|------|---------|
+| Emergency Kill Switch | 1 | Alto |
+| Límites de Pérdida | 2 | Alto |
+| Session Trading | 2 | Medio |
+| Métricas de Riesgo | 3 | Alto |
+| Heatmap Horario | 2 | Medio |
+| Breakeven + Lock Profit | 2 | Alto |
+| News Filter | 5 | Alto |
 
-### Cancelación
-- Efectivo al final del período pagado
-- Datos retenidos 30 días
-- Reactivación sin pérdida de datos
-
----
-
-## Límites Técnicos por Plan
-
-```typescript
-const PLAN_LIMITS = {
-  basic: {
-    maxAccounts: 1,
-    telegramEnabled: false,
-    backtestEnabled: false,
-    multiSymbol: false,
-    apiAccess: false,
-    supportLevel: 'email',
-    maxHistoryDays: 30,
-  },
-  pro: {
-    maxAccounts: 3,
-    telegramEnabled: true,
-    backtestEnabled: false,
-    multiSymbol: false,
-    apiAccess: false,
-    supportLevel: 'priority',
-    maxHistoryDays: 90,
-  },
-  enterprise: {
-    maxAccounts: Infinity,
-    telegramEnabled: true,
-    backtestEnabled: true,
-    multiSymbol: true,
-    apiAccess: true,
-    supportLevel: 'dedicated',
-    maxHistoryDays: 365,
-  },
-};
-```
+**Total Quick Wins: ~17 días**
 
 ---
 
 ## FAQs
 
 **¿Puedo cambiar de plan?**
-Sí, puedes hacer upgrade o downgrade en cualquier momento.
+Sí, upgrade/downgrade en cualquier momento.
 
-**¿Qué pasa si añado más cuentas de las permitidas?**
-El dashboard te avisará y no podrás añadir más hasta hacer upgrade.
+**¿El trial requiere tarjeta?**
+No, el trial es sin tarjeta.
 
-**¿El trial requiere tarjeta de crédito?**
-No, el trial es sin tarjeta. Solo la pides cuando quiere activar el plan.
+**¿Qué pasa si el pago falla?**
+8 días de gracia, 3 intentos de cobro, luego pausa.
 
 **¿Puedo pausar mi suscripción?**
-Sí, puedes pausar hasta 3 meses al año sin perder datos.
+Sí, hasta 3 meses al año sin perder datos.
 
 ---
 
 *Precios actualizados: 2026-02-26*
+*Basado en brainstorming de 4 agentes especializados*
