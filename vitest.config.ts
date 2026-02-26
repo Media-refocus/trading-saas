@@ -8,6 +8,9 @@ export default defineConfig({
     environment: "node",
     include: ["**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
     exclude: ["node_modules", ".next", "prisma"],
+    testTimeout: 60000,
+    hookTimeout: 60000,
+    globalSetup: ["./tests/global-setup.ts"],
   },
   resolve: {
     alias: {

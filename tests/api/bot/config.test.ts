@@ -1,89 +1,58 @@
 /**
  * Tests para endpoints REST del bot
  *
- * Estos tests verifican la API que el bot Python usa para comunicarse con el SaaS.
+ * Usa base de datos de prueba separada (prisma/test.db)
+ * configurada por tests/global-setup.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "@/app/api/bot/config/route";
 import { POST as heartbeatPost } from "@/app/api/bot/heartbeat/route";
 import { POST as signalPost } from "@/app/api/bot/signal/route";
 import { POST as tradePost } from "@/app/api/bot/trade/route";
-import { prisma } from "@/lib/prisma";
 import { generateApiKey } from "@/lib/api-key";
+import {
+  getTestPrisma,
+  createTestTenant,
+  createTestBotConfig,
+  createTestBotAccount,
+} from "../../setup";
 
 // API key de prueba
 let testApiKey: string;
 let testBotConfigId: string;
+let testBotAccountId: string;
 
 describe("Bot API Endpoints", () => {
   beforeAll(async () => {
-    // Crear tenant de prueba si no existe
-    let tenant = await prisma.tenant.findFirst({
-      where: { email: "test-bot@example.com" },
-    });
+    // La DB de test ya está configurada por global-setup.ts
 
-    if (!tenant) {
-      tenant = await prisma.tenant.create({
-        data: {
-          name: "Test Bot Tenant",
-          email: "test-bot@example.com",
-        },
-      });
-    }
+    // Crear tenant de prueba
+    const tenant = await createTestTenant("test-bot-api@example.com");
 
     // Generar API key
     const { apiKey, apiKeyHash } = await generateApiKey();
     testApiKey = apiKey;
 
-    // Crear o actualizar BotConfig
-    const existingConfig = await prisma.botConfig.findUnique({
-      where: { tenantId: tenant.id },
-    });
+    // Crear BotConfig
+    const config = await createTestBotConfig(tenant.id, apiKeyHash);
+    testBotConfigId = config.id;
 
-    if (!existingConfig) {
-      const config = await prisma.botConfig.create({
-        data: {
-          tenantId: tenant.id,
-          apiKeyHash,
-          symbol: "XAUUSD",
-          magicNumber: 20250101,
-          entryLot: 0.1,
-          entryNumOrders: 1,
-          gridStepPips: 10,
-          gridLot: 0.1,
-          gridMaxLevels: 4,
-          gridNumOrders: 1,
-          gridTolerancePips: 1,
-          maxLevels: 4,
-        },
-      });
-      testBotConfigId = config.id;
-    } else {
-      testBotConfigId = existingConfig.id;
-      await prisma.botConfig.update({
-        where: { id: existingConfig.id },
-        data: { apiKeyHash },
-      });
-    }
+    // Crear BotAccount
+    const account = await createTestBotAccount(config.id);
+    testBotAccountId = account.id;
 
-    console.log("Test setup complete. BotConfig ID:", testBotConfigId);
-  });
+    console.log("✅ Test setup complete");
+  }, 60000);
 
-  afterAll(async () => {
-    // Limpiar datos de prueba
-    await prisma.botHeartbeat.deleteMany({
-      where: { botConfigId: testBotConfigId },
-    });
-    await prisma.signal.deleteMany({
-      where: { botConfigId: testBotConfigId },
-    });
-    await prisma.trade.deleteMany({
-      where: { botConfigId: testBotConfigId },
-    });
-
-    await prisma.$disconnect();
+  beforeEach(async () => {
+    // Limpiar heartbeats, señales y trades entre tests
+    const prisma = getTestPrisma();
+    await prisma.botHeartbeat.deleteMany({});
+    await prisma.signal.deleteMany({});
+    await prisma.trade.deleteMany({});
+    await prisma.botPosition.deleteMany({});
   });
 
   describe("GET /api/bot/config", () => {
@@ -92,24 +61,28 @@ describe("Bot API Endpoints", () => {
       const response = await GET(request);
 
       expect(response.status).toBe(401);
+      const data = await response.json();
+      expect(data.error).toContain("Authorization");
     });
 
     it("should return config with valid API key", async () => {
       const request = new NextRequest("http://localhost:3000/api/bot/config", {
         headers: {
           Authorization: `Bearer ${testApiKey}`,
-          "X-Bot-Version": "1.0.0",
+          "X-Bot-Version": "1.0.0-test",
         },
       });
 
       const response = await GET(request);
-      const data = await response.json();
-
       expect(response.status).toBe(200);
+
+      const data = await response.json();
       expect(data.symbol).toBe("XAUUSD");
       expect(data.entry).toBeDefined();
+      expect(data.entry.lot).toBe(0.1);
       expect(data.grid).toBeDefined();
-      expect(data.accounts).toBeDefined();
+      expect(data.grid.stepPips).toBe(10);
+      expect(data.accounts).toBeInstanceOf(Array);
     });
   });
 
@@ -129,7 +102,7 @@ describe("Bot API Endpoints", () => {
         method: "POST",
         headers: {
           Authorization: `Bearer ${testApiKey}`,
-          "X-Bot-Version": "1.0.0",
+          "X-Bot-Version": "1.0.0-test",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -142,12 +115,12 @@ describe("Bot API Endpoints", () => {
       });
 
       const response = await heartbeatPost(request);
-      const data = await response.json();
-
       expect(response.status).toBe(200);
+
+      const data = await response.json();
       expect(data.success).toBe(true);
       expect(data.serverTime).toBeDefined();
-      expect(data.commands).toBeDefined();
+      expect(data.commands).toBeInstanceOf(Array);
     });
 
     it("should return 400 with invalid JSON", async () => {
@@ -157,11 +130,38 @@ describe("Bot API Endpoints", () => {
           Authorization: `Bearer ${testApiKey}`,
           "Content-Type": "application/json",
         },
-        body: "invalid json",
+        body: "not valid json",
       });
 
       const response = await heartbeatPost(request);
       expect(response.status).toBe(400);
+    });
+
+    it("should save heartbeat to database", async () => {
+      const request = new NextRequest("http://localhost:3000/api/bot/heartbeat", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mt5Connected: true,
+          telegramConnected: false,
+          openPositions: 3,
+        }),
+      });
+
+      await heartbeatPost(request);
+
+      // Verificar que se guardó en la DB
+      const prisma = getTestPrisma();
+      const heartbeats = await prisma.botHeartbeat.findMany({
+        where: { botConfigId: testBotConfigId },
+      });
+
+      expect(heartbeats.length).toBeGreaterThan(0);
+      expect(heartbeats[0].mt5Connected).toBe(true);
+      expect(heartbeats[0].openPositions).toBe(3);
     });
   });
 
@@ -182,12 +182,41 @@ describe("Bot API Endpoints", () => {
       });
 
       const response = await signalPost(request);
-      const data = await response.json();
-
       expect(response.status).toBe(200);
+
+      const data = await response.json();
       expect(data.success).toBe(true);
       expect(data.signalId).toBeDefined();
       expect(data.action).toBe("EXECUTE");
+    });
+
+    it("should handle close signal", async () => {
+      const request = new NextRequest("http://localhost:3000/api/bot/signal", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          side: "BUY",
+          symbol: "XAUUSD",
+          messageText: "cerramos rango",
+          isCloseSignal: true,
+        }),
+      });
+
+      const response = await signalPost(request);
+      expect(response.status).toBe(200);
+
+      const data = await response.json();
+      expect(data.action).toBe("EXECUTE");
+
+      // Verificar en DB
+      const prisma = getTestPrisma();
+      const signal = await prisma.signal.findFirst({
+        where: { id: data.signalId },
+      });
+      expect(signal?.isCloseSignal).toBe(true);
     });
 
     it("should reject invalid side", async () => {
@@ -207,22 +236,26 @@ describe("Bot API Endpoints", () => {
       const response = await signalPost(request);
       expect(response.status).toBe(400);
     });
+
+    it("should require side and symbol", async () => {
+      const request = new NextRequest("http://localhost:3000/api/bot/signal", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messageText: "Test",
+        }),
+      });
+
+      const response = await signalPost(request);
+      expect(response.status).toBe(400);
+    });
   });
 
   describe("POST /api/bot/trade", () => {
     it("should create trade with OPEN action", async () => {
-      // Primero crear una cuenta de bot
-      const botAccount = await prisma.botAccount.create({
-        data: {
-          botConfigId: testBotConfigId,
-          loginEnc: "encrypted_login",
-          passwordEnc: "encrypted_password",
-          serverEnc: "encrypted_server",
-          symbol: "XAUUSD",
-          magic: 20250101,
-        },
-      });
-
       const request = new NextRequest("http://localhost:3000/api/bot/trade", {
         method: "POST",
         headers: {
@@ -231,7 +264,7 @@ describe("Bot API Endpoints", () => {
         },
         body: JSON.stringify({
           action: "OPEN",
-          botAccountId: botAccount.id,
+          botAccountId: testBotAccountId,
           mt5Ticket: 12345,
           side: "BUY",
           symbol: "XAUUSD",
@@ -242,11 +275,20 @@ describe("Bot API Endpoints", () => {
       });
 
       const response = await tradePost(request);
-      const data = await response.json();
-
       expect(response.status).toBe(200);
+
+      const data = await response.json();
       expect(data.success).toBe(true);
       expect(data.tradeId).toBeDefined();
+
+      // Verificar en DB
+      const prisma = getTestPrisma();
+      const trade = await prisma.trade.findFirst({
+        where: { id: data.tradeId },
+      });
+      expect(trade?.side).toBe("BUY");
+      expect(trade?.level).toBe(0);
+      expect(trade?.status).toBe("OPEN");
     });
 
     it("should reject invalid action", async () => {
