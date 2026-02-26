@@ -98,3 +98,23 @@ Started: Initial setup
   - Use Proxy pattern for lazy initialization of third-party clients that require env vars
   - Auth protection via auth() from lib/auth.ts, check session?.user?.tenantId
 ---
+
+## [2026-02-26 24:xx] - US-006
+- Created POST /api/stripe/webhook route
+- Uses raw body parsing (request.text()) for Stripe signature verification
+- Verifies signature with stripe.webhooks.constructEvent()
+- Handles 4 event types:
+  - checkout.session.completed: creates/updates subscription, sets plan
+  - customer.subscription.updated: syncs status and period dates
+  - customer.subscription.deleted: marks as CANCELED, downgrades tenant to TRIAL
+  - invoice.payment_failed: marks as PAST_DUE
+- Maps Stripe statuses to SubscriptionStatus enum
+- Maps Stripe Price IDs to PlanType enum
+- Typecheck and build pass
+- **Files changed:**
+  - app/api/stripe/webhook/route.ts (new)
+- **Learnings for future iterations:**
+  - Stripe webhooks require raw body for signature verification - use request.text() not request.json()
+  - Stripe subscription IDs are unique, use upsert by stripeSubId
+  - Always update tenant.plan when subscription changes for consistency
+---
