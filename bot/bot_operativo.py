@@ -38,6 +38,7 @@ from telethon import TelegramClient, events
 from telethon.tl.types import InputChannel
 
 from saas_client import SaasClient, BotConfig, BotCommand
+from telegram_bot import TelegramBot, create_telegram_bot_from_config
 
 # ───────────────────────── logging ────────────────────────────────
 FMT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
@@ -71,6 +72,9 @@ class AccountBot:
 
     mt_lock = threading.RLock()
     DIST_PIP = 0.10  # 1 pip ≈ 0.10 USD (XAU/USD típico)
+
+    # Telegram bot para notificaciones (compartido entre instancias)
+    telegram_bot: Optional[TelegramBot] = None
 
     def __init__(
         self,
@@ -248,6 +252,23 @@ class AccountBot:
             if trade_id:
                 self._open_trades[mt5_ticket] = trade_id
 
+            # Notificar por Telegram
+            if AccountBot.telegram_bot:
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        AccountBot.telegram_bot.notify_trade_open(
+                            symbol=self.SYMBOL,
+                            side=side,
+                            price=r.price if r and r.price else px,
+                            lot=lot,
+                            level=level,
+                            ticket=mt5_ticket,
+                        ),
+                        asyncio.get_event_loop(),
+                    )
+                except Exception as e:
+                    self.log.warning(f"Error notificando por Telegram: {e}")
+
         return success
 
     def _close_ticket(self, pos, side: str, reason: str = "MANUAL") -> None:
@@ -295,6 +316,24 @@ class AccountBot:
                             profit_money=profit_money,
                         )
                         del self._open_trades[pos.ticket]
+
+                    # Notificar por Telegram
+                    if AccountBot.telegram_bot:
+                        try:
+                            asyncio.run_coroutine_threadsafe(
+                                AccountBot.telegram_bot.notify_trade_close(
+                                    symbol=self.SYMBOL,
+                                    side=side,
+                                    close_price=result.price,
+                                    profit=profit_money,
+                                    pips=profit_pips,
+                                    reason=reason,
+                                    ticket=pos.ticket,
+                                ),
+                                asyncio.get_event_loop(),
+                            )
+                        except Exception as e:
+                            self.log.warning(f"Error notificando cierre por Telegram: {e}")
 
     # ===== sanitizar pendientes al arrancar =====
     def _sanitize_pending(self) -> None:
@@ -626,6 +665,40 @@ async def main():
     else:
         log.warning("⚠️ Telegram no configurado en el SaaS")
 
+    # ── Configurar Bot de Telegram (notificaciones) ──────────────────
+    tg_bot = None
+    tg_config = {
+        "telegramBotToken": os.environ.get("TELEGRAM_BOT_TOKEN"),
+        "telegramChatId": os.environ.get("TELEGRAM_CHAT_ID"),
+    }
+
+    # También puede venir en config.json local
+    config_file = Path(__file__).parent / "config.json"
+    if config_file.exists():
+        try:
+            local_config = json.loads(config_file.read_text())
+            tg_config["telegramBotToken"] = tg_config["telegramBotToken"] or local_config.get("telegramBotToken")
+            tg_config["telegramChatId"] = tg_config["telegramChatId"] or local_config.get("telegramChatId")
+        except:
+            pass
+
+    if tg_config["telegramBotToken"] and tg_config["telegramChatId"]:
+        try:
+            tg_bot = TelegramBot(
+                token=tg_config["telegramBotToken"],
+                chat_id=tg_config["telegramChatId"],
+                saas_client=saas,
+                on_pause=lambda: saas.set_paused(True, "Comando /pause"),
+                on_resume=lambda: saas.set_paused(False, "Comando /resume"),
+            )
+            # Compartir con todos los AccountBot
+            AccountBot.telegram_bot = tg_bot
+            log.info("🤖 Telegram Bot configurado para notificaciones")
+        except Exception as e:
+            log.warning(f"⚠️ No se pudo configurar Telegram Bot: {e}")
+    else:
+        log.info("ℹ️ Telegram Bot no configurado (opcional)")
+
     # ── Patrones de señales ──────────────────────────────────────────
     BASE_PATTERN = "XAUUSD"  # Hardcoded por ahora
     SIG_RE = re.compile(
@@ -746,7 +819,29 @@ async def main():
     log.info("🤖 Bot iniciado")
     log.info(f"   Cuentas: {len(bots)}")
     log.info(f"   Telegram: {'Sí' if client else 'No'}")
+    log.info(f"   Telegram Bot: {'Sí' if tg_bot else 'No'}")
     log.info(f"   SaaS: {args.saas_url}")
+
+    # Iniciar Telegram Bot en background para comandos
+    if tg_bot:
+        import threading
+        def run_tg_bot():
+            try:
+                tg_bot.start()
+            except Exception as e:
+                log.error(f"Error en Telegram Bot: {e}")
+
+        tg_thread = threading.Thread(target=run_tg_bot, daemon=True)
+        tg_thread.start()
+        log.info("🤖 Telegram Bot escuchando comandos...")
+
+        # Notificar inicio
+        await tg_bot.send_message(
+            f"🟢 <b>Bot Iniciado</b>\n\n"
+            f"📊 Cuentas: {len(bots)}\n"
+            f"📡 SaaS: {args.saas_url}\n"
+            f"⏰ {datetime.now().strftime('%d/%m %H:%M')}"
+        )
 
     # Crear tareas
     tasks = [

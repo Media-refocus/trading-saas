@@ -3,8 +3,11 @@
 # MetaTrader5
 MetaTrader5>=5.0.45
 
-# Telegram
+# Telegram Client (leer señales de canales)
 telethon>=1.34.0
+
+# Telegram Bot (notificaciones y comandos)
+python-telegram-bot>=21.0
 
 # HTTP requests
 requests>=2.31.0
