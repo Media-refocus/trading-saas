@@ -24,6 +24,12 @@ export default function Navigation() {
                 Backtester
               </Link>
               <Link
+                href="/bot"
+                className="text-sm text-muted-foreground hover:text-foreground transition"
+              >
+                Bot Operativo
+              </Link>
+              <Link
                 href="/settings"
                 className="text-sm text-muted-foreground hover:text-foreground transition"
               >
