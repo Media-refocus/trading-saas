@@ -74,7 +74,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Use Stripe Price IDs from env: STRIPE_PRICE_BASIC, STRIPE_PRICE_PRO, STRIPE_PRICE_ENTERPRISE. Success URL: /dashboard?checkout=success. Cancel URL: /pricing."
     },
     {

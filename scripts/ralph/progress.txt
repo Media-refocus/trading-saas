@@ -78,3 +78,23 @@ Started: Initial setup
   - Use useSession hook from "next-auth/react" for client-side auth state
   - shadcn Badge, Card, Button components work well for pricing cards
 ---
+
+## [2026-02-26 24:xx] - US-005
+- Created POST /api/stripe/checkout route with auth protection
+- Uses auth() from lib/auth.ts to verify authenticated user
+- Creates or retrieves Stripe Customer (linked to tenant.stripeCustomerId)
+- Accepts { planId: 'basic'|'pro'|'enterprise' }
+- Returns checkout session URL
+- Fixed Stripe client to use lazy initialization (Proxy pattern) to avoid build-time errors
+- Added Stripe Price IDs to .env.local.example and .env.production.example
+- Typecheck and build pass
+- **Files changed:**
+  - app/api/stripe/checkout/route.ts (new)
+  - lib/stripe.ts (modified - lazy init via Proxy)
+  - .env.local.example (added STRIPE_PRICE_*)
+  - .env.production.example (added STRIPE_PRICE_*)
+- **Learnings for future iterations:**
+  - Stripe SDK throws at import time if STRIPE_SECRET_KEY is empty during build
+  - Use Proxy pattern for lazy initialization of third-party clients that require env vars
+  - Auth protection via auth() from lib/auth.ts, check session?.user?.tenantId
+---
