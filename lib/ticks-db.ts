@@ -240,3 +240,33 @@ process.on("beforeExit", () => {
     _db = null;
   }
 });
+
+/**
+ * Obtiene ticks agrupados por día (para backtesting)
+ */
+export async function getTicksByDays(
+  startDate: Date,
+  endDate: Date,
+  symbol: string = "XAUUSD"
+): Promise<Map<string, Tick[]>> {
+  const ticks = await getTicksFromDB(startDate, endDate, symbol);
+
+  const byDay = new Map<string, Tick[]>();
+  for (const tick of ticks) {
+    const dayKey = tick.timestamp.toISOString().slice(0, 10);
+    if (!byDay.has(dayKey)) {
+      byDay.set(dayKey, []);
+    }
+    byDay.get(dayKey)!.push(tick);
+  }
+
+  return byDay;
+}
+
+/**
+ * Limpia el cache de ticks (no-op en better-sqlite3)
+ */
+export function clearTicksCache(): void {
+  // better-sqlite3 no usa cache en memoria
+  // Esta función existe para compatibilidad con la API anterior
+}

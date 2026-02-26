@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
-import { Activity, Settings, BarChart3, Bot, LogOut, Circle } from "lucide-react";
+import { Activity, Settings, BarChart3, Bot, LogOut, Circle, Store } from "lucide-react";
 
 export default function Navigation() {
   const pathname = usePathname();
@@ -22,6 +22,7 @@ export default function Navigation() {
   const links = [
     { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
     { href: "/backtester", label: "Backtester", icon: Activity },
+    { href: "/operativas", label: "Operativas", icon: Store },
     { href: "/bot", label: "Bot Operativo", icon: Bot },
     { href: "/settings", label: "Configuración", icon: Settings },
   ];

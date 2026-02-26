@@ -7,6 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import SimpleCandleChart from "@/components/simple-candle-chart";
 import { CHART_THEMES, getPreferredTheme, savePreferredTheme } from "@/lib/chart-themes";
@@ -32,6 +40,7 @@ import {
   Database,
   Signal,
   RefreshCw,
+  Store,
 } from "lucide-react";
 
 interface BacktestFilters {
@@ -131,6 +140,17 @@ export default function BacktesterPage() {
   const [strategyDescription, setStrategyDescription] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Estado para publicar al marketplace
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [publishName, setPublishName] = useState("");
+  const [publishDescription, setPublishDescription] = useState("");
+  const [publishTags, setPublishTags] = useState("");
+  const [publishSuccess, setPublishSuccess] = useState(false);
+  const [savedStrategyId, setSavedStrategyId] = useState<string | null>(null);
+
+  // Marketplace mutation
+  const publishMutation = trpc.marketplace.publish.useMutation();
+
   // Optimizer
   const optimizationPresets = trpc.backtester.getOptimizationPresets.useQuery();
   const runOptimization = trpc.backtester.optimize.useMutation();
@@ -199,7 +219,7 @@ export default function BacktesterPage() {
     if (!results || !strategyName.trim()) return;
 
     try {
-      await saveAsStrategy.mutateAsync({
+      const result = await saveAsStrategy.mutateAsync({
         name: strategyName,
         description: strategyDescription || undefined,
         config: {
@@ -230,12 +250,36 @@ export default function BacktesterPage() {
           maxDrawdown: results.maxDrawdownPercent || 0,
         },
       });
+      setSavedStrategyId(result.id);
       setSaveSuccess(true);
       setStrategyName("");
       setStrategyDescription("");
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
       console.error("Error guardando estrategia:", error);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!savedStrategyId || !publishName.trim()) return;
+
+    try {
+      const tags = publishTags.split(",").map(t => t.trim()).filter(Boolean);
+      await publishMutation.mutateAsync({
+        strategyId: savedStrategyId,
+        name: publishName,
+        description: publishDescription || undefined,
+        tags: tags.length > 0 ? tags : undefined,
+        isPublic: true,
+      });
+      setPublishSuccess(true);
+      setPublishDialogOpen(false);
+      setPublishName("");
+      setPublishDescription("");
+      setPublishTags("");
+      setTimeout(() => setPublishSuccess(false), 3000);
+    } catch (error) {
+      console.error("Error publicando estrategia:", error);
     }
   };
 
@@ -249,6 +293,7 @@ export default function BacktesterPage() {
   const configSummary = `${config.pipsDistance}p × ${config.maxLevels}L × ${config.takeProfitPips}TP × ${config.trailingSLPercent}%Trail`;
 
   return (
+    <>
     <div className="space-y-4 p-4 max-w-[1600px] mx-auto font-sans">
       {/* Header mejorado */}
       <div className="flex items-center justify-between pb-3 border-b border-border/50">
@@ -990,6 +1035,26 @@ export default function BacktesterPage() {
                       Estrategia guardada correctamente
                     </div>
                   )}
+                  {publishSuccess && (
+                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg text-xs animate-fade-in flex items-center gap-2">
+                      <Store className="w-3.5 h-3.5" />
+                      Estrategia publicada al marketplace
+                    </div>
+                  )}
+                  {savedStrategyId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setPublishName(strategyName || `Estrategia ${config.strategyName}`);
+                        setPublishDialogOpen(true);
+                      }}
+                      className="w-full border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-600"
+                    >
+                      <Store className="w-3.5 h-3.5 mr-2" />
+                      Publicar al Marketplace
+                    </Button>
+                  )}
                   {saveAsStrategy.isError && (
                     <div className="p-2 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-xs animate-fade-in flex items-center gap-2">
                       <AlertCircle className="w-3.5 h-3.5" />
@@ -1224,6 +1289,109 @@ export default function BacktesterPage() {
         </Card>
       )}
     </div>
+
+    {/* Dialog para publicar al marketplace */}
+    <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Store className="w-5 h-5 text-blue-500" />
+            Publicar al Marketplace
+          </DialogTitle>
+          <DialogDescription>
+            Comparte tu estrategia con otros traders. Se publicará con los resultados del backtest.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Nombre de la operativa</Label>
+            <Input
+              value={publishName}
+              onChange={(e) => setPublishName(e.target.value)}
+              placeholder="Ej: Grid Conservador XAUUSD"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Descripción (opcional)</Label>
+            <Input
+              value={publishDescription}
+              onChange={(e) => setPublishDescription(e.target.value)}
+              placeholder="Describe tu estrategia..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Tags (separados por coma)</Label>
+            <Input
+              value={publishTags}
+              onChange={(e) => setPublishTags(e.target.value)}
+              placeholder="conservador, gold, grid"
+            />
+            {publishTags && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {publishTags.split(",").map((tag, idx) => (
+                  <Badge key={idx} variant="secondary" className="text-xs">
+                    {tag.trim()}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="p-3 bg-muted/50 rounded-lg text-xs space-y-1">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Config:</span>
+              <span>{config.pipsDistance}p × {config.maxLevels}L × {config.takeProfitPips}TP</span>
+            </div>
+            {results && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Profit:</span>
+                  <span className={results.totalProfit >= 0 ? "text-green-600" : "text-red-600"}>
+                    ${results.totalProfit?.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Win Rate:</span>
+                  <span>{results.winRate?.toFixed(1)}%</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setPublishDialogOpen(false)}
+            className="flex-1"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handlePublish}
+            disabled={!publishName.trim() || publishMutation.isPending}
+            className="flex-1"
+          >
+            {publishMutation.isPending ? (
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Publicando...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Store className="w-4 h-4" />
+                Publicar
+              </span>
+            )}
+          </Button>
+        </div>
+        {publishMutation.isError && (
+          <div className="p-2 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            Error: {publishMutation.error.message}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
