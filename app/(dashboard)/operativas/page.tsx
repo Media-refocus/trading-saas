@@ -117,8 +117,8 @@ export default function OperativasPage() {
   });
 
   // Obtener estado de like para estrategia seleccionada
-  const { data: likeStatus } = trpc.marketplace.hasLiked.useQuery(
-    { id: selectedStrategy?.id ?? "" },
+  const { data: likeStatus } = trpc.marketplace.getLikeStatus.useQuery(
+    { publishedStrategyId: selectedStrategy?.id ?? "" },
     { enabled: !!selectedStrategy }
   );
 

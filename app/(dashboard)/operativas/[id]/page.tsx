@@ -31,7 +31,10 @@ export default function OperativaDetailPage() {
 
   // Queries
   const { data: strategy, isLoading } = trpc.marketplace.get.useQuery({ id: strategyId });
-  const { data: likeStatus } = trpc.marketplace.hasLiked.useQuery({ id: strategyId });
+  const { data: likeStatus } = trpc.marketplace.getLikeStatus.useQuery(
+    { publishedStrategyId: strategyId },
+    { enabled: !!strategyId }
+  );
   const { data: commentsData } = trpc.marketplace.getComments.useQuery({
     publishedStrategyId: strategyId,
     limit: 20,
@@ -66,8 +69,8 @@ export default function OperativaDetailPage() {
 
   const handleLike = async () => {
     if (!strategy) return;
-    await toggleLikeMutation.mutateAsync({ id: strategy.id });
-    utils.marketplace.hasLiked.invalidate({ id: strategyId });
+    await toggleLikeMutation.mutateAsync({ publishedStrategyId: strategy.id });
+    utils.marketplace.getLikeStatus.invalidate({ publishedStrategyId: strategyId });
     utils.marketplace.get.invalidate({ id: strategyId });
   };
 
@@ -102,7 +105,7 @@ export default function OperativaDetailPage() {
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     if (days === 0) return "Hoy";
     if (days === 1) return "Ayer";
-    if (days < 7) return `Hace ${days} días`;
+    if (days < 7) return `Hace ${days} dias`;
     if (days < 30) return `Hace ${Math.floor(days / 7)} semanas`;
     return formatDate(date);
   };
@@ -126,6 +129,8 @@ export default function OperativaDetailPage() {
     );
   }
 
+  const hasLiked = likeStatus?.hasLiked ?? false;
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
@@ -138,17 +143,17 @@ export default function OperativaDetailPage() {
         <div className="flex-1">
           <h1 className="text-3xl font-bold">{strategy.name}</h1>
           <p className="text-muted-foreground mt-1">
-            por {strategy.author?.name || "Anónimo"} • Publicado el {formatDate(strategy.publishedAt)}
+            por {strategy.author?.name || "Anonimo"} - Publicado el {formatDate(strategy.publishedAt)}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
-            variant={likeStatus?.liked ? "default" : "outline"}
+            variant={hasLiked ? "default" : "outline"}
             size="icon"
             onClick={handleLike}
-            className={likeStatus?.liked ? "bg-red-500 hover:bg-red-600" : "hover:text-red-500"}
+            className={hasLiked ? "bg-red-500 hover:bg-red-600" : "hover:text-red-500"}
           >
-            <Heart className={`w-4 h-4 ${likeStatus?.liked ? "fill-current" : ""}`} />
+            <Heart className={`w-4 h-4 ${hasLiked ? "fill-current" : ""}`} />
           </Button>
           <Button variant="outline" size="icon">
             <Share2 className="w-4 h-4" />
@@ -194,7 +199,7 @@ export default function OperativaDetailPage() {
           {strategy.description && (
             <Card>
               <CardHeader>
-                <CardTitle>Descripción</CardTitle>
+                <CardTitle>Descripcion</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground whitespace-pre-wrap">{strategy.description}</p>
@@ -207,7 +212,7 @@ export default function OperativaDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="w-5 h-5" />
-                Parámetros de la Estrategia
+                Parametros de la Estrategia
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -245,7 +250,7 @@ export default function OperativaDetailPage() {
                   </span>
                 </div>
                 <div className="flex justify-between p-3 bg-muted/50 rounded-lg">
-                  <span className="text-muted-foreground">Restricción</span>
+                  <span className="text-muted-foreground">Restriccion</span>
                   <span className="font-medium">{strategy.restrictionType || "Ninguna"}</span>
                 </div>
               </div>
@@ -277,7 +282,7 @@ export default function OperativaDetailPage() {
                 <MessageCircle className="w-5 h-5" />
                 Comentarios
               </CardTitle>
-              <CardDescription>Comparte tu opinión sobre esta operativa</CardDescription>
+              <CardDescription>Comparte tu opinion sobre esta operativa</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Add comment */}
@@ -308,10 +313,10 @@ export default function OperativaDetailPage() {
                     <div key={c.id} className="p-3 bg-muted/30 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                          {c.user?.name?.[0] || "?"}
+                          {c.author?.name?.[0] || "?"}
                         </div>
                         <div>
-                          <span className="font-medium">{c.user?.name || "Anónimo"}</span>
+                          <span className="font-medium">{c.author?.name || "Anonimo"}</span>
                           <span className="text-xs text-muted-foreground ml-2">
                             {formatRelativeTime(c.createdAt)}
                           </span>
@@ -324,7 +329,7 @@ export default function OperativaDetailPage() {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>Sé el primero en comentar</p>
+                  <p>Se el primero en comentar</p>
                 </div>
               )}
             </CardContent>
@@ -363,7 +368,7 @@ export default function OperativaDetailPage() {
           {/* Social Stats */}
           <Card>
             <CardHeader>
-              <CardTitle>Estadísticas Sociales</CardTitle>
+              <CardTitle>Estadisticas Sociales</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -411,7 +416,7 @@ export default function OperativaDetailPage() {
                         <span className={s.totalProfit >= 0 ? "text-green-600" : "text-red-600"}>
                           {formatProfit(s.totalProfit)}
                         </span>
-                        <span>•</span>
+                        <span>-</span>
                         <span className="flex items-center gap-1">
                           <Heart className="w-3 h-3" />
                           {s.likesCount}
@@ -420,23 +425,6 @@ export default function OperativaDetailPage() {
                     </Link>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Fork info */}
-          {strategy.parentStrategy && (
-            <Card className="bg-muted/50">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">
-                  Esta operativa es un fork de:
-                </p>
-                <Link
-                  href={`/operativas/${strategy.parentStrategy.id}`}
-                  className="font-medium hover:underline"
-                >
-                  {strategy.parentStrategy.name}
-                </Link>
               </CardContent>
             </Card>
           )}

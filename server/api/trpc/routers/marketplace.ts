@@ -168,13 +168,6 @@ export const marketplaceRouter = router({
           author: {
             select: { id: true, name: true, email: true },
           },
-          parentStrategy: {
-            select: { id: true, name: true, author: { select: { name: true } } },
-          },
-          forks: {
-            select: { id: true, name: true },
-            take: 5,
-          },
         },
       });
 
@@ -542,7 +535,7 @@ export const marketplaceRouter = router({
         },
       });
 
-      return { liked: !!like };
+      return { hasLiked: !!like };
     }),
 
   /**
@@ -560,7 +553,9 @@ export const marketplaceRouter = router({
         select: { tags: true },
       });
 
-      if (!current || !current.tags || current.tags.length === 0) {
+      const tagsArray = current?.tags as string[] | null;
+
+      if (!current || !tagsArray || tagsArray.length === 0) {
         // Si no tiene tags, retornar estrategias populares
         const popular = await prisma.publishedStrategy.findMany({
           where: {
@@ -570,27 +565,43 @@ export const marketplaceRouter = router({
           orderBy: { likesCount: "desc" },
           take: input.limit,
           include: {
-            author: { select: { name: true } },
+            author: { select: { id: true, name: true } },
           },
         });
         return popular;
       }
 
       // Buscar estrategias con tags similares
-      const related = await prisma.publishedStrategy.findMany({
+      // Nota: SQLite no soporta hasSome, asi que filtramos en memoria
+      const candidates = await prisma.publishedStrategy.findMany({
         where: {
           isPublic: true,
           id: { not: input.id },
-          tags: { hasSome: current.tags },
         },
         orderBy: { likesCount: "desc" },
-        take: input.limit,
+        take: 20, // Traer mas de las necesarias para filtrar
         include: {
-          author: { select: { name: true } },
+          author: { select: { id: true, name: true } },
         },
       });
 
-      return related;
+      // Filtrar por tags similares
+      const related = candidates
+        .filter((s) => {
+          const sTags = s.tags as string[] | null;
+          if (!sTags) return false;
+          return sTags.some((tag) => tagsArray.includes(tag));
+        })
+        .slice(0, input.limit);
+
+      // Si no hay suficientes con tags similares, completar con populares
+      if (related.length < input.limit) {
+        const existingIds = new Set(related.map((r) => r.id));
+        const remaining = candidates.filter((c) => !existingIds.has(c.id));
+        related.push(...remaining.slice(0, input.limit - related.length));
+      }
+
+      return related.slice(0, input.limit);
     }),
 
   /**

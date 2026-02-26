@@ -352,7 +352,8 @@ model PublishedStrategy {
   parentStrategy PublishedStrategy? @relation("StrategyForks", fields: [parentStrategyId], references: [id], onDelete: SetNull)
   forks            PublishedStrategy[] @relation("StrategyForks")
 
-  // Información bás  name            String
+  // Información básica
+  name            String
   description     String?
   version         Int      @default(1)
 
