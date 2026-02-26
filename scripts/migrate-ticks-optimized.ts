@@ -22,7 +22,8 @@ const TICKS_DIR = path.join(process.cwd(), "data", "ticks");
 const BATCH_SIZE = 10000; // Lotes más grandes con SQL raw
 
 // Período de las señales (ajustar según datos disponibles)
-const MIN_DATE = new Date("2025-10-01");
+// Señales disponibles: Ago 2024 → Feb 2026 (3,139 señales)
+const MIN_DATE = new Date("2024-08-01");
 const MAX_DATE = new Date("2026-02-28");
 
 interface TickRow {
@@ -105,9 +106,12 @@ function fileMightContainPeriod(filename: string): boolean {
   const ym = getFileYearMonth(filename);
   if (!ym) return true; // Si no podemos determinar, procesar
 
+  // Para archivos anuales (como XAUUSD_2024.csv.gz), el archivo cubre todo el año
+  // fileEnd = 31 de diciembre del año
   const fileStart = new Date(ym.year, ym.month - 1, 1);
-  const fileEnd = new Date(ym.year, ym.month, 0);
+  const fileEnd = new Date(ym.year, 11, 31, 23, 59, 59); // 31 dic 23:59:59
 
+  // El archivo es relevante si hay ALGÚN solapamiento con el rango de fechas
   return fileStart <= MAX_DATE && fileEnd >= MIN_DATE;
 }
 

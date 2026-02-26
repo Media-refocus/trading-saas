@@ -569,4 +569,159 @@ export const botRouter = router({
 
       return { signals, total };
     }),
+
+  // ==================== STATS ====================
+
+  /**
+   * Obtiene estadísticas de rendimiento
+   */
+  getStats: procedure.query(async () => {
+    // TODO: Obtener tenantId del contexto de autenticación
+    const tenant = await prisma.tenant.findFirst();
+    if (!tenant) {
+      return null;
+    }
+
+    // Obtener todos los trades cerrados
+    const trades = await prisma.trade.findMany({
+      where: {
+        tenantId: tenant.id,
+        status: "CLOSED",
+      },
+      select: {
+        profitMoney: true,
+        profitPips: true,
+        closeReason: true,
+        side: true,
+        openedAt: true,
+        closedAt: true,
+      },
+    });
+
+    // Calcular estadísticas
+    const totalTrades = trades.length;
+    const winningTrades = trades.filter((t) => (t.profitMoney || 0) > 0).length;
+    const losingTrades = trades.filter((t) => (t.profitMoney || 0) < 0).length;
+
+    const totalPnL = trades.reduce((sum, t) => sum + (t.profitMoney || 0), 0);
+    const totalPips = trades.reduce((sum, t) => sum + (t.profitPips || 0), 0);
+
+    const avgWin =
+      winningTrades > 0
+        ? trades
+            .filter((t) => (t.profitMoney || 0) > 0)
+            .reduce((sum, t) => sum + (t.profitMoney || 0), 0) / winningTrades
+        : 0;
+
+    const avgLoss =
+      losingTrades > 0
+        ? Math.abs(
+            trades
+              .filter((t) => (t.profitMoney || 0) < 0)
+              .reduce((sum, t) => sum + (t.profitMoney || 0), 0) / losingTrades
+          )
+        : 0;
+
+    // Profit factor
+    const grossProfit = trades
+      .filter((t) => (t.profitMoney || 0) > 0)
+      .reduce((sum, t) => sum + (t.profitMoney || 0), 0);
+    const grossLoss = Math.abs(
+      trades
+        .filter((t) => (t.profitMoney || 0) < 0)
+        .reduce((sum, t) => sum + (t.profitMoney || 0), 0)
+    );
+    const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0;
+
+    // Win rate
+    const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+
+    // Estadísticas de hoy
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todaysTrades = trades.filter((t) => t.closedAt && new Date(t.closedAt) >= today);
+    const todayPnL = todaysTrades.reduce((sum, t) => sum + (t.profitMoney || 0), 0);
+    const todayTrades = todaysTrades.length;
+    const todayWinRate =
+      todayTrades > 0
+        ? (todaysTrades.filter((t) => (t.profitMoney || 0) > 0).length / todayTrades) * 100
+        : 0;
+
+    return {
+      total: {
+        trades: totalTrades,
+        wins: winningTrades,
+        losses: losingTrades,
+        winRate: Math.round(winRate * 10) / 10,
+        pnl: Math.round(totalPnL * 100) / 100,
+        pips: Math.round(totalPips * 10) / 10,
+        avgWin: Math.round(avgWin * 100) / 100,
+        avgLoss: Math.round(avgLoss * 100) / 100,
+        profitFactor: Math.round(profitFactor * 100) / 100,
+      },
+      today: {
+        trades: todayTrades,
+        pnl: Math.round(todayPnL * 100) / 100,
+        winRate: Math.round(todayWinRate * 10) / 10,
+      },
+    };
+  }),
+
+  /**
+   * Exporta trades a CSV
+   */
+  exportTradesCsv: procedure.query(async () => {
+    // TODO: Obtener tenantId del contexto de autenticación
+    const tenant = await prisma.tenant.findFirst();
+    if (!tenant) {
+      return null;
+    }
+
+    const trades = await prisma.trade.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: { openedAt: "desc" },
+      take: 1000,
+    });
+
+    // Generar CSV
+    const headers = [
+      "Ticket",
+      "Symbol",
+      "Side",
+      "Level",
+      "Lot",
+      "Open Price",
+      "Close Price",
+      "P&L",
+      "Pips",
+      "Reason",
+      "Opened At",
+      "Closed At",
+    ];
+
+    const rows = trades.map((t) => [
+      t.mt5Ticket,
+      t.symbol,
+      t.side,
+      t.level,
+      t.lotSize,
+      t.openPrice || "",
+      t.closePrice || "",
+      t.profitMoney || 0,
+      t.profitPips || 0,
+      t.closeReason || "",
+      t.openedAt?.toISOString() || "",
+      t.closedAt?.toISOString() || "",
+    ]);
+
+    const csv = [
+      headers.join(","),
+      ...rows.map((r) => r.map((c) => `"${c}"`).join(",")),
+    ].join("\n");
+
+    return {
+      csv,
+      filename: `trades_${new Date().toISOString().split("T")[0]}.csv`,
+    };
+  }),
 });

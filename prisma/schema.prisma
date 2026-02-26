@@ -329,6 +329,67 @@ model Strategy {
 }
 
 // ============================================
+// PUBLISHED STRATEGIES - Marketplace de operativas
+// ============================================
+
+model PublishedStrategy {
+  id              String   @id @default(cuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Autor (quien publicó)
+  authorId        String
+  author          User    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  // Estrategia original (opcional, si es fork)
+  parentStrategyId String?
+  parentStrategy PublishedStrategy? @relation(fields: [parentStrategyId], references: [id], onDelete: SetNull)
+
+  // Información bás  name            String
+  description     String?
+  version         Int      @default(1)
+
+  // Parámetros de configuración (copiados de Strategy)
+  strategyName    String              @default("Custom")
+  lotajeBase      Float               @default(0.1)
+  numOrders       Int                 @default(1)
+  pipsDistance    Int                 @default(10)
+  maxLevels       Int                 @default(4)
+  takeProfitPips  Int                 @default(20)
+  stopLossPips    Int?
+  useStopLoss     Boolean             @default(false)
+  useTrailingSL   Boolean             @default(true)
+  trailingSLPercent Int              @default(50)
+  restrictionType String?             // "RIESGO", "SIN_PROMEDIOS", "SOLO_1_PROMEDIO"
+
+  // Resultados del backtest (snapshot al publicación)
+  totalTrades     Int      @default(0)
+  totalProfit     Float    @default(0)
+  winRate         Float    @default(0)
+  maxDrawdown     Float    @default(0)
+  profitFactor    Float    @default(0)
+
+  // Métricas sociales
+  likesCount      Int      @default(0)
+  forksCount     Int      @default(0)
+  downloadsCount Int      @default(0)
+
+  // Categorización
+  tags            String[]  // Para filtros
+  isPublic        Boolean @default(true)
+
+  // Timestamps
+  publishedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([authorId])
+  @@index([parentStrategyId])
+  @@index([isPublic])
+}
+
+// ============================================
 // BOT CONFIGURATION - Configuración del bot por tenant
 // ============================================
 

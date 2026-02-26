@@ -25,6 +25,11 @@ import {
   CheckCircle2,
   XCircle,
   MessageSquare,
+  Download,
+  DollarSign,
+  Target,
+  BarChart3,
+  Calendar,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -218,13 +223,30 @@ export default function BotMonitorPage() {
     limit: 10,
   });
 
+  const { data: stats, isLoading: statsLoading } = trpc.bot.getStats.useQuery();
+
+  const exportCsv = trpc.bot.exportTradesCsv.useQuery(undefined, { enabled: false });
+
+  const handleExport = async () => {
+    const result = await exportCsv.refetch();
+    if (result.data?.csv) {
+      const blob = new Blob([result.data.csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = result.data.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await Promise.all([refetchStatus()]);
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
-  const isLoading = statusLoading || signalsLoading || tradesLoading;
+  const isLoading = statusLoading || signalsLoading || tradesLoading || statsLoading;
 
   return (
     <div className="space-y-6">
@@ -250,6 +272,15 @@ export default function BotMonitorPage() {
           </div>
           <Button
             variant="outline"
+            size="sm"
+            onClick={handleExport}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button
+            variant="outline"
             size="icon"
             onClick={handleRefresh}
             disabled={isRefreshing}
@@ -259,8 +290,80 @@ export default function BotMonitorPage() {
         </div>
       </div>
 
+      {/* Performance Stats */}
+      <div className="grid gap-4 md:grid-cols-5">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-500" />
+              <span className={`text-2xl font-bold ${(stats?.total.pnl || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {(stats?.total.pnl || 0) >= 0 ? "+" : ""}{(stats?.total.pnl || 0).toFixed(2)}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">P&L Total</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-blue-500" />
+              <span className="text-2xl font-bold">
+                {stats?.total.winRate.toFixed(1) || 0}%
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">Win Rate</p>
+            <p className="text-xs text-muted-foreground">
+              {stats?.total.wins || 0}W / {stats?.total.losses || 0}L
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-purple-500" />
+              <span className="text-2xl font-bold">
+                {stats?.total.trades || 0}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">Total Trades</p>
+            <p className="text-xs text-muted-foreground">
+              PF: {stats?.total.profitFactor || 0}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-orange-500" />
+              <span className={`text-lg font-bold ${(stats?.today.pnl || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {(stats?.today.pnl || 0) >= 0 ? "+" : ""}{(stats?.today.pnl || 0).toFixed(2)}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">Hoy</p>
+            <p className="text-xs text-muted-foreground">
+              {stats?.today.trades || 0} trades
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-amber-500" />
+              <span className="text-2xl font-bold">
+                {status?.positions.length || 0}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">Posiciones</p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Status Overview */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="pt-6">
             <StatusIndicator
@@ -289,18 +392,6 @@ export default function BotMonitorPage() {
                 </span>
               )}
             </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-amber-500" />
-              <span className="text-2xl font-bold">
-                {status?.positions.length || 0}
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">Posiciones abiertas</p>
           </CardContent>
         </Card>
 
