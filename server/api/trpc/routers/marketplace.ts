@@ -3,14 +3,47 @@
  *
  * Permite a los usuarios:
  * - Publicar estrategias al marketplace
- * - Ver, buscar y filtrar operativas públicas
+ * - Ver, buscar y filtrar operativas publicas
  * - Hacer fork de operativas
- * - Dar like a operativas
+ * - Dar/quitar like a operativas (con tracking en StrategyLike)
+ * - Comentar en operativas
  */
 
 import { z } from "zod";
 import { procedure, router } from "../init";
 import { prisma } from "@/lib/prisma";
+
+// ============================================
+// HELPER: Obtener usuario actual
+// ============================================
+// TODO: Reemplazar con contexto de autenticacion real (ctx.user)
+async function getCurrentUser() {
+  let user = await prisma.user.findFirst();
+
+  if (!user) {
+    // Crear usuario por defecto si no existe
+    let tenant = await prisma.tenant.findFirst();
+    if (!tenant) {
+      tenant = await prisma.tenant.create({
+        data: { name: "Default Tenant", email: "default@example.com" },
+      });
+    }
+    user = await prisma.user.create({
+      data: {
+        email: "default@example.com",
+        password: "hashed",
+        name: "Usuario por defecto",
+        tenantId: tenant.id,
+      },
+    });
+  }
+
+  return user;
+}
+
+// ============================================
+// SCHEMAS
+// ============================================
 
 // Schema para publicar una estrategia
 const PublishInputSchema = z.object({
@@ -30,12 +63,22 @@ const FilterSchema = z.object({
   minWinRate: z.number().min(0).max(100).optional(),
   maxDrawdown: z.number().min(0).max(100).optional(),
   limit: z.number().min(1).max(50).default(20),
-  cursor: z.string().optional(), // Para paginación
+  cursor: z.string().optional(), // Para paginacion
 });
+
+// Schema para comentarios
+const CommentInputSchema = z.object({
+  publishedStrategyId: z.string(),
+  content: z.string().min(1).max(1000),
+});
+
+// ============================================
+// ROUTER
+// ============================================
 
 export const marketplaceRouter = router({
   /**
-   * Lista operativas públicas con filtros y paginación
+   * Lista operativas publicas con filtros y paginacion
    */
   list: procedure
     .input(FilterSchema)
@@ -91,7 +134,7 @@ export const marketplaceRouter = router({
       const strategies = await prisma.publishedStrategy.findMany({
         where,
         orderBy,
-        take: limit + 1, // +1 para detectar si hay más
+        take: limit + 1, // +1 para detectar si hay mas
         cursor: cursor ? { id: cursor } : undefined,
         include: {
           author: {
@@ -100,7 +143,7 @@ export const marketplaceRouter = router({
         },
       });
 
-      // Paginación
+      // Paginacion
       let nextCursor: string | undefined;
       if (strategies.length > limit) {
         const nextItem = strategies.pop();
@@ -114,7 +157,7 @@ export const marketplaceRouter = router({
     }),
 
   /**
-   * Obtiene una operativa pública por ID
+   * Obtiene una operativa publica por ID
    */
   get: procedure
     .input(z.object({ id: z.string() }))
@@ -144,26 +187,7 @@ export const marketplaceRouter = router({
   publish: procedure
     .input(PublishInputSchema)
     .mutation(async ({ input }) => {
-      // Obtener tenant y usuario por defecto
-      // TODO: Obtener del contexto de autenticación
-      let tenant = await prisma.tenant.findFirst();
-      let user = await prisma.user.findFirst();
-
-      if (!tenant) {
-        tenant = await prisma.tenant.create({
-          data: { name: "Default Tenant", email: "default@example.com" },
-        });
-      }
-
-      if (!user) {
-        user = await prisma.user.create({
-          data: {
-            email: "default@example.com",
-            password: "hashed",
-            tenantId: tenant.id,
-          },
-        });
-      }
+      const user = await getCurrentUser();
 
       // Obtener la estrategia original
       const originalStrategy = await prisma.strategy.findUnique({
@@ -177,14 +201,14 @@ export const marketplaceRouter = router({
       // Crear la operativa publicada
       const published = await prisma.publishedStrategy.create({
         data: {
-          tenantId: tenant.id,
+          tenantId: user.tenantId,
           authorId: user.id,
           name: input.name,
           description: input.description,
-          tags: input.tags ? JSON.stringify(input.tags) : undefined,
+          tags: input.tags || [],
           isPublic: input.isPublic,
 
-          // Copiar parámetros de la estrategia
+          // Copiar parametros de la estrategia
           strategyName: originalStrategy.strategyName,
           lotajeBase: originalStrategy.lotajeBase,
           numOrders: originalStrategy.numOrders,
@@ -218,14 +242,7 @@ export const marketplaceRouter = router({
       name: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
-      // Obtener tenant por defecto
-      let tenant = await prisma.tenant.findFirst();
-
-      if (!tenant) {
-        tenant = await prisma.tenant.create({
-          data: { name: "Default Tenant", email: "default@example.com" },
-        });
-      }
+      const user = await getCurrentUser();
 
       // Obtener la operativa publicada
       const published = await prisma.publishedStrategy.findUnique({
@@ -239,7 +256,7 @@ export const marketplaceRouter = router({
       // Crear estrategia local a partir del fork
       const forked = await prisma.strategy.create({
         data: {
-          tenantId: tenant.id,
+          tenantId: user.tenantId,
           name: input.name || `${published.name} (fork)`,
           description: published.description,
           strategyName: published.strategyName,
@@ -265,8 +282,118 @@ export const marketplaceRouter = router({
       return forked;
     }),
 
+  // ============================================
+  // SISTEMA DE LIKES
+  // ============================================
+
   /**
-   * Da like a una operativa
+   * Toggle like: anade o quita like segun el estado actual
+   * Registra en la tabla StrategyLike y actualiza likesCount
+   */
+  toggleLike: procedure
+    .input(z.object({ publishedStrategyId: z.string() }))
+    .mutation(async ({ input }) => {
+      const user = await getCurrentUser();
+
+      // Verificar que la estrategia existe
+      const strategy = await prisma.publishedStrategy.findUnique({
+        where: { id: input.publishedStrategyId },
+        select: { id: true, likesCount: true },
+      });
+
+      if (!strategy) {
+        throw new Error("Estrategia no encontrada");
+      }
+
+      // Verificar si ya existe el like
+      const existingLike = await prisma.strategyLike.findUnique({
+        where: {
+          userId_publishedStrategyId: {
+            userId: user.id,
+            publishedStrategyId: input.publishedStrategyId,
+          },
+        },
+      });
+
+      let hasLiked: boolean;
+      let likesCount: number;
+
+      if (existingLike) {
+        // Quitar like
+        await prisma.$transaction([
+          prisma.strategyLike.delete({
+            where: { id: existingLike.id },
+          }),
+          prisma.publishedStrategy.update({
+            where: { id: input.publishedStrategyId },
+            data: { likesCount: { decrement: 1 } },
+          }),
+        ]);
+        hasLiked = false;
+        likesCount = Math.max(0, strategy.likesCount - 1);
+      } else {
+        // Anadir like
+        await prisma.$transaction([
+          prisma.strategyLike.create({
+            data: {
+              userId: user.id,
+              publishedStrategyId: input.publishedStrategyId,
+            },
+          }),
+          prisma.publishedStrategy.update({
+            where: { id: input.publishedStrategyId },
+            data: { likesCount: { increment: 1 } },
+          }),
+        ]);
+        hasLiked = true;
+        likesCount = strategy.likesCount + 1;
+      }
+
+      return {
+        success: true,
+        hasLiked,
+        likesCount,
+      };
+    }),
+
+  /**
+   * Obtiene el estado de like del usuario actual para una estrategia
+   * Retorna si el usuario ya dio like y el contador total de likes
+   */
+  getLikeStatus: procedure
+    .input(z.object({ publishedStrategyId: z.string() }))
+    .query(async ({ input }) => {
+      const user = await getCurrentUser();
+
+      // Obtener la estrategia con su contador de likes
+      const strategy = await prisma.publishedStrategy.findUnique({
+        where: { id: input.publishedStrategyId },
+        select: { likesCount: true },
+      });
+
+      if (!strategy) {
+        throw new Error("Estrategia no encontrada");
+      }
+
+      // Verificar si el usuario dio like
+      const like = await prisma.strategyLike.findUnique({
+        where: {
+          userId_publishedStrategyId: {
+            userId: user.id,
+            publishedStrategyId: input.publishedStrategyId,
+          },
+        },
+      });
+
+      return {
+        hasLiked: !!like,
+        likesCount: strategy.likesCount,
+      };
+    }),
+
+  /**
+   * Da like a una operativa (deprecated: usar toggleLike)
+   * @deprecated Use toggleLike instead
    */
   like: procedure
     .input(z.object({ id: z.string() }))
@@ -280,7 +407,8 @@ export const marketplaceRouter = router({
     }),
 
   /**
-   * Quita like de una operativa
+   * Quita like de una operativa (deprecated: usar toggleLike)
+   * @deprecated Use toggleLike instead
    */
   unlike: procedure
     .input(z.object({ id: z.string() }))
@@ -302,6 +430,169 @@ export const marketplaceRouter = router({
       return { success: true, likesCount: 0 };
     }),
 
+  // ============================================
+  // SISTEMA DE COMENTARIOS
+  // ============================================
+
+  /**
+   * Anade un comentario a una estrategia
+   * Retorna el comentario creado con info del autor
+   */
+  addComment: procedure
+    .input(CommentInputSchema)
+    .mutation(async ({ input }) => {
+      const user = await getCurrentUser();
+
+      // Verificar que la estrategia existe
+      const strategy = await prisma.publishedStrategy.findUnique({
+        where: { id: input.publishedStrategyId },
+        select: { id: true },
+      });
+
+      if (!strategy) {
+        throw new Error("Estrategia no encontrada");
+      }
+
+      // Crear el comentario
+      const comment = await prisma.strategyComment.create({
+        data: {
+          userId: user.id,
+          publishedStrategyId: input.publishedStrategyId,
+          content: input.content,
+        },
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, image: true },
+          },
+        },
+      });
+
+      return {
+        id: comment.id,
+        content: comment.content,
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
+        author: comment.user,
+      };
+    }),
+
+  /**
+   * Obtiene comentarios de una estrategia con paginacion
+   * Incluye info del autor (name, email)
+   */
+  getComments: procedure
+    .input(z.object({
+      publishedStrategyId: z.string(),
+      limit: z.number().min(1).max(50).default(20),
+      cursor: z.string().optional(),
+    }))
+    .query(async ({ input }) => {
+      const { publishedStrategyId, limit, cursor } = input;
+
+      const comments = await prisma.strategyComment.findMany({
+        where: { publishedStrategyId },
+        orderBy: { createdAt: "desc" },
+        take: limit + 1,
+        cursor: cursor ? { id: cursor } : undefined,
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, image: true },
+          },
+        },
+      });
+
+      // Paginacion
+      let nextCursor: string | undefined;
+      if (comments.length > limit) {
+        const nextItem = comments.pop();
+        nextCursor = nextItem!.id;
+      }
+
+      return {
+        comments: comments.map((c) => ({
+          id: c.id,
+          content: c.content,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+          author: c.user,
+        })),
+        nextCursor,
+      };
+    }),
+
+  // ============================================
+  // OTROS ENDPOINTS
+  // ============================================
+
+  /**
+   * Verifica si el usuario actual ha dado like a una operativa
+   * @deprecated Use getLikeStatus instead
+   */
+  hasLiked: procedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const user = await getCurrentUser();
+
+      const like = await prisma.strategyLike.findUnique({
+        where: {
+          userId_publishedStrategyId: {
+            userId: user.id,
+            publishedStrategyId: input.id,
+          },
+        },
+      });
+
+      return { liked: !!like };
+    }),
+
+  /**
+   * Obtiene estrategias relacionadas por tags similares
+   */
+  getRelated: procedure
+    .input(z.object({
+      id: z.string(),
+      limit: z.number().min(1).max(10).default(3),
+    }))
+    .query(async ({ input }) => {
+      // Obtener la estrategia actual para sus tags
+      const current = await prisma.publishedStrategy.findUnique({
+        where: { id: input.id },
+        select: { tags: true },
+      });
+
+      if (!current || !current.tags || current.tags.length === 0) {
+        // Si no tiene tags, retornar estrategias populares
+        const popular = await prisma.publishedStrategy.findMany({
+          where: {
+            isPublic: true,
+            id: { not: input.id },
+          },
+          orderBy: { likesCount: "desc" },
+          take: input.limit,
+          include: {
+            author: { select: { name: true } },
+          },
+        });
+        return popular;
+      }
+
+      // Buscar estrategias con tags similares
+      const related = await prisma.publishedStrategy.findMany({
+        where: {
+          isPublic: true,
+          id: { not: input.id },
+          tags: { hasSome: current.tags },
+        },
+        orderBy: { likesCount: "desc" },
+        take: input.limit,
+        include: {
+          author: { select: { name: true } },
+        },
+      });
+
+      return related;
+    }),
+
   /**
    * Registra una descarga (cuando alguien usa la operativa)
    */
@@ -317,7 +608,7 @@ export const marketplaceRouter = router({
     }),
 
   /**
-   * Obtiene las operativas más populares (top 10)
+   * Obtiene las operativas mas populares (top 10)
    */
   getTop: procedure
     .input(z.object({
@@ -327,7 +618,7 @@ export const marketplaceRouter = router({
     .query(async ({ input }) => {
       const { period, limit } = input;
 
-      // Calcular fecha mínima según período
+      // Calcular fecha minima segun periodo
       let minDate: Date | undefined;
       const now = new Date();
 
@@ -390,7 +681,7 @@ export const marketplaceRouter = router({
     }),
 
   /**
-   * Obtiene operativas de un autor específico
+   * Obtiene operativas de un autor especifico
    */
   getByAuthor: procedure
     .input(z.object({
@@ -414,12 +705,29 @@ export const marketplaceRouter = router({
 
   /**
    * Elimina una operativa publicada (solo el autor)
+   * Verifica que el usuario que hace unpublish es el autor de la estrategia
    */
   unpublish: procedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
-      // TODO: Verificar que el usuario es el autor
+      const user = await getCurrentUser();
 
+      // Obtener la estrategia para verificar autoria
+      const strategy = await prisma.publishedStrategy.findUnique({
+        where: { id: input.id },
+        select: { authorId: true },
+      });
+
+      if (!strategy) {
+        throw new Error("Estrategia no encontrada");
+      }
+
+      // Verificar que el usuario es el autor
+      if (strategy.authorId !== user.id) {
+        throw new Error("No tienes permiso para eliminar esta estrategia. Solo el autor puede unpublish.");
+      }
+
+      // Eliminar la estrategia (los likes y comentarios se eliminan en cascada)
       await prisma.publishedStrategy.delete({
         where: { id: input.id },
       });

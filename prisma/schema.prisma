@@ -31,6 +31,9 @@ model Tenant {
   // Bot Operativa
   botConfigs      BotConfig[]
   trades          Trade[]
+
+  // Marketplace
+  publishedStrategies PublishedStrategy[]
 }
 
 model User {
@@ -48,6 +51,9 @@ model User {
   accounts         Account[]
   sessions         Session[]
   tradingAccounts  TradingAccount[]
+  publishedStrategies PublishedStrategy[]
+  strategyLikes    StrategyLike[]
+  strategyComments StrategyComment[]
 }
 
 model Account {
@@ -343,7 +349,8 @@ model PublishedStrategy {
 
   // Estrategia original (opcional, si es fork)
   parentStrategyId String?
-  parentStrategy PublishedStrategy? @relation(fields: [parentStrategyId], references: [id], onDelete: SetNull)
+  parentStrategy PublishedStrategy? @relation("StrategyForks", fields: [parentStrategyId], references: [id], onDelete: SetNull)
+  forks            PublishedStrategy[] @relation("StrategyForks")
 
   // Información bás  name            String
   description     String?
@@ -375,13 +382,17 @@ model PublishedStrategy {
   downloadsCount Int      @default(0)
 
   // Categorización
-  tags            String[]  // Para filtros
+  tags            Json?    // Array de strings serializado: ["tag1", "tag2"]
   isPublic        Boolean @default(true)
 
   // Timestamps
   publishedAt     DateTime @default(now())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  // Relaciones sociales
+  likes           StrategyLike[]
+  comments        StrategyComment[]
 
   @@index([tenantId])
   @@index([authorId])
@@ -608,5 +619,41 @@ model BotPosition {
 
   @@unique([botAccountId, mt5Ticket])
   @@index([botAccountId])
+}
+
+// ============================================
+// STRATEGY LIKE - Likes de usuarios a estrategias publicadas
+// ============================================
+
+model StrategyLike {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publishedStrategyId String
+  publishedStrategy   PublishedStrategy @relation(fields: [publishedStrategyId], references: [id], onDelete: Cascade)
+
+  createdAt           DateTime @default(now())
+
+  @@unique([userId, publishedStrategyId])
+  @@index([publishedStrategyId])
+}
+
+// ============================================
+// STRATEGY COMMENT - Comentarios en estrategias publicadas
+// ============================================
+
+model StrategyComment {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publishedStrategyId String
+  publishedStrategy   PublishedStrategy @relation(fields: [publishedStrategyId], references: [id], onDelete: Cascade)
+
+  content             String
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([publishedStrategyId])
 }
 

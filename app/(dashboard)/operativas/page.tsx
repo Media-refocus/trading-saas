@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -23,17 +26,16 @@ import { trpc } from "@/lib/trpc";
 import {
   Search,
   TrendingUp,
-  Users,
   Download,
   Heart,
   Star,
-  ChevronRight,
   ArrowUpDown,
   Clock,
   Target,
-  Shield,
   Copy,
   Loader2,
+  MessageCircle,
+  Send,
 } from "lucide-react";
 
 interface PublishedStrategy {
@@ -59,13 +61,47 @@ interface PublishedStrategy {
   useStopLoss: boolean;
 }
 
+interface Comment {
+  id: string;
+  content: string;
+  createdAt: Date;
+  author: {
+    id: string;
+    name: string | null;
+    image: string | null;
+  };
+}
+
 type SortOption = "recent" | "popular" | "profitable" | "downloads";
+
+// Funcion para formatear fecha relativa
+function formatRelativeDate(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - new Date(date).getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const weeks = Math.floor(days / 7);
+  const months = Math.floor(days / 30);
+  const years = Math.floor(days / 365);
+
+  if (years > 0) return `hace ${years} año${years > 1 ? "s" : ""}`;
+  if (months > 0) return `hace ${months} mes${months > 1 ? "es" : ""}`;
+  if (weeks > 0) return `hace ${weeks} semana${weeks > 1 ? "s" : ""}`;
+  if (days > 0) return `hace ${days} dia${days > 1 ? "s" : ""}`;
+  if (hours > 0) return `hace ${hours} hora${hours > 1 ? "s" : ""}`;
+  if (minutes > 0) return `hace ${minutes} minuto${minutes > 1 ? "s" : ""}`;
+  return "hace unos segundos";
+}
 
 export default function OperativasPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [selectedStrategy, setSelectedStrategy] = useState<PublishedStrategy | null>(null);
   const [forking, setForking] = useState(false);
+  const [likedStrategies, setLikedStrategies] = useState<Set<string>>(new Set());
+  const [newComment, setNewComment] = useState("");
 
   // Obtener operativas
   const { data, isLoading, refetch } = trpc.marketplace.list.useQuery({
@@ -80,12 +116,29 @@ export default function OperativasPage() {
     limit: 5,
   });
 
+  // Obtener estado de like para estrategia seleccionada
+  const { data: likeStatus } = trpc.marketplace.hasLiked.useQuery(
+    { id: selectedStrategy?.id ?? "" },
+    { enabled: !!selectedStrategy }
+  );
+
+  // Obtener comentarios
+  const { data: commentsData, refetch: refetchComments } = trpc.marketplace.getComments.useQuery(
+    { publishedStrategyId: selectedStrategy?.id ?? "", limit: 20 },
+    { enabled: !!selectedStrategy }
+  );
+
+  // Obtener estrategias relacionadas
+  const { data: relatedStrategies } = trpc.marketplace.getRelated.useQuery(
+    { id: selectedStrategy?.id ?? "", limit: 3 },
+    { enabled: !!selectedStrategy }
+  );
+
   // Fork mutation
   const forkMutation = trpc.marketplace.fork.useMutation({
     onSuccess: () => {
       setForking(false);
       setSelectedStrategy(null);
-      // TODO: Mostrar toast de éxito
     },
     onError: (error) => {
       setForking(false);
@@ -93,20 +146,57 @@ export default function OperativasPage() {
     },
   });
 
-  // Like mutation
-  const likeMutation = trpc.marketplace.like.useMutation({
-    onSuccess: () => {
+  // Toggle like mutation
+  const toggleLikeMutation = trpc.marketplace.toggleLike.useMutation({
+    onSuccess: (result, variables) => {
+      if (result.hasLiked) {
+        setLikedStrategies(prev => new Set(prev).add(variables.publishedStrategyId));
+      } else {
+        setLikedStrategies(prev => {
+          const next = new Set(prev);
+          next.delete(variables.publishedStrategyId);
+          return next;
+        });
+      }
       refetch();
     },
   });
+
+  // Add comment mutation
+  const addCommentMutation = trpc.marketplace.addComment.useMutation({
+    onSuccess: () => {
+      setNewComment("");
+      refetchComments();
+    },
+  });
+
+  // Actualizar estado de like cuando cambia la estrategia seleccionada
+  useEffect(() => {
+    if (likeStatus && selectedStrategy) {
+      if (likeStatus.hasLiked) {
+        setLikedStrategies(prev => new Set(prev).add(selectedStrategy.id));
+      }
+    }
+  }, [likeStatus, selectedStrategy]);
 
   const handleFork = async (strategyId: string) => {
     setForking(true);
     forkMutation.mutate({ publishedId: strategyId });
   };
 
-  const handleLike = (strategyId: string) => {
-    likeMutation.mutate({ id: strategyId });
+  const handleToggleLike = (strategyId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    toggleLikeMutation.mutate({ publishedStrategyId: strategyId });
+  };
+
+  const handleAddComment = () => {
+    if (!selectedStrategy || !newComment.trim()) return;
+    addCommentMutation.mutate({
+      publishedStrategyId: selectedStrategy.id,
+      content: newComment.trim(),
+    });
   };
 
   const formatProfit = (value: number) => {
@@ -126,6 +216,8 @@ export default function OperativasPage() {
     }).format(new Date(date));
   };
 
+  const isLiked = (strategyId: string) => likedStrategies.has(strategyId);
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -144,7 +236,7 @@ export default function OperativasPage() {
               <Star className="h-5 w-5 text-yellow-500" />
               Top del Mes
             </CardTitle>
-            <CardDescription>Las operativas más populares este mes</CardDescription>
+            <CardDescription>Las operativas mas populares este mes</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4 overflow-x-auto pb-2">
@@ -191,10 +283,10 @@ export default function OperativasPage() {
             <SelectValue placeholder="Ordenar por" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="recent">Más recientes</SelectItem>
-            <SelectItem value="popular">Más populares</SelectItem>
-            <SelectItem value="profitable">Más rentables</SelectItem>
-            <SelectItem value="downloads">Más descargadas</SelectItem>
+            <SelectItem value="recent">Mas recientes</SelectItem>
+            <SelectItem value="popular">Mas populares</SelectItem>
+            <SelectItem value="profitable">Mas rentables</SelectItem>
+            <SelectItem value="downloads">Mas descargadas</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -210,7 +302,7 @@ export default function OperativasPage() {
             <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="font-semibold mb-2">No se encontraron operativas</h3>
             <p className="text-muted-foreground">
-              Intenta con otros términos de búsqueda o filtros
+              Intenta con otros terminos de busqueda o filtros
             </p>
           </CardContent>
         </Card>
@@ -227,7 +319,7 @@ export default function OperativasPage() {
                   <div>
                     <CardTitle className="text-lg">{strategy.name}</CardTitle>
                     <CardDescription className="flex items-center gap-1 mt-1">
-                      <span>por {strategy.author?.name || "Anónimo"}</span>
+                      <span>por {strategy.author?.name || "Anonimo"}</span>
                     </CardDescription>
                   </div>
                   {strategy.totalProfit >= 0 ? (
@@ -266,10 +358,15 @@ export default function OperativasPage() {
                 {/* Footer */}
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
                   <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      <Heart className="h-4 w-4" />
+                    <button
+                      className={`flex items-center gap-1 transition-colors ${
+                        isLiked(strategy.id) ? "text-red-500" : "hover:text-red-500"
+                      }`}
+                      onClick={(e) => handleToggleLike(strategy.id, e)}
+                    >
+                      <Heart className={`h-4 w-4 ${isLiked(strategy.id) ? "fill-current" : ""}`} />
                       {strategy.likesCount}
-                    </span>
+                    </button>
                     <span className="flex items-center gap-1">
                       <Download className="h-4 w-4" />
                       {strategy.downloadsCount}
@@ -277,7 +374,7 @@ export default function OperativasPage() {
                   </div>
                   <span className="flex items-center gap-1 text-xs">
                     <Clock className="h-3 w-3" />
-                    {formatDate(strategy.publishedAt)}
+                    {formatRelativeDate(strategy.publishedAt)}
                   </span>
                 </div>
               </CardContent>
@@ -288,142 +385,254 @@ export default function OperativasPage() {
 
       {/* Detail Modal */}
       <Dialog open={!!selectedStrategy} onOpenChange={() => setSelectedStrategy(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
           {selectedStrategy && (
             <>
-              <DialogHeader>
+              {/* Header fijo */}
+              <DialogHeader className="p-6 pb-4 border-b shrink-0">
                 <DialogTitle className="text-xl">{selectedStrategy.name}</DialogTitle>
                 <DialogDescription>
-                  por {selectedStrategy.author?.name || "Anónimo"} • Publicado {formatDate(selectedStrategy.publishedAt)}
+                  por {selectedStrategy.author?.name || "Anonimo"} - Publicado {formatDate(selectedStrategy.publishedAt)}
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-6">
-                {/* Description */}
-                {selectedStrategy.description && (
+              {/* Contenido scrolleable */}
+              <ScrollArea className="flex-1 px-6">
+                <div className="space-y-6 py-4">
+                  {/* Description */}
+                  {selectedStrategy.description && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Descripcion</h4>
+                      <p className="text-muted-foreground">{selectedStrategy.description}</p>
+                    </div>
+                  )}
+
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="pt-4 text-center">
+                        <div className={`text-2xl font-bold ${selectedStrategy.totalProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {formatProfit(selectedStrategy.totalProfit)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Profit Total</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4 text-center">
+                        <div className="text-2xl font-bold">{formatPercent(selectedStrategy.winRate)}</div>
+                        <div className="text-xs text-muted-foreground">Win Rate</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4 text-center">
+                        <div className="text-2xl font-bold">{selectedStrategy.totalTrades}</div>
+                        <div className="text-xs text-muted-foreground">Trades</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4 text-center">
+                        <div className="text-2xl font-bold text-red-500">
+                          {formatPercent(selectedStrategy.maxDrawdown)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Max DD</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Parameters */}
                   <div>
-                    <h4 className="font-semibold mb-2">Descripción</h4>
-                    <p className="text-muted-foreground">{selectedStrategy.description}</p>
-                  </div>
-                )}
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <Card>
-                    <CardContent className="pt-4 text-center">
-                      <div className={`text-2xl font-bold ${selectedStrategy.totalProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {formatProfit(selectedStrategy.totalProfit)}
+                    <h4 className="font-semibold mb-3">Parametros de la Estrategia</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="flex justify-between p-2 bg-muted/50 rounded">
+                        <span className="text-muted-foreground">Estrategia</span>
+                        <span className="font-medium">{selectedStrategy.strategyName}</span>
                       </div>
-                      <div className="text-xs text-muted-foreground">Profit Total</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4 text-center">
-                      <div className="text-2xl font-bold">{formatPercent(selectedStrategy.winRate)}</div>
-                      <div className="text-xs text-muted-foreground">Win Rate</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4 text-center">
-                      <div className="text-2xl font-bold">{selectedStrategy.totalTrades}</div>
-                      <div className="text-xs text-muted-foreground">Trades</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4 text-center">
-                      <div className="text-2xl font-bold text-red-500">
-                        {formatPercent(selectedStrategy.maxDrawdown)}
+                      <div className="flex justify-between p-2 bg-muted/50 rounded">
+                        <span className="text-muted-foreground">Lotaje Base</span>
+                        <span className="font-medium">{selectedStrategy.lotajeBase}</span>
                       </div>
-                      <div className="text-xs text-muted-foreground">Max DD</div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Parameters */}
-                <div>
-                  <h4 className="font-semibold mb-3">Parámetros de la Estrategia</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-muted-foreground">Estrategia</span>
-                      <span className="font-medium">{selectedStrategy.strategyName}</span>
-                    </div>
-                    <div className="flex justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-muted-foreground">Lotaje Base</span>
-                      <span className="font-medium">{selectedStrategy.lotajeBase}</span>
-                    </div>
-                    <div className="flex justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-muted-foreground">TP</span>
-                      <span className="font-medium">{selectedStrategy.takeProfitPips} pips</span>
-                    </div>
-                    <div className="flex justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-muted-foreground">Niveles Max</span>
-                      <span className="font-medium">{selectedStrategy.maxLevels}</span>
-                    </div>
-                    <div className="flex justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-muted-foreground">Stop Loss</span>
-                      <span className="font-medium">{selectedStrategy.useStopLoss ? "Sí" : "No"}</span>
+                      <div className="flex justify-between p-2 bg-muted/50 rounded">
+                        <span className="text-muted-foreground">TP</span>
+                        <span className="font-medium">{selectedStrategy.takeProfitPips} pips</span>
+                      </div>
+                      <div className="flex justify-between p-2 bg-muted/50 rounded">
+                        <span className="text-muted-foreground">Niveles Max</span>
+                        <span className="font-medium">{selectedStrategy.maxLevels}</span>
+                      </div>
+                      <div className="flex justify-between p-2 bg-muted/50 rounded">
+                        <span className="text-muted-foreground">Stop Loss</span>
+                        <span className="font-medium">{selectedStrategy.useStopLoss ? "Si" : "No"}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Tags */}
-                {selectedStrategy.tags && Array.isArray(selectedStrategy.tags) && (selectedStrategy.tags as string[]).length > 0 && (
+                  {/* Tags */}
+                  {selectedStrategy.tags && Array.isArray(selectedStrategy.tags) && (selectedStrategy.tags as string[]).length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Tags</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {(selectedStrategy.tags as string[]).map((tag, idx) => (
+                          <Badge key={idx} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Social Stats */}
+                  <div className="flex items-center gap-6 py-3 border-t">
+                    <button
+                      className={`flex items-center gap-1 transition-colors ${
+                        isLiked(selectedStrategy.id) ? "text-red-500" : "text-muted-foreground hover:text-red-500"
+                      }`}
+                      onClick={() => handleToggleLike(selectedStrategy.id)}
+                    >
+                      <Heart className={`h-5 w-5 ${isLiked(selectedStrategy.id) ? "fill-current" : ""}`} />
+                      <span>{selectedStrategy.likesCount}</span>
+                    </button>
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Copy className="h-5 w-5" />
+                      <span>{selectedStrategy.forksCount} forks</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Download className="h-5 w-5" />
+                      <span>{selectedStrategy.downloadsCount} descargas</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-3">
+                    <Button
+                      className="flex-1"
+                      onClick={() => handleFork(selectedStrategy.id)}
+                      disabled={forking}
+                    >
+                      {forking ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Copy className="h-4 w-4 mr-2" />
+                      )}
+                      {forking ? "Copiando..." : "Copiar a mis Estrategias"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        // TODO: Ir al backtester con estos parametros
+                      }}
+                    >
+                      <Target className="h-4 w-4 mr-2" />
+                      Probar en Backtester
+                    </Button>
+                  </div>
+
+                  {/* Comments Section */}
+                  <Separator className="my-4" />
                   <div>
-                    <h4 className="font-semibold mb-2">Tags</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {(selectedStrategy.tags as string[]).map((tag, idx) => (
-                        <Badge key={idx} variant="secondary">
-                          {tag}
-                        </Badge>
-                      ))}
+                    <h4 className="font-semibold mb-4 flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4" />
+                      Comentarios
+                    </h4>
+
+                    {/* Add Comment */}
+                    <div className="flex gap-2 mb-4">
+                      <Input
+                        placeholder="Escribe un comentario..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddComment();
+                          }
+                        }}
+                      />
+                      <Button
+                        size="icon"
+                        onClick={handleAddComment}
+                        disabled={!newComment.trim() || addCommentMutation.isPending}
+                      >
+                        {addCommentMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Comments List */}
+                    <div className="space-y-4">
+                      {commentsData?.comments.length === 0 ? (
+                        <p className="text-muted-foreground text-sm text-center py-4">
+                          Se el primero en comentar
+                        </p>
+                      ) : (
+                        commentsData?.comments.map((comment) => (
+                          <div key={comment.id} className="flex gap-3">
+                            <Avatar className="h-8 w-8 shrink-0">
+                              <AvatarImage src={comment.author.image ?? undefined} />
+                              <AvatarFallback>
+                                {comment.author.name?.charAt(0).toUpperCase() ?? "?"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium text-sm">
+                                  {comment.author.name ?? "Anonimo"}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatRelativeDate(comment.createdAt)}
+                                </span>
+                              </div>
+                              <p className="text-sm text-muted-foreground break-words">
+                                {comment.content}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
-                )}
 
-                {/* Social Stats */}
-                <div className="flex items-center gap-6 py-3 border-t">
-                  <button
-                    className="flex items-center gap-1 text-muted-foreground hover:text-red-500 transition-colors"
-                    onClick={() => handleLike(selectedStrategy.id)}
-                  >
-                    <Heart className="h-5 w-5" />
-                    <span>{selectedStrategy.likesCount}</span>
-                  </button>
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <Copy className="h-5 w-5" />
-                    <span>{selectedStrategy.forksCount} forks</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <Download className="h-5 w-5" />
-                    <span>{selectedStrategy.downloadsCount} descargas</span>
-                  </div>
+                  {/* Related Strategies */}
+                  {relatedStrategies && relatedStrategies.length > 0 && (
+                    <>
+                      <Separator className="my-4" />
+                      <div>
+                        <h4 className="font-semibold mb-3">Estrategias Relacionadas</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {relatedStrategies.map((related) => (
+                            <Card
+                              key={related.id}
+                              className="cursor-pointer hover:border-primary/50 transition-colors"
+                              onClick={() => {
+                                setSelectedStrategy(related as any);
+                                setNewComment("");
+                              }}
+                            >
+                              <CardContent className="p-3">
+                                <div className="font-medium truncate mb-1">{related.name}</div>
+                                <div className="text-sm text-muted-foreground mb-2">
+                                  por {related.author?.name ?? "Anonimo"}
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  <span className={`font-medium ${related.totalProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {formatProfit(related.totalProfit)}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Heart className="h-3 w-3" />
+                                    {related.likesCount}
+                                  </span>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-
-                {/* Actions */}
-                <div className="flex gap-3">
-                  <Button
-                    className="flex-1"
-                    onClick={() => handleFork(selectedStrategy.id)}
-                    disabled={forking}
-                  >
-                    {forking ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Copy className="h-4 w-4 mr-2" />
-                    )}
-                    {forking ? "Copiando..." : "Copiar a mis Estrategias"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      // TODO: Ir al backtester con estos parámetros
-                    }}
-                  >
-                    <Target className="h-4 w-4 mr-2" />
-                    Probar en Backtester
-                  </Button>
-                </div>
-              </div>
+              </ScrollArea>
             </>
           )}
         </DialogContent>
