@@ -1,7 +1,8 @@
-import NextAuth, { DefaultSession } from "next-auth";
+import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prisma";
+import type { DefaultSession } from "next-auth";
 
 // Declaracion de tipos para extender NextAuth
 declare module "next-auth" {
@@ -17,6 +18,8 @@ declare module "next-auth" {
   }
 }
 
+// NextAuth completo con autorizacion usando bcrypt
+// Este archivo NO debe ser importado desde middleware.ts (usa Node.js modules)
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
   session: { strategy: "jwt" },

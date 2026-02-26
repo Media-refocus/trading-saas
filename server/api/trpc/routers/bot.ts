@@ -11,7 +11,7 @@
  */
 
 import { z } from "zod";
-import { procedure, protectedProcedure, router } from "../init";
+import { protectedProcedure, router } from "../init";
 import { prisma } from "@/lib/prisma";
 import { generateApiKey } from "@/lib/api-key";
 import { encryptCredential } from "@/lib/encryption";
@@ -196,15 +196,11 @@ export const botRouter = router({
    * Genera una nueva API key (revoca la anterior)
    * IMPORTANTE: La API key solo se muestra una vez
    */
-  regenerateApiKey: procedure.mutation(async () => {
-    // TODO: Obtener tenantId del contexto de autenticación
-    const tenant = await prisma.tenant.findFirst();
-    if (!tenant) {
-      throw new Error("Tenant not found");
-    }
+  regenerateApiKey: protectedProcedure.mutation(async ({ ctx }) => {
+    const tenantId = ctx.user.tenantId;
 
     const botConfig = await prisma.botConfig.findUnique({
-      where: { tenantId: tenant.id },
+      where: { tenantId },
     });
 
     if (!botConfig) {
@@ -231,15 +227,11 @@ export const botRouter = router({
   /**
    * Obtiene la API key actual (solo si es la primera vez)
    */
-  getApiKey: procedure.query(async () => {
-    // TODO: Obtener tenantId del contexto de autenticación
-    const tenant = await prisma.tenant.findFirst();
-    if (!tenant) {
-      return null;
-    }
+  getApiKey: protectedProcedure.query(async ({ ctx }) => {
+    const tenantId = ctx.user.tenantId;
 
     const botConfig = await prisma.botConfig.findUnique({
-      where: { tenantId: tenant.id },
+      where: { tenantId },
       select: { id: true, createdAt: true, updatedAt: true },
     });
 
@@ -262,17 +254,13 @@ export const botRouter = router({
   /**
    * Añade una cuenta MT5 al bot
    */
-  addAccount: procedure
+  addAccount: protectedProcedure
     .input(BotAccountInputSchema)
-    .mutation(async ({ input }) => {
-      // TODO: Obtener tenantId del contexto de autenticación
-      const tenant = await prisma.tenant.findFirst();
-      if (!tenant) {
-        throw new Error("Tenant not found");
-      }
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = ctx.user.tenantId;
 
       const botConfig = await prisma.botConfig.findUnique({
-        where: { tenantId: tenant.id },
+        where: { tenantId },
       });
 
       if (!botConfig) {
@@ -306,7 +294,7 @@ export const botRouter = router({
   /**
    * Actualiza una cuenta MT5
    */
-  updateAccount: procedure
+  updateAccount: protectedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -319,8 +307,21 @@ export const botRouter = router({
         isActive: z.boolean().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = ctx.user.tenantId;
       const { id, ...updates } = input;
+
+      // Verificar que la cuenta pertenece al tenant
+      const account = await prisma.botAccount.findFirst({
+        where: {
+          id,
+          botConfig: { tenantId },
+        },
+      });
+
+      if (!account) {
+        throw new Error("Account not found or access denied");
+      }
 
       const data: Record<string, unknown> = {};
 
@@ -342,9 +343,23 @@ export const botRouter = router({
   /**
    * Elimina una cuenta MT5
    */
-  removeAccount: procedure
+  removeAccount: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = ctx.user.tenantId;
+
+      // Verificar que la cuenta pertenece al tenant
+      const account = await prisma.botAccount.findFirst({
+        where: {
+          id: input.id,
+          botConfig: { tenantId },
+        },
+      });
+
+      if (!account) {
+        throw new Error("Account not found or access denied");
+      }
+
       return prisma.botAccount.delete({
         where: { id: input.id },
       });
@@ -353,15 +368,11 @@ export const botRouter = router({
   /**
    * Lista las cuentas MT5 del bot
    */
-  listAccounts: procedure.query(async () => {
-    // TODO: Obtener tenantId del contexto de autenticación
-    const tenant = await prisma.tenant.findFirst();
-    if (!tenant) {
-      return [];
-    }
+  listAccounts: protectedProcedure.query(async ({ ctx }) => {
+    const tenantId = ctx.user.tenantId;
 
     const botConfig = await prisma.botConfig.findUnique({
-      where: { tenantId: tenant.id },
+      where: { tenantId },
       include: {
         botAccounts: {
           orderBy: { createdAt: "asc" },
@@ -392,15 +403,11 @@ export const botRouter = router({
   /**
    * Obtiene el estado actual del bot
    */
-  getStatus: procedure.query(async () => {
-    // TODO: Obtener tenantId del contexto de autenticación
-    const tenant = await prisma.tenant.findFirst();
-    if (!tenant) {
-      return null;
-    }
+  getStatus: protectedProcedure.query(async ({ ctx }) => {
+    const tenantId = ctx.user.tenantId;
 
     const botConfig = await prisma.botConfig.findUnique({
-      where: { tenantId: tenant.id },
+      where: { tenantId },
       include: {
         heartbeats: {
           take: 1,
@@ -458,15 +465,11 @@ export const botRouter = router({
   /**
    * Pausa el bot
    */
-  pause: procedure.mutation(async () => {
-    // TODO: Obtener tenantId del contexto de autenticación
-    const tenant = await prisma.tenant.findFirst();
-    if (!tenant) {
-      throw new Error("Tenant not found");
-    }
+  pause: protectedProcedure.mutation(async ({ ctx }) => {
+    const tenantId = ctx.user.tenantId;
 
     return prisma.botConfig.updateMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId },
       data: { status: "PAUSED" },
     });
   }),
@@ -474,15 +477,11 @@ export const botRouter = router({
   /**
    * Reanuda el bot
    */
-  resume: procedure.mutation(async () => {
-    // TODO: Obtener tenantId del contexto de autenticación
-    const tenant = await prisma.tenant.findFirst();
-    if (!tenant) {
-      throw new Error("Tenant not found");
-    }
+  resume: protectedProcedure.mutation(async ({ ctx }) => {
+    const tenantId = ctx.user.tenantId;
 
     return prisma.botConfig.updateMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId },
       data: { status: "RESUMING" }, // El bot lo cambiará a ONLINE en el próximo heartbeat
     });
   }),
@@ -492,29 +491,25 @@ export const botRouter = router({
   /**
    * Obtiene el historial de trades
    */
-  getTradeHistory: procedure
+  getTradeHistory: protectedProcedure
     .input(
       z.object({
         limit: z.number().min(1).max(100).default(50),
         offset: z.number().default(0),
       })
     )
-    .query(async ({ input }) => {
-      // TODO: Obtener tenantId del contexto de autenticación
-      const tenant = await prisma.tenant.findFirst();
-      if (!tenant) {
-        return { trades: [], total: 0 };
-      }
+    .query(async ({ ctx, input }) => {
+      const tenantId = ctx.user.tenantId;
 
       const [trades, total] = await Promise.all([
         prisma.trade.findMany({
-          where: { tenantId: tenant.id },
+          where: { tenantId },
           orderBy: { openedAt: "desc" },
           take: input.limit,
           skip: input.offset,
         }),
         prisma.trade.count({
-          where: { tenantId: tenant.id },
+          where: { tenantId },
         }),
       ]);
 
@@ -524,29 +519,25 @@ export const botRouter = router({
   /**
    * Obtiene el historial de señales
    */
-  getSignalHistory: procedure
+  getSignalHistory: protectedProcedure
     .input(
       z.object({
         limit: z.number().min(1).max(100).default(50),
         offset: z.number().default(0),
       })
     )
-    .query(async ({ input }) => {
-      // TODO: Obtener tenantId del contexto de autenticación
-      const tenant = await prisma.tenant.findFirst();
-      if (!tenant) {
-        return { signals: [], total: 0 };
-      }
+    .query(async ({ ctx, input }) => {
+      const tenantId = ctx.user.tenantId;
 
       const [signals, total] = await Promise.all([
         prisma.signal.findMany({
-          where: { tenantId: tenant.id },
+          where: { tenantId },
           orderBy: { receivedAt: "desc" },
           take: input.limit,
           skip: input.offset,
         }),
         prisma.signal.count({
-          where: { tenantId: tenant.id },
+          where: { tenantId },
         }),
       ]);
 
@@ -558,17 +549,13 @@ export const botRouter = router({
   /**
    * Obtiene estadísticas de rendimiento
    */
-  getStats: procedure.query(async () => {
-    // TODO: Obtener tenantId del contexto de autenticación
-    const tenant = await prisma.tenant.findFirst();
-    if (!tenant) {
-      return null;
-    }
+  getStats: protectedProcedure.query(async ({ ctx }) => {
+    const tenantId = ctx.user.tenantId;
 
     // Obtener todos los trades cerrados
     const trades = await prisma.trade.findMany({
       where: {
-        tenantId: tenant.id,
+        tenantId,
         status: "CLOSED",
       },
       select: {
@@ -653,15 +640,11 @@ export const botRouter = router({
   /**
    * Exporta trades a CSV
    */
-  exportTradesCsv: procedure.query(async () => {
-    // TODO: Obtener tenantId del contexto de autenticación
-    const tenant = await prisma.tenant.findFirst();
-    if (!tenant) {
-      return null;
-    }
+  exportTradesCsv: protectedProcedure.query(async ({ ctx }) => {
+    const tenantId = ctx.user.tenantId;
 
     const trades = await prisma.trade.findMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId },
       orderBy: { openedAt: "desc" },
       take: 1000,
     });
