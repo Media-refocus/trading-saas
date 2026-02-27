@@ -95,6 +95,12 @@ docs/                 — Analysis, historical data, guides
 5. **Document Results**: Añade sección de review en `tasks/todo.md`
 6. **Capture Lessons**: Actualiza `tasks/lessons.md` después de correcciones
 
+## Agent Coordination
+- Cada agente tiene file ownership definido en su .md
+- Shared dirs (lib/): el que llega primero documenta en MEMORY.md qué está tocando
+- Conflictos: architect decide prioridad
+- Pre-flight: OBLIGATORIO — leer SESSION_CONTEXT.md + MEMORY.md antes de actuar
+
 ### Core Principles
 - **Simplicity First**: Cada cambio lo más simple posible. Impacto mínimo
 - **No Laziness**: Busca root causes. No fixes temporales. Estándares de senior dev
