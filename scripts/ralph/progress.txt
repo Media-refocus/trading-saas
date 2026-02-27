@@ -5,13 +5,195 @@ Started: Initial setup
 ## Codebase Patterns
 - Multi-tenant: every DB query must filter by tenantId
 - Auth: NextAuth v5 with getServerSession, session includes tenantId
+- Client-side auth: useSession hook from "next-auth/react" (SessionProvider in components/providers.tsx)
 - tRPC routers in server/api/trpc/routers/, registered in _app.ts
 - API routes (non-tRPC) in app/api/
 - UI components: shadcn/ui from @/components/ui/
-- Pages: app/(dashboard)/ for authenticated, app/(auth)/ for login/register
+- Pages: app/(dashboard)/ for authenticated, app/(auth)/ for login/register, app/(marketing)/ for public pages
 - Prisma client: import from @/lib/prisma (singleton pattern)
 - Existing Subscription model in schema.prisma (line ~189)
 - Registration flow: app/api/register/route.ts
 - Navigation: components/navigation.tsx
 - Middleware: middleware.ts (route protection)
+---
+
+## [2026-02-26 23:xx] - US-001
+- Installed stripe and @stripe/stripe-js packages
+- Created lib/stripe.ts with server-side Stripe client (singleton pattern, apiVersion: 2025-02-24.acacia)
+- Created lib/stripe-client.ts with getStripe() helper for client-side loadStripe
+- Env vars already configured in .env.local.example and .env.production.example
+- Typecheck and build pass
+- **Files changed:**
+  - lib/stripe.ts (new)
+  - lib/stripe-client.ts (new)
+  - package.json (added dependencies)
+  - package-lock.json
+- **Learnings for future iterations:**
+  - Stripe SDK requires specific apiVersion - always use latest from TypeScript types
+  - Singleton pattern prevents multiple Stripe instances in dev hot reload
+---
+
+## [2026-02-26 23:32] - US-002
+- Added PlanType enum (BASIC, PRO, ENTERPRISE) to Prisma schema
+- Added SubscriptionStatus enum (TRIAL, ACTIVE, PAST_DUE, CANCELED, PAUSED)
+- Updated Subscription model: plan (PlanType), status (SubscriptionStatus), trialEnd (DateTime?)
+- Added plan field to Tenant model with default "TRIAL"
+- Ran prisma migrate dev --name stripe-plans (SQLite dev.db created)
+- Typecheck and build pass
+- **Files changed:**
+  - prisma/schema.prisma (modified)
+  - prisma/migrations/20260226223205_stripe_plans/ (new, but not tracked per .gitignore)
+- **Learnings for future iterations:**
+  - Project intentionally ignores migration.sql files in .gitignore (only tracks schema)
+  - Run migrations with: DATABASE_URL="file:./dev.db" npx prisma migrate dev --name <name>
+  - Prisma enums are better than string types for type safety
+---
+
+## [2026-02-26 23:45] - US-003
+- Updated register route to auto-create trial subscription
+- Uses Prisma $transaction for atomic creation of tenant, user, and subscription
+- Trial subscription: plan=PRO, status=TRIAL, trialEnd=now+14days
+- Typecheck and build pass
+- **Files changed:**
+  - app/api/register/route.ts (modified)
+- **Learnings for future iterations:**
+  - Use Prisma $transaction when creating related entities to ensure atomicity
+  - Trial users get PRO features (per PRD notes)
+---
+
+## [2026-02-26 23:55] - US-004
+- Created marketing layout with header/footer navigation
+- Created pricing page at app/(marketing)/pricing/page.tsx
+- Shows 3 plan cards (Basic €57, Pro €147, Enterprise €347) with feature comparison
+- Pro plan highlighted as "Most Popular" with Badge component
+- CTA buttons: "Start Free Trial" (not logged in) / "Subscribe" (logged in)
+- Includes ROI section and FAQs from docs/PLANS.md
+- Uses useSession from next-auth/react for auth state
+- Typecheck and build pass
+- **Files changed:**
+  - app/(marketing)/layout.tsx (new)
+  - app/(marketing)/pricing/page.tsx (new)
+- **Learnings for future iterations:**
+  - SessionProvider is already set up in components/providers.tsx
+  - Use useSession hook from "next-auth/react" for client-side auth state
+  - shadcn Badge, Card, Button components work well for pricing cards
+---
+
+## [2026-02-26 24:xx] - US-005
+- Created POST /api/stripe/checkout route with auth protection
+- Uses auth() from lib/auth.ts to verify authenticated user
+- Creates or retrieves Stripe Customer (linked to tenant.stripeCustomerId)
+- Accepts { planId: 'basic'|'pro'|'enterprise' }
+- Returns checkout session URL
+- Fixed Stripe client to use lazy initialization (Proxy pattern) to avoid build-time errors
+- Added Stripe Price IDs to .env.local.example and .env.production.example
+- Typecheck and build pass
+- **Files changed:**
+  - app/api/stripe/checkout/route.ts (new)
+  - lib/stripe.ts (modified - lazy init via Proxy)
+  - .env.local.example (added STRIPE_PRICE_*)
+  - .env.production.example (added STRIPE_PRICE_*)
+- **Learnings for future iterations:**
+  - Stripe SDK throws at import time if STRIPE_SECRET_KEY is empty during build
+  - Use Proxy pattern for lazy initialization of third-party clients that require env vars
+  - Auth protection via auth() from lib/auth.ts, check session?.user?.tenantId
+---
+
+## [2026-02-26 24:xx] - US-006
+- Created POST /api/stripe/webhook route
+- Uses raw body parsing (request.text()) for Stripe signature verification
+- Verifies signature with stripe.webhooks.constructEvent()
+- Handles 4 event types:
+  - checkout.session.completed: creates/updates subscription, sets plan
+  - customer.subscription.updated: syncs status and period dates
+  - customer.subscription.deleted: marks as CANCELED, downgrades tenant to TRIAL
+  - invoice.payment_failed: marks as PAST_DUE
+- Maps Stripe statuses to SubscriptionStatus enum
+- Maps Stripe Price IDs to PlanType enum
+- Typecheck and build pass
+- **Files changed:**
+  - app/api/stripe/webhook/route.ts (new)
+- **Learnings for future iterations:**
+  - Stripe webhooks require raw body for signature verification - use request.text() not request.json()
+  - Stripe subscription IDs are unique, use upsert by stripeSubId
+  - Always update tenant.plan when subscription changes for consistency
+---
+
+## [2026-02-27 00:xx] - US-007
+- Created POST /api/stripe/portal route with auth protection
+- Uses auth() from lib/auth.ts to verify authenticated user
+- Checks tenant has stripeCustomerId before creating portal session
+- Creates Stripe billing portal session with return_url to /dashboard
+- Returns portal URL for client-side redirect
+- Typecheck and build pass
+- **Files changed:**
+  - app/api/stripe/portal/route.ts (new)
+- **Learnings for future iterations:**
+  - Billing portal requires existing stripeCustomerId - handle case where user hasn't subscribed yet
+  - Return URL pattern same as checkout: uses NEXT_PUBLIC_APP_URL env var
+---
+
+## [2026-02-27 10:xx] - US-008
+- Created lib/plan-gates.ts with comprehensive feature flags for each plan tier
+- Implemented getPlanFeatures(plan) returning PlanFeatures interface with 30+ feature flags
+- Features gated based on PLANS.md: backtester/monteCarlo/apiAccess (Enterprise), circuitBreaker/telegramBot/analyticsPro (Pro+)
+- Added hasFeature() helper to check individual feature access
+- Added getEffectivePlan() to determine actual plan based on subscription status (trial expiry handling)
+- Added getTenantSubscription() to fetch subscription info from DB
+- Created planGatedProcedure(feature) in init.ts for tRPC middleware
+- Created protectedProcedureWithPlan for context enrichment without gating
+- Fixed circular dependency between init.ts and plan-gates.ts by moving middleware creation to init.ts
+- Typecheck and build pass
+- **Files changed:**
+  - lib/plan-gates.ts (new)
+  - server/api/trpc/init.ts (modified - added plan-gated procedures)
+- **Learnings for future iterations:**
+  - Avoid circular deps between lib/ and server/api/trpc/ - tRPC middleware must be defined where `t` is initialized
+  - Plan gates should use `FORBIDDEN` error code for plan-related access denial
+  - Trial users get PRO features - effective plan is "TRIAL" which maps to PRO features
+  - Use planGatedProcedure("featureName") to protect tRPC routes, protectedProcedureWithPlan for UI visibility
+---
+
+## [2026-02-27 11:30] - US-009
+- Added getSubscription query to tenant router with comprehensive status info
+- Returns: status, plan, planName, effectivePlan, trialDaysRemaining, convenience flags (isTrial, isPastDue, isPaused, isActive)
+- Updated navigation.tsx with subscription status badge:
+  - Badge shows plan name (Pro (Trial), Básico, Pro, Enterprise)
+  - Trial countdown displayed as "(Xd)" suffix
+  - Warning icons for past_due (AlertTriangle) and paused (Zap)
+  - Badge variant changes based on status (destructive for past_due, outline for paused)
+- Added warning banner above nav for past_due and paused subscriptions
+- Banner includes contextual message and CTA (update payment / subscribe now)
+- Badge links to billing portal (if hasStripeCustomer) or /pricing page
+- Typecheck and build pass
+- **Files changed:**
+  - server/api/trpc/routers/tenant.ts (modified - added getSubscription query)
+  - components/navigation.tsx (modified - added subscription badge and warning banner)
+- **Learnings for future iterations:**
+  - Subscription queries should include convenience flags for UI logic (isTrial, isPastDue, etc.)
+  - Warning banners should be outside the nav component to avoid layout shift
+  - Badge onClick can trigger billing portal redirect - wrap in button for accessibility
+---
+
+## [2026-02-27 12:00] - US-010
+- Added checkAndUpdateExpiredTrial() and hasActiveAccess() helpers to lib/plan-gates.ts
+- Updated bot auth (app/api/bot/auth.ts) to check subscription status after authentication
+- Bot API now returns 403 with code "SUBSCRIPTION_PAUSED" for paused tenants
+- Updated dashboard layout to check trial expiry on every access
+- If trial expired: auto-updates subscription status to PAUSED
+- If subscription PAUSED/CANCELED: shows UpgradeRequired component instead of dashboard
+- Created app/(dashboard)/upgrade-required.tsx with upgrade CTA and feature list
+- Paused users see message about expired trial with link to /pricing
+- User data is preserved - they can reactivate anytime by subscribing
+- Typecheck and build pass
+- **Files changed:**
+  - lib/plan-gates.ts (modified - added checkAndUpdateExpiredTrial, hasActiveAccess)
+  - app/api/bot/auth.ts (modified - added subscription check after bot auth)
+  - app/(dashboard)/layout.tsx (modified - added trial expiry check and conditional rendering)
+  - app/(dashboard)/upgrade-required.tsx (new - upgrade CTA component)
+- **Learnings for future iterations:**
+  - For server components, use conditional rendering instead of redirect to avoid redirect loops
+  - Subscription checks should happen at the layout level to protect all child routes
+  - Bot API authentication is separate from user auth - need to check subscription separately
+  - Auto-pausing expired trials preserves data while blocking access
 ---

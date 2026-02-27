@@ -10,12 +10,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Plan types for subscriptions
+enum PlanType {
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+// Subscription status
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  PAUSED
+}
+
 // Multi-tenancy: Cada cliente tiene su tenant
 model Tenant {
   id              String         @id @default(cuid())
   name            String
   email           String         @unique
   stripeCustomerId String?       @unique
+  plan            String         @default("TRIAL") // TRIAL, BASIC, PRO, ENTERPRISE
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
@@ -191,9 +208,11 @@ model Subscription {
   tenantId        String
   tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  plan            PlanType            // BASIC, PRO, ENTERPRISE
   stripePriceId    String?
   stripeSubId      String?   @unique
-  status          String              // "ACTIVE", "CANCELED", "PAST_DUE"
+  status          SubscriptionStatus  @default(TRIAL) // TRIAL, ACTIVE, PAST_DUE, CANCELED, PAUSED
+  trialEnd        DateTime?           // When trial ends
 
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?

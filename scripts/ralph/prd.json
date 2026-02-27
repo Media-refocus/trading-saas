@@ -15,7 +15,7 @@
         "Typecheck passes (npx tsc --noEmit)"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Use stripe@latest. Keys are test mode for now."
     },
     {
@@ -29,7 +29,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Subscription model already exists with basic fields. Extend it. Don't break existing data."
     },
     {
@@ -42,7 +42,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Check app/api/register/route.ts for current flow"
     },
     {
@@ -58,7 +58,7 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Reference docs/PLANS.md for exact features per plan. Use shadcn Card, Badge, Button."
     },
     {
@@ -74,7 +74,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Use Stripe Price IDs from env: STRIPE_PRICE_BASIC, STRIPE_PRICE_PRO, STRIPE_PRICE_ENTERPRISE. Success URL: /dashboard?checkout=success. Cancel URL: /pricing."
     },
     {
@@ -89,7 +89,7 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Use raw body parsing (not JSON) for webhook signature verification. Export const runtime = 'nodejs' if needed."
     },
     {
@@ -104,7 +104,7 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Return URL should be /dashboard"
     },
     {
@@ -118,7 +118,7 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Trial users get PRO features. Check docs/PLANS.md for exact feature matrix."
     },
     {
@@ -134,7 +134,7 @@
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "Update components/navigation.tsx. Use tRPC to fetch subscription status."
     },
     {
@@ -149,7 +149,7 @@
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "Don't delete data — just pause access. User can reactivate by subscribing."
     }
   ]

@@ -13,6 +13,7 @@ import {
   RATE_LIMITS,
   createRateLimitHeaders,
 } from "@/lib/rate-limit";
+import { checkAndUpdateExpiredTrial } from "@/lib/plan-gates";
 
 // Cache de bot configs para evitar consultas repetidas
 // TTL: 60 segundos
@@ -129,6 +130,24 @@ export async function authenticateBot(
         tenantId: config.tenantId,
         status: config.status,
       };
+
+      // Check subscription status - auto-pause expired trials
+      const subscriptionInfo = await checkAndUpdateExpiredTrial(config.tenantId);
+
+      // If subscription is paused, deny access
+      if (subscriptionInfo.status === "PAUSED" || subscriptionInfo.status === "CANCELED") {
+        return {
+          success: false,
+          error: NextResponse.json(
+            {
+              error: "Subscription paused or expired",
+              code: "SUBSCRIPTION_PAUSED",
+              message: "Tu suscripción está pausada. Actívala desde el dashboard.",
+            },
+            { status: 403 }
+          ),
+        };
+      }
 
       // Guardar en cache
       botConfigCache.set(apiKey, {

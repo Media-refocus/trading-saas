@@ -48,29 +48,48 @@ export async function POST(request: Request) {
       );
     }
 
-    // Crear tenant
-    const tenant = await prisma.tenant.create({
-      data: {
-        name,
-        email,
-      },
-    });
-
     // Hashear password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crear usuario asociado al tenant
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        tenantId: tenant.id,
-      },
+    // Fecha de fin de trial: 14 días desde ahora
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 14);
+
+    // Crear tenant, usuario y suscripción trial en transacción atómica
+    const result = await prisma.$transaction(async (tx) => {
+      // Crear tenant
+      const tenant = await tx.tenant.create({
+        data: {
+          name,
+          email,
+        },
+      });
+
+      // Crear usuario asociado al tenant
+      const user = await tx.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          tenantId: tenant.id,
+        },
+      });
+
+      // Crear suscripción trial (14 días con features PRO)
+      await tx.subscription.create({
+        data: {
+          tenantId: tenant.id,
+          plan: "PRO",
+          status: "TRIAL",
+          trialEnd,
+        },
+      });
+
+      return { tenant, user };
     });
 
     return NextResponse.json(
-      { message: "Usuario creado exitosamente", userId: user.id },
+      { message: "Usuario creado exitosamente", userId: result.user.id },
       { status: 201 }
     );
   } catch (error) {
