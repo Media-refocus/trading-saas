@@ -176,6 +176,64 @@ async function main() {
   });
   console.log('Backtest demo creado:', exampleBacktest.id);
 
+  // ============================================
+  // 8. Crear Subscription con trial
+  // ============================================
+  const trialEnd = new Date();
+  trialEnd.setDate(trialEnd.getDate() + 14);
+
+  const subscription = await prisma.subscription.upsert({
+    where: { id: `sub-${demoTenant.id}` },
+    update: { trialEnd },
+    create: {
+      id: `sub-${demoTenant.id}`,
+      tenantId: demoTenant.id,
+      plan: 'PRO',
+      status: 'TRIAL',
+      trialEnd,
+    },
+  });
+  console.log('Subscription creada:', subscription.id, '- Trial hasta:', trialEnd.toDateString());
+
+  // ============================================
+  // 9. Crear Ticks de Demo (1000 ticks XAUUSD)
+  // ============================================
+  const existingTicks = await prisma.tickData.count();
+
+  if (existingTicks > 0) {
+    console.log('Ticks ya existen:', existingTicks);
+  } else {
+    console.log('Generando 1000 ticks de demo (XAUUSD)...');
+
+    const ticks = [];
+    const basePrice = 2000;
+    const now = new Date();
+
+    for (let i = 0; i < 1000; i++) {
+      const timestamp = new Date(now.getTime() - (1000 - i) * 60000);
+      const variation = (Math.random() - 0.5) * 10;
+      const bid = basePrice + variation;
+      const spread = 0.3;
+      const ask = bid + spread;
+
+      ticks.push({
+        symbol: 'XAUUSD',
+        bid: parseFloat(bid.toFixed(2)),
+        ask: parseFloat(ask.toFixed(2)),
+        spread,
+        timestamp,
+      });
+    }
+
+    const batchSize = 100;
+    for (let i = 0; i < ticks.length; i += batchSize) {
+      const batch = ticks.slice(i, i + batchSize);
+      await prisma.tickData.createMany({ data: batch });
+      process.stdout.write(`\r   Insertados: ${Math.min(i + batchSize, ticks.length)}/${ticks.length}`);
+    }
+    console.log('\nTicks creados: 1000');
+  }
+
   console.log('\n========================================');
   console.log('Seed completado exitosamente!');
   console.log('========================================');
