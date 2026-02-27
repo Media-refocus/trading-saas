@@ -429,5 +429,161 @@ npm run build
 
 ---
 
+## Fase 6: Bot Cliente y VPS (ACTUAL - Q1 2026)
+
+### 6.1 Paquete de Instalacion ✅
+**Prioridad**: CRITICA
+**Estado**: COMPLETADO
+
+**Tareas completadas**:
+- [x] Script de instalacion automatica (install.ps1)
+- [x] Verificacion de requisitos (MT5, Python, RAM, disco)
+- [x] Descarga automatica del bot
+- [x] Creacion de servicio Windows (auto-arranque)
+- [x] Scripts auxiliares (start, stop, status)
+- [x] Documentacion para el cliente (README.md)
+
+### 6.2 Landing Page Mejorada ✅
+**Prioridad**: ALTA
+**Estado**: COMPLETADO
+
+**Tareas completadas**:
+- [x] Hero con propuesta de valor clara
+- [x] Seccion de seguridad (credenciales nunca salen del VPS)
+- [x] Como funciona (4 pasos)
+- [x] Requisitos del VPS y proveedores recomendados
+- [x] FAQs completas
+- [x] CTAs mejorados
+
+---
+
+## Fase 7: Notificaciones Telegram (Q2 2026)
+
+### 7.1 Bot de Notificaciones
+**Prioridad**: ALTA
+**Dependencias**: Fase 6
+**Tiempo estimado**: 5-7 dias
+
+**Objetivo**: Bot de Telegram que envia alertas en tiempo real al cliente.
+
+**Features**:
+- [ ] Alertas de operativa:
+  - Operacion abierta (con detalles)
+  - Operacion cerrada (con P&L)
+  - Error del bot
+  - Daily Loss Limit alcanzado
+  - Kill Switch activado
+- [ ] Comandos basicos:
+  - `/status` - Estado del bot (online/offline)
+  - `/positions` - Posiciones abiertas
+  - `/balance` - Balance y equity actual
+  - `/stop` - Detener bot (requiere confirmacion)
+- [ ] Configuracion por usuario:
+  - Activar/desactivar notificaciones
+  - Frecuencia de actualizaciones
+
+**Disponible en planes**: Pro (97 EUR) y VIP (197 EUR)
+
+---
+
+## Fase 8: Agente IA de Operativa (Q3-Q4 2026) - FEATURE ESTRELLA
+
+### 8.1 Concepto
+**Objetivo**: Agente de IA conversacional en Telegram que actua como asistente personal de trading.
+
+El cliente puede:
+- Enviar mensajes de voz o texto
+- Recibir asesoramiento personalizado
+- Gestionar su operativa conversando
+
+### 8.2 Capacidades del Agente
+
+**Analisis de Operativa**
+- [ ] "Como voy esta semana?" - Resumen de rendimiento
+- [ ] "Que estrategia me recomiendas?" - Sugerencias basadas en perfil
+- [ ] "Analiza mis ultimas operaciones" - Identificar patrones
+
+**Gestion de Riesgo**
+- [ ] "Tengo 5000 EUR, que lote me recomiendas?" - Position sizing
+- [ ] "Cuanto riesgo estoy asumiendo ahora?" - Analisis de exposicion
+- [ ] "Deberia reducir mi exposicion?" - Consejos personalizados
+
+**Soporte y Educativo**
+- [ ] Explicar conceptos de trading
+- [ ] Responder dudas sobre el bot
+- [ ] Guiar en configuracion de parametros
+- [ ] Alertas educativas cuando detecta errores comunes
+
+**Configuracion del Bot**
+- [ ] "Cambia mi lote a 0.05" - Modificar parametros via chat
+- [ ] "Activa el Daily Loss Limit al 3%" - Ajustar protecciones
+- [ ] "Pon 4 niveles maximos" - Cambiar grid
+
+### 8.3 Stack Tecnico Sugerido
+- OpenAI GPT-4o para conversacion
+- Whisper para speech-to-text
+- LangChain para orquestacion
+- Vector DB para contexto del cliente
+
+### 8.4 Seguridad
+- [ ] No exponer datos sensibles en prompts
+- [ ] Anonimizar datos para el modelo
+- [ ] Auditoria de conversaciones
+- [ ] Rate limiting por plan
+
+**Disponible en plan**: VIP (197 EUR) - Diferencial competitivo
+
+---
+
+## Features por Plan (Actualizado 2026-02-27)
+
+| Feature | Trader (57 EUR) | Pro (97 EUR) | VIP (197 EUR) |
+|---------|-----------------|--------------|---------------|
+| Dashboard completo | Si | Si | Si |
+| Bot MT5 | 1 cuenta | 3 cuentas | Ilimitadas |
+| Backtester avanzado | Si | Si | Si |
+| Daily Loss Limit | Si | Si | Si |
+| Kill Switch | Si | Si | Si |
+| Instalacion VPS guiada | Si | Si | Si |
+| Soporte email | Si | Si | Si |
+| Telegram notificaciones | No | Si | Si |
+| Analytics Pro | No | Si | Si |
+| **Agente IA de Operativa** | No | No | **Si** |
+| Soporte prioritario | No | No | Si |
+| Canal VIP con Xisco | No | No | Si |
+| Onboarding asistido | No | No | Si |
+
+---
+
+## Timeline Visual Actualizado
+
+```
+2026 Q1  [======Fase 1-6======] MVP + Bot Cliente + Landing
+2026 Q2            [======Fase 7======] Telegram Notificaciones
+2026 Q3-Q4                   [========Fase 8========] Agente IA
+2027+                                    [====Fase 4-5====] Expansion
+```
+
+---
+
+## Metricas de Exito
+
+### Fase 6 (Actual)
+- [ ] 10 clientes activos
+- [ ] <1% downtime del bot
+- [ ] Tiempo de instalacion <30 min
+
+### Fase 7
+- [ ] 50 clientes activos
+- [ ] 80% adoption Telegram bot
+- [ ] NPS >50
+
+### Fase 8
+- [ ] 100 clientes activos
+- [ ] 30% clientes en plan VIP
+- [ ] 5+ interacciones/semana con agente IA
+
+---
+
 *Documento creado: 2026-02-19*
-*Última actualización: 2026-02-19*
+*Ultima actualizacion: 2026-02-27*
