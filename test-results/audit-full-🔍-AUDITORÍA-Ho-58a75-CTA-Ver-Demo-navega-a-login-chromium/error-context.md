@@ -1,0 +1,176 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Trading Bot" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img [ref=e6]
+          - text: Trading Bot
+        - navigation [ref=e9]:
+          - link "Precios" [ref=e10] [cursor=pointer]:
+            - /url: /pricing
+          - link "Iniciar Sesion" [ref=e11] [cursor=pointer]:
+            - /url: /login
+          - link "Prueba Gratis" [ref=e12] [cursor=pointer]:
+            - /url: /register
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - img [ref=e16]
+          - generic [ref=e18]: 14 dias gratis. Sin tarjeta.
+        - heading "Automatiza tu trading sin arriesgar tu capital" [level=1] [ref=e19]
+        - paragraph [ref=e20]: Bot que ejecuta senales de Telegram en MT5. Control total desde el dashboard. Sin guardar credenciales. Sin manejar tu dinero.
+        - generic [ref=e21]:
+          - link "Comenzar Gratis" [ref=e22] [cursor=pointer]:
+            - /url: /register
+            - text: Comenzar Gratis
+            - img [ref=e23]
+          - link "Ver Precios" [ref=e25] [cursor=pointer]:
+            - /url: /pricing
+      - generic [ref=e26]:
+        - generic [ref=e27]:
+          - generic [ref=e28]: 25,000+
+          - generic [ref=e29]: Senales en backtester
+        - generic [ref=e30]:
+          - generic [ref=e31]: 24/7
+          - generic [ref=e32]: Operacion automatica
+        - generic [ref=e33]:
+          - generic [ref=e34]: "0"
+          - generic [ref=e35]: Credenciales guardadas
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - heading "Todo lo que necesitas para operar" [level=2] [ref=e39]
+        - paragraph [ref=e40]: Herramientas profesionales sin complicaciones tecnicas.
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - img [ref=e43]
+          - heading "Ejecucion Automatica 24/7" [level=3] [ref=e46]
+          - paragraph [ref=e47]: El bot opera por ti las 24 horas. Recibe senales de tu canal de Telegram y las ejecuta en MT5 automaticamente.
+        - generic [ref=e48]:
+          - img [ref=e49]
+          - heading "Dashboard Completo" [level=3] [ref=e52]
+          - paragraph [ref=e53]: "Controla todo desde una unica pantalla: posiciones, balance, metricas, historico de operaciones."
+        - generic [ref=e54]:
+          - img [ref=e55]
+          - heading "Kill Switch de Emergencia" [level=3] [ref=e57]
+          - paragraph [ref=e58]: Un clic para cerrar TODAS las posiciones y detener el bot. Proteccion total ante imprevistos.
+        - generic [ref=e59]:
+          - img [ref=e60]
+          - heading "Daily Loss Limit" [level=3] [ref=e62]
+          - paragraph [ref=e63]: El bot se detiene automaticamente si pierdes mas del limite diario que configures. Protege tu capital.
+        - generic [ref=e64]:
+          - img [ref=e65]
+          - heading "Backtester Avanzado" [level=3] [ref=e68]
+          - paragraph [ref=e69]: 25,000+ senales historicas para probar estrategias antes de arriesgar dinero real.
+        - generic [ref=e70]:
+          - img [ref=e71]
+          - heading "Notificaciones Telegram" [level=3] [ref=e74]
+          - paragraph [ref=e75]: "Recibe alertas en tiempo real: operaciones abiertas, cerradas, errores, limites alcanzados."
+    - generic [ref=e78]:
+      - generic [ref=e79]:
+        - img [ref=e80]
+        - heading "Seguridad Primero" [level=2] [ref=e83]
+      - paragraph [ref=e84]: Tu capital y credenciales nunca salen de tu control. Nosotros solo proporcionamos la herramienta, no tocamos tu dinero.
+      - generic [ref=e85]:
+        - generic [ref=e86]:
+          - img [ref=e87]
+          - generic [ref=e90]: Tus credenciales de broker NUNCA salen de tu VPS
+        - generic [ref=e91]:
+          - img [ref=e92]
+          - generic [ref=e95]: No guardamos ningun dato bancario
+        - generic [ref=e96]:
+          - img [ref=e97]
+          - generic [ref=e100]: Conexion encriptada entre bot y dashboard
+        - generic [ref=e101]:
+          - img [ref=e102]
+          - generic [ref=e105]: Tu capital siempre bajo tu control
+        - generic [ref=e106]:
+          - img [ref=e107]
+          - generic [ref=e110]: "Cumplimiento regulatorio: no manejamos tu dinero"
+    - generic [ref=e112]:
+      - generic [ref=e113]:
+        - heading "Como Funciona" [level=2] [ref=e114]
+        - paragraph [ref=e115]: Configuracion en menos de 30 minutos. Sin conocimientos tecnicos.
+      - generic [ref=e116]:
+        - generic [ref=e117]:
+          - generic [ref=e118]: "1"
+          - heading "Contrata tu VPS Windows" [level=3] [ref=e119]
+          - paragraph [ref=e120]: Necesitas un VPS con Windows (4GB RAM minimo). Nosotros te guiamos en la eleccion.
+        - generic [ref=e121]:
+          - generic [ref=e122]: "2"
+          - heading "Instala el bot con un script" [level=3] [ref=e123]
+          - paragraph [ref=e124]: "Te damos un script que instala todo automaticamente: Python, dependencias, el bot."
+        - generic [ref=e125]:
+          - generic [ref=e126]: "3"
+          - heading "Configura MT5 con tus credenciales" [level=3] [ref=e127]
+          - paragraph [ref=e128]: Pones tu usuario y contrasena de MT5 en TU VPS. NUNCA salen de ahi.
+        - generic [ref=e129]:
+          - generic [ref=e130]: "4"
+          - heading "Conecta con tu API Key" [level=3] [ref=e131]
+          - paragraph [ref=e132]: Generas una API Key en el dashboard y la pones en el bot. Ya esta, a operar.
+    - generic [ref=e135]:
+      - generic [ref=e136]:
+        - img [ref=e137]
+        - heading "Requisitos del VPS" [level=2] [ref=e140]
+      - generic [ref=e141]:
+        - generic [ref=e142]:
+          - heading "Minimo Recomendado" [level=3] [ref=e143]
+          - list [ref=e144]:
+            - listitem [ref=e145]: Windows Server 2019 o superior
+            - listitem [ref=e146]: 4 GB RAM
+            - listitem [ref=e147]: 50 GB disco SSD
+            - listitem [ref=e148]: 2 vCPU
+            - listitem [ref=e149]: Latencia <50ms a tu broker
+        - generic [ref=e150]:
+          - heading "Proveedores Recomendados" [level=3] [ref=e151]
+          - list [ref=e152]:
+            - listitem [ref=e153]: Contabo - Economico, buena opcion
+            - listitem [ref=e154]: ForexVPS - Optimizado para trading
+            - listitem [ref=e155]: Vultr - Buen rendimiento general
+            - listitem [ref=e156]: Hetzner - Calidad-precio excelente
+    - generic [ref=e158]:
+      - heading "Preguntas Frecuentes" [level=2] [ref=e160]
+      - generic [ref=e161]:
+        - generic [ref=e162]:
+          - heading "Necesito tener el PC encendido todo el dia?" [level=3] [ref=e163]
+          - paragraph [ref=e164]: No. Usamos un VPS Windows (servidor virtual) que esta encendido 24/7. Tu PC puede estar apagado.
+        - generic [ref=e165]:
+          - heading "Es seguro? Teneis acceso a mi cuenta?" [level=3] [ref=e166]
+          - paragraph [ref=e167]: No. Tus credenciales de MT5 se quedan en tu VPS. Nosotros solo recibimos datos de operativa (no dinero). Nunca podemos tocar tu capital.
+        - generic [ref=e168]:
+          - heading "Que VPS necesito?" [level=3] [ref=e169]
+          - paragraph [ref=e170]: Windows Server 2019+, 4GB RAM minimo, 50GB disco. Recomendamos contybo, forexvps o similar. Te ayudamos a configurarlo.
+        - generic [ref=e171]:
+          - heading "Puedo usar MT4 en lugar de MT5?" [level=3] [ref=e172]
+          - paragraph [ref=e173]: Actualmente solo soportamos MT5. MT4 es una plataforma legacy con menos funcionalidades.
+        - generic [ref=e174]:
+          - heading "Que pasa si el bot falla?" [level=3] [ref=e175]
+          - paragraph [ref=e176]: El bot tiene un sistema de heartbeat que nos avisa si se cae. Ademas, puedes reiniciarlo remotamente desde el dashboard.
+        - generic [ref=e177]:
+          - heading "Puedo cancelar cuando quiera?" [level=3] [ref=e178]
+          - paragraph [ref=e179]: Si, sin penalizaciones. El acceso sigue activo hasta el final del periodo pagado.
+    - generic [ref=e181]:
+      - heading "Empieza tu prueba gratis de 14 dias" [level=2] [ref=e182]
+      - paragraph [ref=e183]: Todas las funciones del plan Pro. Sin tarjeta de credito. Cancela cuando quieras.
+      - link "Crear Cuenta Gratis" [ref=e184] [cursor=pointer]:
+        - /url: /register
+        - text: Crear Cuenta Gratis
+        - img [ref=e185]
+    - contentinfo [ref=e187]:
+      - generic [ref=e189]:
+        - generic [ref=e190]:
+          - img [ref=e191]
+          - generic [ref=e194]: Trading Bot
+        - paragraph [ref=e195]: © 2026 Trading Bot SaaS. Todos los derechos reservados.
+        - generic [ref=e197]: "Soporte: soporte@tradingbot.com"
+  - generic [ref=e198]:
+    - img [ref=e200]
+    - button "Open Tanstack query devtools" [ref=e248] [cursor=pointer]:
+      - img [ref=e249]
+  - button "Open Next.js Dev Tools" [ref=e302] [cursor=pointer]:
+    - img [ref=e303]
+  - alert [ref=e306]
+```

@@ -1,0 +1,185 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - link "Trading Bot SaaS" [ref=e7] [cursor=pointer]:
+            - /url: /dashboard
+          - generic [ref=e8]:
+            - link "Dashboard" [ref=e9] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e10]
+              - text: Dashboard
+            - link "Backtester" [ref=e12] [cursor=pointer]:
+              - /url: /backtester
+              - img [ref=e13]
+              - text: Backtester
+            - link "Operativas" [ref=e15] [cursor=pointer]:
+              - /url: /operativas
+              - img [ref=e16]
+              - text: Operativas
+            - link "Bot Operativo" [ref=e21] [cursor=pointer]:
+              - /url: /bot
+              - img [ref=e22]
+              - text: Bot Operativo
+            - link "Configuración" [ref=e25] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e26]
+              - text: Configuración
+        - generic [ref=e29]:
+          - button [ref=e30] [cursor=pointer]:
+            - img [ref=e31]
+          - link "Monitor" [ref=e34] [cursor=pointer]:
+            - /url: /bot/monitor
+            - button "Monitor" [ref=e35]:
+              - img [ref=e36]
+              - text: Monitor
+          - button "Cerrar Sesion" [ref=e38] [cursor=pointer]:
+            - img [ref=e39]
+            - text: Cerrar Sesion
+    - main [ref=e42]:
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - generic [ref=e46]:
+              - img [ref=e48]
+              - generic [ref=e50]:
+                - heading "Backtester" [level=1] [ref=e51]
+                - paragraph [ref=e52]: Grid con promedios y trailing SL
+            - generic [ref=e53]:
+              - img [ref=e54]
+              - generic [ref=e57]: "Config:"
+              - generic [ref=e58]: 10p × 4L × 20TP × 50%Trail
+          - button [ref=e60] [cursor=pointer]:
+            - img [ref=e61]
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - heading "Configuración" [level=3] [ref=e66]: Configuración
+            - generic [ref=e68]:
+              - generic [ref=e69]:
+                - generic [ref=e70]:
+                  - text: Señales
+                  - combobox [ref=e71]
+                - generic [ref=e72]:
+                  - text: Estrategia
+                  - combobox [ref=e73]:
+                    - option "Toni (G4)" [selected]
+                    - option "Xisco (G2)"
+                    - option "Personalizada"
+              - generic [ref=e74]:
+                - generic [ref=e75]:
+                  - generic [ref=e76]:
+                    - img [ref=e77]
+                    - generic [ref=e81]: Grid Spacing (pips)
+                    - img [ref=e82]
+                  - generic [ref=e85]: "10"
+                - slider [ref=e90]
+                - generic [ref=e91]:
+                  - generic [ref=e92]: "5"
+                  - generic [ref=e93]: "50"
+              - generic [ref=e94]:
+                - generic [ref=e95]:
+                  - generic [ref=e96]:
+                    - img [ref=e97]
+                    - generic [ref=e99]: Max Levels
+                    - img [ref=e100]
+                  - generic [ref=e103]: "4"
+                - slider [ref=e108]
+                - generic [ref=e109]:
+                  - generic [ref=e110]: "1"
+                  - generic [ref=e111]: "30"
+              - generic [ref=e112]:
+                - generic [ref=e113]:
+                  - generic [ref=e114]:
+                    - img [ref=e115]
+                    - generic [ref=e119]: Take Profit (pips)
+                    - img [ref=e120]
+                  - generic [ref=e123]: "20"
+                - slider [ref=e128]
+                - generic [ref=e129]:
+                  - generic [ref=e130]: "5"
+                  - generic [ref=e131]: "50"
+              - generic [ref=e134]:
+                - switch [ref=e135] [cursor=pointer]
+                - img [ref=e136]
+                - generic [ref=e138] [cursor=pointer]: Use Stop Loss
+              - generic [ref=e139]:
+                - generic [ref=e140]:
+                  - text: Lot Size
+                  - spinbutton [ref=e141]: "0.1"
+                - generic [ref=e142]:
+                  - text: Capital €
+                  - spinbutton [ref=e143]: "10000"
+              - generic [ref=e144]:
+                - generic [ref=e145]:
+                  - text: Sesión
+                  - combobox [ref=e146]:
+                    - option "Todas" [selected]
+                    - option "Asia"
+                    - option "Europa"
+                    - option "US"
+                - generic [ref=e147]:
+                  - text: Dirección
+                  - combobox [ref=e148]:
+                    - option "Ambas" [selected]
+                    - option "BUY"
+                    - option "SELL"
+                - generic [ref=e149]:
+                  - text: Límite
+                  - spinbutton [ref=e150]: "100"
+              - generic [ref=e151]:
+                - switch [checked] [ref=e152] [cursor=pointer]
+                - generic [ref=e153] [cursor=pointer]: Trailing SL
+                - spinbutton [ref=e154]: "50"
+                - generic [ref=e155]: "%"
+              - generic [ref=e156]:
+                - switch [ref=e157] [cursor=pointer]
+                - generic [ref=e158] [cursor=pointer]: Usar ticks reales (lento)
+              - button "Procesando 100 señales..." [disabled]:
+                - generic:
+                  - img
+                  - text: Procesando 100 señales...
+              - generic [ref=e159]:
+                - generic [ref=e160]: "Grid: 10p x 4L"
+                - generic [ref=e161]: •
+                - generic [ref=e162]: "TP: 20p"
+                - generic [ref=e163]: •
+                - generic [ref=e164]: "Trail: 50%"
+                - generic [ref=e165]: •
+                - generic [ref=e166]: "Lote: 0.1"
+              - button "Limpiar caché" [ref=e167] [cursor=pointer]:
+                - generic [ref=e168]:
+                  - img [ref=e169]
+                  - text: Limpiar caché
+          - generic [ref=e172]:
+            - heading "Resultados" [level=3] [ref=e175]: Resultados
+            - generic [ref=e178]:
+              - img [ref=e180]
+              - heading "¡Ejecuta tu primer backtest!" [level=3] [ref=e182]
+              - paragraph [ref=e183]: Configura los parámetros de la estrategia y presiona el botón para ver los resultados
+              - generic [ref=e184]:
+                - generic [ref=e185]:
+                  - img [ref=e186]
+                  - generic [ref=e188]: "Tip: Empieza con los valores por defecto"
+                - button "Ejecutar Backtest" [disabled]:
+                  - img
+                  - text: Ejecutar Backtest
+        - generic [ref=e189]:
+          - heading "Optimizador" [level=3] [ref=e191]:
+            - img [ref=e192]
+            - text: Optimizador
+          - button "Optimizar" [ref=e196] [cursor=pointer]:
+            - generic [ref=e197]:
+              - img [ref=e198]
+              - text: Optimizar
+  - generic [ref=e200]:
+    - img [ref=e202]
+    - button "Open Tanstack query devtools" [ref=e250] [cursor=pointer]:
+      - img [ref=e251]
+  - button "Open Next.js Dev Tools" [ref=e304] [cursor=pointer]:
+    - img [ref=e305]
+  - alert [ref=e308]
+```

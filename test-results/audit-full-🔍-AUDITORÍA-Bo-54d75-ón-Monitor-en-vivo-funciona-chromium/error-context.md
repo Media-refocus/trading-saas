@@ -1,0 +1,183 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - link "Trading Bot SaaS" [ref=e7] [cursor=pointer]:
+            - /url: /dashboard
+          - generic [ref=e8]:
+            - link "Dashboard" [ref=e9] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e10]
+              - text: Dashboard
+            - link "Backtester" [ref=e12] [cursor=pointer]:
+              - /url: /backtester
+              - img [ref=e13]
+              - text: Backtester
+            - link "Operativas" [ref=e15] [cursor=pointer]:
+              - /url: /operativas
+              - img [ref=e16]
+              - text: Operativas
+            - link "Bot Operativo" [ref=e21] [cursor=pointer]:
+              - /url: /bot
+              - img [ref=e22]
+              - text: Bot Operativo
+            - link "Configuración" [ref=e25] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e26]
+              - text: Configuración
+        - generic [ref=e29]:
+          - button "0" [ref=e30] [cursor=pointer]:
+            - img [ref=e31]
+            - text: "0"
+          - link "Monitor" [ref=e34] [cursor=pointer]:
+            - /url: /bot/monitor
+            - button "Monitor" [ref=e35]:
+              - img [ref=e36]
+              - text: Monitor
+          - button "Cerrar Sesion" [ref=e38] [cursor=pointer]:
+            - img [ref=e39]
+            - text: Cerrar Sesion
+    - main [ref=e42]:
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - heading "Bot Operativo" [level=1] [ref=e46]
+            - paragraph [ref=e47]: Configura y controla el bot de trading automático
+          - generic [ref=e48]:
+            - link "Monitor en vivo" [ref=e49] [cursor=pointer]:
+              - /url: /bot/monitor
+              - button "Monitor en vivo" [active] [ref=e50]:
+                - img [ref=e51]
+                - text: Monitor en vivo
+            - button "Pausar" [ref=e53] [cursor=pointer]:
+              - img [ref=e54]
+              - text: Pausar
+        - generic [ref=e60]:
+          - generic [ref=e61]: 🔴 Offline
+          - paragraph [ref=e63]: "Última conexión: Nunca"
+        - generic [ref=e64]:
+          - generic [ref=e65]:
+            - heading "API Key del Bot" [level=3] [ref=e66]:
+              - img [ref=e67]
+              - text: API Key del Bot
+            - paragraph [ref=e71]: Clave de autenticación para conectar el bot Python con el SaaS
+          - generic [ref=e73]:
+            - generic [ref=e74]:
+              - code [ref=e75]: ••••••••••••••••••••
+              - generic [ref=e76]: (clave oculta por seguridad)
+            - button "Regenerar clave" [ref=e78] [cursor=pointer]:
+              - img [ref=e79]
+              - text: Regenerar clave
+        - generic [ref=e84]:
+          - heading "Configuración de Trading" [level=2] [ref=e85]:
+            - img [ref=e86]
+            - text: Configuración de Trading
+          - generic [ref=e89]:
+            - generic [ref=e90]:
+              - generic [ref=e91]:
+                - heading "Entrada (Level 0)" [level=3] [ref=e92]
+                - paragraph [ref=e93]: Configuración de la orden inicial de cada señal
+              - generic [ref=e94]:
+                - generic [ref=e95]:
+                  - text: Símbolo
+                  - textbox "Símbolo" [ref=e96]: XAUUSD
+                - generic [ref=e97]:
+                  - text: Lote entrada
+                  - spinbutton "Lote entrada" [ref=e98]: "0.1"
+                - generic [ref=e99]:
+                  - text: Nº órdenes
+                  - spinbutton "Nº órdenes" [ref=e100]: "1"
+            - generic [ref=e101]:
+              - generic [ref=e102]:
+                - heading "Trailing Stop Loss Virtual" [level=3] [ref=e103]
+                - paragraph [ref=e104]: SL que se mueve con el precio para proteger ganancias
+              - generic [ref=e106]:
+                - checkbox "Activar trailing SL" [ref=e107]
+                - generic [ref=e108]: Activar trailing SL
+            - generic [ref=e109]:
+              - generic [ref=e110]:
+                - heading "Grid de Promedios" [level=3] [ref=e111]
+                - paragraph [ref=e112]: Configuración de los niveles adicionales (escalones)
+              - generic [ref=e113]:
+                - generic [ref=e114]:
+                  - text: Distancia (pips)
+                  - spinbutton "Distancia (pips)" [ref=e115]: "10"
+                - generic [ref=e116]:
+                  - text: Lote promedios
+                  - spinbutton "Lote promedios" [ref=e117]: "0.1"
+                - generic [ref=e118]:
+                  - text: Máx niveles
+                  - spinbutton "Máx niveles" [ref=e119]: "4"
+            - generic [ref=e120]:
+              - generic [ref=e121]:
+                - heading "Restricciones" [level=3] [ref=e122]
+                - paragraph [ref=e123]: Límites opcionales según el tipo de señal del canal
+              - generic [ref=e124]:
+                - generic [ref=e125]:
+                  - text: Tipo de restricción
+                  - combobox [ref=e126] [cursor=pointer]:
+                    - generic: Sin restricción
+                    - img [ref=e127]
+                  - combobox [ref=e129]
+                - generic [ref=e130]:
+                  - text: Máx niveles (override)
+                  - spinbutton "Máx niveles (override)" [ref=e131]: "4"
+            - generic [ref=e132]:
+              - generic [ref=e133]:
+                - heading "Límite de Pérdida Diaria" [level=3] [ref=e134]:
+                  - img [ref=e135]
+                  - text: Límite de Pérdida Diaria
+                - paragraph [ref=e137]: El bot se pausará automáticamente si la pérdida del día supera este límite
+              - generic [ref=e138]:
+                - generic [ref=e139]:
+                  - text: Límite diario (%)
+                  - spinbutton "Límite diario (%)" [ref=e140]: "3"
+                  - paragraph [ref=e141]: "Ejemplo: 3% significa que si pierdes más del 3% de tu balance en un día, el bot se pausa."
+                - generic [ref=e142]:
+                  - text: Estado actual
+                  - paragraph [ref=e144]:
+                    - text: "Pérdida hoy:"
+                    - generic [ref=e145]: $0.00
+            - button "Guardar configuración" [ref=e147] [cursor=pointer]:
+              - img [ref=e148]
+              - text: Guardar configuración
+        - generic [ref=e151]:
+          - generic [ref=e153]:
+            - generic [ref=e154]:
+              - heading "Cuentas MT5" [level=3] [ref=e155]:
+                - img [ref=e156]
+                - text: Cuentas MT5
+              - paragraph [ref=e158]: Cuentas de MetaTrader donde el bot ejecutará trades
+            - button "Añadir cuenta" [ref=e159] [cursor=pointer]:
+              - img [ref=e160]
+              - text: Añadir cuenta
+          - generic [ref=e162]:
+            - paragraph [ref=e163]: No hay cuentas MT5 configuradas
+            - paragraph [ref=e164]: Añade una cuenta para que el bot pueda operar
+        - generic [ref=e165]:
+          - generic [ref=e166]:
+            - heading "Telegram" [level=3] [ref=e167]:
+              - img [ref=e168]
+              - text: Telegram
+            - paragraph [ref=e170]: Configuración para recibir señales de canales de Telegram
+          - generic [ref=e172]:
+            - generic [ref=e173]:
+              - img [ref=e174]
+              - generic [ref=e176]: Telegram no configurado
+            - paragraph [ref=e177]:
+              - text: Para configurar Telegram, necesitas obtener API ID y API Hash desde
+              - link "my.telegram.org" [ref=e178] [cursor=pointer]:
+                - /url: https://my.telegram.org
+            - paragraph [ref=e179]: La configuración de Telegram se añadirá próximamente al dashboard. Por ahora, configura manualmente en el bot.
+  - generic [ref=e180]:
+    - img [ref=e182]
+    - button "Open Tanstack query devtools" [ref=e230] [cursor=pointer]:
+      - img [ref=e231]
+  - button "Open Next.js Dev Tools" [ref=e284] [cursor=pointer]:
+    - img [ref=e285]
+  - alert [ref=e288]
+```

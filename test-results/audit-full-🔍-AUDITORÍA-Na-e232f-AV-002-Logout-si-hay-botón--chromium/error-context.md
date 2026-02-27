@@ -1,0 +1,154 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - link "Trading Bot SaaS" [ref=e7] [cursor=pointer]:
+            - /url: /dashboard
+          - generic [ref=e8]:
+            - link "Dashboard" [ref=e9] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e10]
+              - text: Dashboard
+            - link "Backtester" [ref=e12] [cursor=pointer]:
+              - /url: /backtester
+              - img [ref=e13]
+              - text: Backtester
+            - link "Operativas" [ref=e15] [cursor=pointer]:
+              - /url: /operativas
+              - img [ref=e16]
+              - text: Operativas
+            - link "Bot Operativo" [ref=e21] [cursor=pointer]:
+              - /url: /bot
+              - img [ref=e22]
+              - text: Bot Operativo
+            - link "Configuración" [ref=e25] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e26]
+              - text: Configuración
+        - generic [ref=e29]:
+          - button "Pro (Trial) (14d)" [ref=e30] [cursor=pointer]:
+            - generic [ref=e31]:
+              - img [ref=e32]
+              - text: Pro (Trial)
+              - generic [ref=e35]: (14d)
+          - button "0" [ref=e36] [cursor=pointer]:
+            - img [ref=e37]
+            - text: "0"
+          - link "Monitor" [ref=e40] [cursor=pointer]:
+            - /url: /bot/monitor
+            - button "Monitor" [ref=e41]:
+              - img [ref=e42]
+              - text: Monitor
+          - button "Cerrar Sesion" [active] [ref=e44] [cursor=pointer]:
+            - img [ref=e45]
+            - text: Cerrar Sesion
+    - main [ref=e48]:
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - generic [ref=e51]:
+            - heading "Dashboard" [level=1] [ref=e52]
+            - paragraph [ref=e53]: Bienvenido a tu panel de control de trading
+          - generic [ref=e55]:
+            - img [ref=e56]
+            - generic [ref=e59]: Bot Offline
+        - generic [ref=e60]:
+          - generic [ref=e63]:
+            - generic [ref=e64]:
+              - paragraph [ref=e65]: Señales Disponibles
+              - paragraph [ref=e66]: "388"
+            - img [ref=e67]
+          - generic [ref=e70]:
+            - generic [ref=e71]:
+              - paragraph [ref=e72]: Operativas Publicadas
+              - paragraph [ref=e73]: "0"
+            - img [ref=e74]
+          - generic [ref=e81]:
+            - generic [ref=e82]:
+              - paragraph [ref=e83]: Bot Status
+              - paragraph [ref=e84]: Inactivo
+            - img [ref=e85]
+          - generic [ref=e89]:
+            - generic [ref=e90]:
+              - paragraph [ref=e91]: Win Rate Promedio
+              - paragraph [ref=e92]: "--"
+            - img [ref=e93]
+        - generic [ref=e96]:
+          - generic [ref=e97]:
+            - generic [ref=e98]:
+              - generic [ref=e99]:
+                - heading "Top Operativas del Mes" [level=3] [ref=e100]:
+                  - img [ref=e101]
+                  - text: Top Operativas del Mes
+                - paragraph [ref=e106]: Las estrategias más populares en el marketplace
+              - link "Ver todas" [ref=e107] [cursor=pointer]:
+                - /url: /operativas
+                - button "Ver todas" [ref=e108]:
+                  - text: Ver todas
+                  - img [ref=e109]
+            - generic [ref=e112]:
+              - img [ref=e113]
+              - paragraph [ref=e118]: No hay operativas publicadas aún
+              - link "Sé el primero en publicar" [ref=e119] [cursor=pointer]:
+                - /url: /backtester
+                - button "Sé el primero en publicar" [ref=e120]
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - heading "Acciones Rápidas" [level=3] [ref=e123]
+              - paragraph [ref=e124]: Comienza a operar en minutos
+            - generic [ref=e125]:
+              - link "Ejecutar Backtest Prueba estrategias con datos históricos" [ref=e126] [cursor=pointer]:
+                - /url: /backtester
+                - generic [ref=e127]:
+                  - img [ref=e129]
+                  - generic [ref=e131]:
+                    - heading "Ejecutar Backtest" [level=3] [ref=e132]
+                    - paragraph [ref=e133]: Prueba estrategias con datos históricos
+                  - img [ref=e134]
+              - link "Explorar Marketplace Descubre estrategias de otros traders" [ref=e136] [cursor=pointer]:
+                - /url: /operativas
+                - generic [ref=e137]:
+                  - img [ref=e139]
+                  - generic [ref=e144]:
+                    - heading "Explorar Marketplace" [level=3] [ref=e145]
+                    - paragraph [ref=e146]: Descubre estrategias de otros traders
+                  - img [ref=e147]
+              - link "Bot Operativo Configura el bot de trading automático" [ref=e149] [cursor=pointer]:
+                - /url: /bot
+                - generic [ref=e150]:
+                  - img [ref=e152]
+                  - generic [ref=e155]:
+                    - heading "Bot Operativo" [level=3] [ref=e156]
+                    - paragraph [ref=e157]: Configura el bot de trading automático
+                  - img [ref=e158]
+              - link "Configuración Gestiona tu cuenta y preferencias" [ref=e160] [cursor=pointer]:
+                - /url: /settings
+                - generic [ref=e161]:
+                  - img [ref=e163]
+                  - generic [ref=e166]:
+                    - heading "Configuración" [level=3] [ref=e167]
+                    - paragraph [ref=e168]: Gestiona tu cuenta y preferencias
+                  - img [ref=e169]
+        - generic [ref=e171]:
+          - heading "💡 Tips para Empezar" [level=3] [ref=e173]
+          - generic [ref=e175]:
+            - generic [ref=e176]:
+              - heading "1. Prueba el Backtester" [level=4] [ref=e177]
+              - paragraph [ref=e178]: Usa las 388 señales históricas disponibles para probar tus estrategias.
+            - generic [ref=e179]:
+              - heading "2. Publica tu Mejor Estrategia" [level=4] [ref=e180]
+              - paragraph [ref=e181]: Comparte tus resultados y ayuda a otros traders a encontrar operativas rentables.
+            - generic [ref=e182]:
+              - heading "3. Conecta tu Bot" [level=4] [ref=e183]
+              - paragraph [ref=e184]: Configura el bot para ejecutar automáticamente las señales en tu cuenta MT5.
+  - generic [ref=e185]:
+    - img [ref=e187]
+    - button "Open Tanstack query devtools" [ref=e235] [cursor=pointer]:
+      - img [ref=e236]
+  - button "Open Next.js Dev Tools" [ref=e289] [cursor=pointer]:
+    - img [ref=e290]
+  - alert [ref=e293]: Dashboard
+```
