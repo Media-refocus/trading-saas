@@ -11,6 +11,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { trpc } from "@/lib/trpc";
 import {
   Activity,
@@ -30,6 +41,7 @@ import {
   Target,
   BarChart3,
   Calendar,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -223,6 +235,13 @@ export default function BotMonitorPage() {
 
   const exportCsv = trpc.bot.exportTradesCsv.useQuery(undefined, { enabled: false });
 
+  // Kill switch mutation
+  const killSwitchMutation = trpc.bot.killSwitch.useMutation({
+    onSuccess: () => {
+      refetchStatus();
+    },
+  });
+
   const handleExport = async () => {
     const result = await exportCsv.refetch();
     if (result.data?.csv) {
@@ -266,6 +285,50 @@ export default function BotMonitorPage() {
             <Clock className="h-4 w-4" />
             Auto-refresh: {refreshInterval / 1000}s
           </div>
+
+          {/* Kill Switch Button */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="gap-2"
+                disabled={killSwitchMutation.isPending}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Kill Switch
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                  <AlertTriangle className="h-5 w-5" />
+                  ¿Activar Kill Switch?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-2">
+                  <p>
+                    <strong>Esto cerrará TODAS las posiciones abiertas inmediatamente a precio de mercado.</strong>
+                  </p>
+                  <p>
+                    Esta acción es irreversible y el bot se pausará automáticamente.
+                  </p>
+                  <p className="text-red-600 font-medium">
+                    Solo úsalo en caso de emergencia.
+                  </p>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={() => killSwitchMutation.mutate()}
+                >
+                  {killSwitchMutation.isPending ? "Ejecutando..." : "Sí, cerrar todo"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <Button
             variant="outline"
             size="sm"

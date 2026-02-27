@@ -122,6 +122,19 @@ export async function POST(request: NextRequest) {
   // En el futuro, estos comandos vendrían de una cola o campo en BotConfig
   const commands: BotCommand[] = [];
 
+  // ═══════════════════════════════════════════════════════════════
+  // KILL SWITCH: Si el dashboard solicitó cerrar todo
+  // ═══════════════════════════════════════════════════════════════
+  if (botConfig.status === "KILL_REQUESTED") {
+    commands.push({ type: "CLOSE_ALL", reason: "KILL_SWITCH" });
+    // Actualizar status a PAUSED después de enviar el comando
+    await prisma.botConfig.update({
+      where: { id: botConfig.id },
+      data: { status: "PAUSED" },
+    });
+    console.log(`[KILL_SWITCH] Enviado comando CLOSE_ALL para bot ${botConfig.id}`);
+  }
+
   // Si el bot estaba pausado y se reanudó desde el dashboard, enviar RESUME
   if (botConfig.status === "PAUSED") {
     // El dashboard podría cambiar el status a "RESUMING" para indicar comando pendiente

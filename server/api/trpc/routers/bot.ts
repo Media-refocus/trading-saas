@@ -44,6 +44,9 @@ const BotConfigInputSchema = z.object({
   // Restrictions
   restrictionType: z.enum(["RIESGO", "SIN_PROMEDIOS", "SOLO_1_PROMEDIO"]).optional(),
   maxLevels: z.number().min(1).max(20).default(4),
+
+  // Daily loss limit
+  dailyLossLimitPercent: z.number().min(0.5).max(20).optional(), // 0.5% to 20%
 });
 
 const BotAccountInputSchema = z.object({
@@ -104,6 +107,10 @@ export const botRouter = router({
       gridTolerancePips: botConfig.gridTolerancePips,
       restrictionType: botConfig.restrictionType,
       maxLevels: botConfig.maxLevels,
+      // Daily loss limit
+      dailyLossLimitPercent: botConfig.dailyLossLimitPercent,
+      dailyLossCurrent: botConfig.dailyLossCurrent,
+      dailyLossResetAt: botConfig.dailyLossResetAt,
       hasTelegramConfig: !!(botConfig.telegramApiIdEnc && botConfig.telegramApiHashEnc),
       telegramChannels: botConfig.telegramChannels,
       accounts: botConfig.botAccounts.map((acc) => ({
@@ -162,6 +169,7 @@ export const botRouter = router({
             gridTolerancePips: input.gridTolerancePips,
             restrictionType: input.restrictionType,
             maxLevels: input.maxLevels,
+            dailyLossLimitPercent: input.dailyLossLimitPercent,
           },
         });
       } else {
@@ -187,6 +195,7 @@ export const botRouter = router({
             gridTolerancePips: input.gridTolerancePips,
             restrictionType: input.restrictionType,
             maxLevels: input.maxLevels,
+            dailyLossLimitPercent: input.dailyLossLimitPercent,
           },
         });
       }
@@ -484,6 +493,37 @@ export const botRouter = router({
       where: { tenantId },
       data: { status: "RESUMING" }, // El bot lo cambiará a ONLINE en el próximo heartbeat
     });
+  }),
+
+  /**
+   * KILL SWITCH - Cierra TODAS las posiciones inmediatamente
+   * Emergencia: cierra todo a mercado y pausa el bot
+   */
+  killSwitch: protectedProcedure.mutation(async ({ ctx }) => {
+    const tenantId = ctx.user.tenantId;
+
+    // Actualizar estado del bot a KILL_REQUESTED
+    const result = await prisma.botConfig.updateMany({
+      where: { tenantId },
+      data: { status: "KILL_REQUESTED" },
+    });
+
+    // Log de la acción
+    await prisma.botHeartbeat.create({
+      data: {
+        botConfigId: (await prisma.botConfig.findFirst({ where: { tenantId } }))!.id,
+        timestamp: new Date(),
+        mt5Connected: false,
+        telegramConnected: false,
+        openPositions: 0,
+        pendingOrders: 0,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Kill Switch activado. El bot cerrará todas las posiciones en el próximo ciclo.",
+    };
   }),
 
   // ==================== HISTORY ====================

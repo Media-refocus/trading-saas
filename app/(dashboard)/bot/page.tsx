@@ -204,6 +204,8 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
     trailingStep: 10,
     trailingBack: 20,
     trailingBuffer: 1,
+    // Daily loss limit
+    dailyLossLimitPercent: 3,
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -227,6 +229,7 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
         trailingStep: config.entryTrailing?.step || 10,
         trailingBack: config.entryTrailing?.back || 20,
         trailingBuffer: config.entryTrailing?.buffer || 1,
+        dailyLossLimitPercent: config.dailyLossLimitPercent || 3,
       });
     }
   }, [config]);
@@ -258,6 +261,7 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
         gridTolerancePips: formData.gridTolerancePips,
         restrictionType: (formData.restrictionType || undefined) as "RIESGO" | "SIN_PROMEDIOS" | "SOLO_1_PROMEDIO" | undefined,
         maxLevels: formData.maxLevels,
+        dailyLossLimitPercent: formData.dailyLossLimitPercent || undefined,
       });
 
       utils.bot.getConfig.invalidate();
@@ -465,6 +469,53 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               value={formData.maxLevels}
               onChange={(e) => setFormData({ ...formData, maxLevels: parseInt(e.target.value) })}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Daily Loss Limit */}
+      <Card className="border-amber-500/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            Límite de Pérdida Diaria
+          </CardTitle>
+          <CardDescription>
+            El bot se pausará automáticamente si la pérdida del día supera este límite
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="dailyLossLimitPercent">Límite diario (%)</Label>
+            <Input
+              id="dailyLossLimitPercent"
+              type="number"
+              step="0.5"
+              min="0.5"
+              max="20"
+              value={formData.dailyLossLimitPercent}
+              onChange={(e) => setFormData({ ...formData, dailyLossLimitPercent: parseFloat(e.target.value) })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Ejemplo: 3% significa que si pierdes más del 3% de tu balance en un día, el bot se pausa.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Estado actual</Label>
+            {config?.dailyLossCurrent !== undefined && (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm">
+                  Pérdida hoy: <span className={config.dailyLossCurrent > 0 ? "text-red-500 font-semibold" : "text-green-500 font-semibold"}>
+                    ${config.dailyLossCurrent.toFixed(2)}
+                  </span>
+                </p>
+                {config.dailyLossLimitPercent && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Límite: {config.dailyLossLimitPercent}% del balance
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

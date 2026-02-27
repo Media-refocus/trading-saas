@@ -247,6 +247,87 @@ async function handleTradeClose(body: TradeCloseRequest, botConfig: { id: string
     },
   });
 
+  // ═══════════════════════════════════════════════════════════════
+  // LÍMITE DE PÉRDIDA DIARIA
+  // ═══════════════════════════════════════════════════════════════
+  const fullBotConfig = await prisma.botConfig.findUnique({
+    where: { id: botConfig.id },
+    select: {
+      dailyLossLimitPercent: true,
+      dailyLossCurrent: true,
+      dailyLossResetAt: true,
+      status: true,
+    },
+  });
+
+  let shouldPause = false;
+  let pauseReason = "";
+
+  if (fullBotConfig?.dailyLossLimitPercent) {
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
+    // Verificar si necesitamos resetear el contador (nuevo día)
+    let currentLoss = fullBotConfig.dailyLossCurrent || 0;
+    if (!fullBotConfig.dailyLossResetAt || new Date(fullBotConfig.dailyLossResetAt) < todayStart) {
+      // Nuevo día, resetear contador
+      currentLoss = 0;
+    }
+
+    // Actualizar pérdida (sumar si es pérdida, restar si es ganancia)
+    if (body.profitMoney < 0) {
+      currentLoss += Math.abs(body.profitMoney);
+    } else {
+      // Si es ganancia, reducir la pérdida acumulada (no ir debajo de 0)
+      currentLoss = Math.max(0, currentLoss - body.profitMoney);
+    }
+
+    // Obtener el balance actual para calcular el límite
+    const account = await prisma.botAccount.findFirst({
+      where: { id: body.botAccountId },
+      select: { lastBalance: true, lastEquity: true },
+    });
+
+    const balance = account?.lastBalance || 10000; // Default si no hay balance
+    const limitAmount = (fullBotConfig.dailyLossLimitPercent / 100) * balance;
+
+    // Verificar si se superó el límite
+    if (currentLoss >= limitAmount) {
+      shouldPause = true;
+      pauseReason = `Límite de pérdida diaria superado: ${currentLoss.toFixed(2)} >= ${limitAmount.toFixed(2)} (${fullBotConfig.dailyLossLimitPercent}% de ${balance.toFixed(2)})`;
+    }
+
+    // Actualizar contador en DB
+    await prisma.botConfig.update({
+      where: { id: botConfig.id },
+      data: {
+        dailyLossCurrent: currentLoss,
+        dailyLossResetAt: now,
+      },
+    });
+
+    console.log(`[DAILY_LOSS] Trade closed: ${body.profitMoney}, Current loss: ${currentLoss}, Limit: ${limitAmount}`);
+  }
+
+  // Si se superó el límite, pausar el bot
+  if (shouldPause) {
+    await prisma.botConfig.update({
+      where: { id: botConfig.id },
+      data: { status: "PAUSED" },
+    });
+
+    console.log(`[DAILY_LOSS] Bot paused: ${pauseReason}`);
+
+    return botSuccessResponse({
+      tradeId: trade.id,
+      message: "Trade closed successfully",
+      warning: pauseReason,
+      botPaused: true,
+      commands: [{ type: "PAUSE", reason: "DAILY_LOSS_LIMIT" }],
+    });
+  }
+
   return botSuccessResponse({
     tradeId: trade.id,
     message: "Trade closed successfully",

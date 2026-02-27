@@ -1,12 +1,12 @@
 /**
  * Plan Enforcement - Feature Gates for Subscription Tiers
  *
- * This module defines which features are available for each plan tier:
- * - BASIC: Core bot functionality, 1 MT5 account
- * - PRO: Protection features, analytics, automation
- * - ENTERPRISE: Backtesting, API access, multi-symbol
+ * NUEVO PRICING 2026:
+ * - TRADER €57/mes: Bot completo + protección básica
+ * - PRO €97/mes: Multi-cuenta + features avanzadas
+ * - VIP €197/mes: Cuentas ilimitadas + acceso exclusivo
  *
- * Trial users get PRO features during their 14-day trial.
+ * Trial users get PRO features durante 14 días.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -16,50 +16,42 @@ import type { PlanType, SubscriptionStatus } from "@prisma/client";
  * Feature flags for each plan tier
  */
 export interface PlanFeatures {
-  // Core features (available in all plans)
+  // Core features (disponible en todos los planes)
   botSignals: boolean; // Bot de señales XAUUSD
   dashboard: boolean; // Dashboard básico
   heartbeat: boolean; // Monitoreo de estado del bot
+  backtester: boolean; // Backtesting engine
 
   // Account limits
   maxMt5Accounts: number; // Maximum MT5 accounts
 
-  // Protection features (Pro+)
-  circuitBreaker: boolean; // Pausa automática en volatilidad extrema
-  accountGuardian: boolean; // DD protection
-  lossLimits: boolean; // Límites de pérdida (D/S/M)
+  // Protection features (TRADER+)
+  dailyLossLimit: boolean; // Límite de pérdida diaria
   killSwitch: boolean; // Emergency kill switch
-  positionSizing: boolean; // Position sizing auto (Kelly)
 
-  // Analytics (Pro+)
-  analyticsPro: boolean; // Métricas profesionales
-  equityCurve: boolean; // Equity curve interactiva
-  heatmap: boolean; // Heatmap rendimiento horario
-  streaks: boolean; // Análisis de rachas
-  pdfReports: boolean; // Reportes PDF semanales
-  benchmark: boolean; // Benchmark vs Buy & Hold
-
-  // Automation (Pro+)
+  // Automation (TRADER+)
   telegramBot: boolean; // Telegram notificaciones
+
+  // Pro features (PRO+)
+  circuitBreaker: boolean; // Pausa automática en volatilidad extrema
   newsFilter: boolean; // News filter
-  sessionTrading: boolean; // Session trading
   tradingView: boolean; // TradingView bridge
   webhooks: boolean; // Webhooks personalizados
 
-  // Smart trading (Pro+)
+  // Analytics (PRO+)
+  analyticsPro: boolean; // Métricas profesionales
+  equityCurve: boolean; // Equity curve interactiva
+  heatmap: boolean; // Heatmap rendimiento horario
+
+  // Smart trading (PRO+)
   smartEntry: boolean; // Smart entry filter
-  signalConfidence: boolean; // Signal confidence score
-  breakevenLock: boolean; // Breakeven + Lock profit
   smartTrailing: boolean; // Smart trailing ATR-based
 
-  // Premium features (Enterprise only)
-  backtester: boolean; // Backtesting engine
-  monteCarlo: boolean; // Monte Carlo simulation
-  multiTimeframe: boolean; // Multi-timeframe confirmation
-  copyTrading: boolean; // Copy trading network
-  apiAccess: boolean; // API pública REST + WebSocket
-  multiSymbol: boolean; // Multi-símbolo
-  paperTrading: boolean; // Paper trading
+  // VIP features (VIP only)
+  unlimitedAccounts: boolean; // Cuentas ilimitadas
+  vipCommunity: boolean; // Acceso canal VIP con Xisco
+  prioritySupport: boolean; // Soporte prioritario
+  earlyAccess: boolean; // Nuevas features antes
 }
 
 /**
@@ -68,148 +60,105 @@ export interface PlanFeatures {
  */
 const PLAN_FEATURES: Record<PlanType | "TRIAL", PlanFeatures> = {
   TRIAL: {
-    // Trial gets PRO features
+    // Trial obtiene PRO features
     botSignals: true,
     dashboard: true,
     heartbeat: true,
+    backtester: true,
     maxMt5Accounts: 3,
-    circuitBreaker: true,
-    accountGuardian: true,
-    lossLimits: true,
+    dailyLossLimit: true,
     killSwitch: true,
-    positionSizing: true,
+    telegramBot: true,
+    circuitBreaker: true,
+    newsFilter: true,
+    tradingView: true,
+    webhooks: true,
     analyticsPro: true,
     equityCurve: true,
     heatmap: true,
-    streaks: true,
-    pdfReports: true,
-    benchmark: true,
-    telegramBot: true,
-    newsFilter: true,
-    sessionTrading: true,
-    tradingView: true,
-    webhooks: true,
     smartEntry: true,
-    signalConfidence: true,
-    breakevenLock: true,
     smartTrailing: true,
-    backtester: false,
-    monteCarlo: false,
-    multiTimeframe: false,
-    copyTrading: false,
-    apiAccess: false,
-    multiSymbol: false,
-    paperTrading: false,
+    unlimitedAccounts: false,
+    vipCommunity: false,
+    prioritySupport: false,
+    earlyAccess: false,
   },
   BASIC: {
-    // Basic - core features only
+    // TRADER €57/mes - Todo lo esencial + protección
     botSignals: true,
     dashboard: true,
     heartbeat: true,
+    backtester: true,
     maxMt5Accounts: 1,
+    dailyLossLimit: true,
+    killSwitch: true,
+    telegramBot: true,
     circuitBreaker: false,
-    accountGuardian: false,
-    lossLimits: false,
-    killSwitch: false,
-    positionSizing: false,
+    newsFilter: false,
+    tradingView: false,
+    webhooks: false,
     analyticsPro: false,
     equityCurve: false,
     heatmap: false,
-    streaks: false,
-    pdfReports: false,
-    benchmark: false,
-    telegramBot: false,
-    newsFilter: false,
-    sessionTrading: false,
-    tradingView: false,
-    webhooks: false,
     smartEntry: false,
-    signalConfidence: false,
-    breakevenLock: false,
     smartTrailing: false,
-    backtester: false,
-    monteCarlo: false,
-    multiTimeframe: false,
-    copyTrading: false,
-    apiAccess: false,
-    multiSymbol: false,
-    paperTrading: false,
+    unlimitedAccounts: false,
+    vipCommunity: false,
+    prioritySupport: false,
+    earlyAccess: false,
   },
   PRO: {
-    // Pro - all except enterprise features
+    // PRO €97/mes - Multi-cuenta + features avanzadas
     botSignals: true,
     dashboard: true,
     heartbeat: true,
+    backtester: true,
     maxMt5Accounts: 3,
-    circuitBreaker: true,
-    accountGuardian: true,
-    lossLimits: true,
+    dailyLossLimit: true,
     killSwitch: true,
-    positionSizing: true,
+    telegramBot: true,
+    circuitBreaker: true,
+    newsFilter: true,
+    tradingView: true,
+    webhooks: true,
     analyticsPro: true,
     equityCurve: true,
     heatmap: true,
-    streaks: true,
-    pdfReports: true,
-    benchmark: true,
-    telegramBot: true,
-    newsFilter: true,
-    sessionTrading: true,
-    tradingView: true,
-    webhooks: true,
     smartEntry: true,
-    signalConfidence: true,
-    breakevenLock: true,
     smartTrailing: true,
-    backtester: false,
-    monteCarlo: false,
-    multiTimeframe: false,
-    copyTrading: false,
-    apiAccess: false,
-    multiSymbol: false,
-    paperTrading: false,
+    unlimitedAccounts: false,
+    vipCommunity: false,
+    prioritySupport: false,
+    earlyAccess: false,
   },
   ENTERPRISE: {
-    // Enterprise - everything
+    // VIP €197/mes - Todo ilimitado + exclusividad
     botSignals: true,
     dashboard: true,
     heartbeat: true,
+    backtester: true,
     maxMt5Accounts: Infinity,
-    circuitBreaker: true,
-    accountGuardian: true,
-    lossLimits: true,
+    dailyLossLimit: true,
     killSwitch: true,
-    positionSizing: true,
+    telegramBot: true,
+    circuitBreaker: true,
+    newsFilter: true,
+    tradingView: true,
+    webhooks: true,
     analyticsPro: true,
     equityCurve: true,
     heatmap: true,
-    streaks: true,
-    pdfReports: true,
-    benchmark: true,
-    telegramBot: true,
-    newsFilter: true,
-    sessionTrading: true,
-    tradingView: true,
-    webhooks: true,
     smartEntry: true,
-    signalConfidence: true,
-    breakevenLock: true,
     smartTrailing: true,
-    backtester: true,
-    monteCarlo: true,
-    multiTimeframe: true,
-    copyTrading: true,
-    apiAccess: true,
-    multiSymbol: true,
-    paperTrading: true,
+    unlimitedAccounts: true,
+    vipCommunity: true,
+    prioritySupport: true,
+    earlyAccess: true,
   },
 };
 
 /**
  * Get features available for a specific plan
- *
- * @param plan - Plan type (BASIC, PRO, ENTERPRISE, or TRIAL)
- * @returns Feature flags for the plan
  */
 export function getPlanFeatures(plan: PlanType | "TRIAL"): PlanFeatures {
   return PLAN_FEATURES[plan] ?? PLAN_FEATURES.BASIC;
@@ -217,10 +166,6 @@ export function getPlanFeatures(plan: PlanType | "TRIAL"): PlanFeatures {
 
 /**
  * Check if a specific feature is available for a plan
- *
- * @param plan - Plan type
- * @param feature - Feature key to check
- * @returns true if feature is available
  */
 export function hasFeature(
   plan: PlanType | "TRIAL",
@@ -233,17 +178,6 @@ export function hasFeature(
 
 /**
  * Get the effective plan for a tenant based on subscription status
- *
- * - TRIAL status during trial period -> PRO features
- * - TRIAL status expired -> BASIC (downgrade)
- * - ACTIVE status -> use subscription plan
- * - PAST_DUE -> use subscription plan (grace period)
- * - PAUSED/CANCELED -> BASIC (downgrade)
- *
- * @param status - Subscription status
- * @param plan - Subscription plan
- * @param trialEnd - Trial end date (if applicable)
- * @returns Effective plan for feature access
  */
 export function getEffectivePlan(
   status: SubscriptionStatus,
@@ -254,23 +188,19 @@ export function getEffectivePlan(
 
   switch (status) {
     case "TRIAL":
-      // If trial is still active, give PRO features
       if (trialEnd && trialEnd > now) {
-        return "TRIAL"; // TRIAL gets PRO features
+        return "TRIAL";
       }
-      // Trial expired - downgrade to BASIC
       return "BASIC";
 
     case "ACTIVE":
       return plan;
 
     case "PAST_DUE":
-      // Grace period - still allow current plan
       return plan;
 
     case "PAUSED":
     case "CANCELED":
-      // Downgrade to basic
       return "BASIC";
 
     default:
@@ -289,9 +219,6 @@ export interface SubscriptionInfo {
 
 /**
  * Get subscription info for a tenant
- *
- * @param tenantId - Tenant ID
- * @returns Subscription info or null if no subscription
  */
 export async function getTenantSubscription(
   tenantId: string
@@ -310,30 +237,26 @@ export async function getTenantSubscription(
 }
 
 /**
- * Feature requirement type for middleware
- */
-export type FeatureRequirement = keyof PlanFeatures;
-
-/**
  * Plan names for display
  */
 export const PLAN_NAMES: Record<PlanType | "TRIAL", string> = {
   TRIAL: "Pro (Trial)",
-  BASIC: "Básico",
+  BASIC: "Trader",
   PRO: "Pro",
-  ENTERPRISE: "Enterprise",
+  ENTERPRISE: "VIP",
+};
+
+/**
+ * Plan prices for display (EUR/month)
+ */
+export const PLAN_PRICES: Record<PlanType, number> = {
+  BASIC: 57,
+  PRO: 97,
+  ENTERPRISE: 197,
 };
 
 /**
  * Check if a tenant's trial has expired and auto-pause if needed
- *
- * This function:
- * 1. Checks if the tenant has a TRIAL subscription
- * 2. If trial has expired (trialEnd < now), updates status to PAUSED
- * 3. Returns the updated subscription info
- *
- * @param tenantId - Tenant ID to check
- * @returns Subscription info after potential update
  */
 export async function checkAndUpdateExpiredTrial(
   tenantId: string
@@ -349,7 +272,6 @@ export async function checkAndUpdateExpiredTrial(
     orderBy: { createdAt: "desc" },
   });
 
-  // No subscription = treat as paused
   if (!subscription) {
     return {
       status: "PAUSED",
@@ -360,22 +282,19 @@ export async function checkAndUpdateExpiredTrial(
 
   const now = new Date();
 
-  // Check if trial has expired
   if (
     subscription.status === "TRIAL" &&
     subscription.trialEnd &&
     subscription.trialEnd < now
   ) {
-    // Trial expired - auto-pause
     await prisma.subscription.update({
       where: { id: subscription.id },
       data: { status: "PAUSED" },
     });
 
-    // Also update tenant plan
     await prisma.tenant.update({
       where: { id: tenantId },
-      data: { plan: "TRIAL" }, // Keep TRIAL as indicator of former trial user
+      data: { plan: "TRIAL" },
     });
 
     return {
@@ -394,9 +313,6 @@ export async function checkAndUpdateExpiredTrial(
 
 /**
  * Check if a tenant has active access (not paused)
- *
- * @param tenantId - Tenant ID to check
- * @returns true if tenant has active access
  */
 export async function hasActiveAccess(tenantId: string): Promise<boolean> {
   const subscription = await prisma.subscription.findFirst({
@@ -416,11 +332,10 @@ export async function hasActiveAccess(tenantId: string): Promise<boolean> {
 
   switch (subscription.status) {
     case "TRIAL":
-      // Trial is active if trialEnd is in the future
       return subscription.trialEnd ? subscription.trialEnd > now : false;
 
     case "ACTIVE":
-    case "PAST_DUE": // Grace period
+    case "PAST_DUE":
       return true;
 
     case "PAUSED":
@@ -433,10 +348,6 @@ export async function hasActiveAccess(tenantId: string): Promise<boolean> {
 }
 
 /**
- * Plan prices for display (EUR/month)
+ * Feature requirement type for middleware
  */
-export const PLAN_PRICES: Record<PlanType, number> = {
-  BASIC: 57,
-  PRO: 147,
-  ENTERPRISE: 347,
-};
+export type FeatureRequirement = keyof PlanFeatures;

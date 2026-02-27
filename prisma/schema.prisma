@@ -465,6 +465,11 @@ model BotConfig {
   restrictionType String?  // "RIESGO", "SIN_PROMEDIOS", "SOLO_1_PROMEDIO"
   maxLevels       Int      @default(4)
 
+  // Límite de pérdida diaria (protección)
+  dailyLossLimitPercent Float?   // Porcentaje máximo de pérdida diaria (ej: 3.0 = 3%)
+  dailyLossCurrent      Float    @default(0)  // Pérdida acumulada del día actual
+  dailyLossResetAt      DateTime?  // Última vez que se reseteó el contador
+
   // Timestamps
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

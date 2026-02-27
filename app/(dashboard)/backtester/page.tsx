@@ -41,7 +41,15 @@ import {
   Signal,
   RefreshCw,
   Store,
+  HelpCircle,
+  Sparkles,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface BacktestFilters {
   dateFrom?: string;
@@ -392,6 +400,18 @@ export default function BacktesterPage() {
                 <div className="flex items-center gap-2">
                   <Scale className="w-3.5 h-3.5 text-primary" />
                   <Label className="text-xs font-medium text-primary">Grid Spacing (pips)</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3.5 h-3.5 text-primary/50 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <p className="text-xs"><strong>Distancia entre niveles</strong></p>
+                        <p className="text-xs text-muted-foreground mt-1">Separación en pips entre cada orden del grid. Un valor menor = más operaciones pero mayor riesgo.</p>
+                        <p className="text-xs text-muted-foreground mt-1">💡 Recomendado: 10-15 pips para XAUUSD</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 <span className="text-sm font-mono font-bold text-primary">{config.pipsDistance}</span>
               </div>
@@ -415,6 +435,18 @@ export default function BacktesterPage() {
                 <div className="flex items-center gap-2">
                   <Activity className="w-3.5 h-3.5 text-purple-500" />
                   <Label className="text-xs font-medium text-purple-600 dark:text-purple-400">Max Levels</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3.5 h-3.5 text-purple-500/50 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <p className="text-xs"><strong>Niveles máximos del grid</strong></p>
+                        <p className="text-xs text-muted-foreground mt-1">Cantidad máxima de órdenes que se abrirán en contra del precio.</p>
+                        <p className="text-xs text-muted-foreground mt-1">💡 Más niveles = más promedios pero mayor exposición</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 <span className="text-sm font-mono font-bold text-purple-600">{config.maxLevels}</span>
               </div>
@@ -438,6 +470,18 @@ export default function BacktesterPage() {
                 <div className="flex items-center gap-2">
                   <Target className="w-3.5 h-3.5 text-success" />
                   <Label className="text-xs font-medium text-success">Take Profit (pips)</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3.5 h-3.5 text-success/50 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <p className="text-xs"><strong>Objetivo de ganancia</strong></p>
+                        <p className="text-xs text-muted-foreground mt-1">Distancia en pips donde se cierra la operación con ganancias.</p>
+                        <p className="text-xs text-muted-foreground mt-1">💡 Recomendado: 15-25 pips para XAUUSD</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 <span className="text-sm font-mono font-bold text-success">{config.takeProfitPips}</span>
               </div>
@@ -1076,14 +1120,28 @@ export default function BacktesterPage() {
                 )}
               </div>
             ) : (
-              <div className="text-center py-16 animate-fade-in">
+              <div className="text-center py-12 animate-fade-in">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-accent/10 mb-4">
                   <BarChart3 className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-lg font-medium mb-1">Sin resultados</h3>
-                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                  Configura los parámetros y ejecuta un backtest para ver los resultados aquí
+                <h3 className="text-lg font-semibold mb-2">¡Ejecuta tu primer backtest!</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto mb-6">
+                  Configura los parámetros de la estrategia y presiona el botón para ver los resultados
                 </p>
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <span>Tip: Empieza con los valores por defecto</span>
+                  </div>
+                  <Button
+                    onClick={handleExecute}
+                    disabled={executeBacktest.isPending}
+                    className="gap-2"
+                  >
+                    <Play className="w-4 h-4" />
+                    Ejecutar Backtest
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
