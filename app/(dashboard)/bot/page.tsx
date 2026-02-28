@@ -110,22 +110,22 @@ function ApiKeySection({ onRegenerate }: { onRegenerate: () => Promise<{ apiKey?
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Key className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+          <Key className="h-4 w-4 md:h-5 md:w-5" />
           API Key del Bot
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-xs md:text-sm">
           Clave de autenticación para conectar el bot Python con el SaaS
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 md:space-y-4">
         {newKey ? (
-          <div className="space-y-3">
-            <div className="p-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <div className="space-y-2 md:space-y-3">
+            <div className="p-3 md:p-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="space-y-1 md:space-y-2">
+                  <p className="text-xs md:text-sm font-medium text-amber-800 dark:text-amber-200">
                     ¡Guarda esta clave ahora!
                   </p>
                   <p className="text-xs text-amber-700 dark:text-amber-300">
@@ -135,29 +135,29 @@ function ApiKeySection({ onRegenerate }: { onRegenerate: () => Promise<{ apiKey?
               </div>
             </div>
             <div className="flex gap-2">
-              <code className="flex-1 p-3 bg-muted rounded font-mono text-sm break-all">
+              <code className="flex-1 p-2 md:p-3 bg-muted rounded font-mono text-xs md:text-sm break-all">
                 {newKey}
               </code>
-              <Button variant="outline" size="icon" onClick={handleCopy}>
+              <Button variant="outline" size="icon" onClick={handleCopy} className="shrink-0">
                 {copied ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
-            <Button variant="outline" onClick={() => setShowKey(false)}>
+            <Button variant="outline" size="sm" onClick={() => setShowKey(false)} className="text-sm">
               Ya la guardé
             </Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 p-3 bg-muted rounded">
-              <code className="font-mono text-sm">••••••••••••••••••••</code>
-              <span className="text-sm text-muted-foreground">
+          <div className="space-y-2 md:space-y-3">
+            <div className="flex items-center gap-2 p-2 md:p-3 bg-muted rounded">
+              <code className="font-mono text-xs md:text-sm">••••••••••••••••••••</code>
+              <span className="text-xs md:text-sm text-muted-foreground hidden sm:inline">
                 (clave oculta por seguridad)
               </span>
             </div>
             <div className="flex gap-2">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="outline" disabled={isRegenerating}>
+                  <Button variant="outline" disabled={isRegenerating} size="sm">
                     <RefreshCw className={`h-4 w-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
                     Regenerar clave
                   </Button>
@@ -171,8 +171,8 @@ function ApiKeySection({ onRegenerate }: { onRegenerate: () => Promise<{ apiKey?
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <Button variant="outline">Cancelar</Button>
-                    <AlertDialogAction onClick={handleRegenerate}>
+                    <Button variant="outline" size="sm">Cancelar</Button>
+                    <AlertDialogAction onClick={handleRegenerate} className="text-sm">
                       Regenerar
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -274,26 +274,27 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
       {/* Entry Config */}
       <Card>
-        <CardHeader>
-          <CardTitle>Entrada (Level 0)</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-2 md:pb-4">
+          <CardTitle className="text-base md:text-lg">Entrada (Level 0)</CardTitle>
+          <CardDescription className="text-xs md:text-sm">
             Configuración de la orden inicial de cada señal
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="symbol">Símbolo</Label>
+        <CardContent className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-3">
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="symbol" className="text-xs md:text-sm">Símbolo</Label>
             <Input
               id="symbol"
               value={formData.symbol}
               onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
+              className="h-9 md:h-10"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="entryLot">Lote entrada</Label>
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="entryLot" className="text-xs md:text-sm">Lote entrada</Label>
             <Input
               id="entryLot"
               type="number"
@@ -302,10 +303,11 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               max="10"
               value={formData.entryLot}
               onChange={(e) => setFormData({ ...formData, entryLot: parseFloat(e.target.value) })}
+              className="h-9 md:h-10"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="entryNumOrders">Nº órdenes</Label>
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="entryNumOrders" className="text-xs md:text-sm">Nº órdenes</Label>
             <Input
               id="entryNumOrders"
               type="number"
@@ -313,6 +315,7 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               max="5"
               value={formData.entryNumOrders}
               onChange={(e) => setFormData({ ...formData, entryNumOrders: parseInt(e.target.value) })}
+              className="h-9 md:h-10"
             />
           </div>
         </CardContent>
@@ -320,13 +323,13 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
 
       {/* Trailing SL */}
       <Card>
-        <CardHeader>
-          <CardTitle>Trailing Stop Loss Virtual</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-2 md:pb-4">
+          <CardTitle className="text-base md:text-lg">Trailing Stop Loss Virtual</CardTitle>
+          <CardDescription className="text-xs md:text-sm">
             SL que se mueve con el precio para proteger ganancias
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 md:space-y-4">
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
@@ -335,49 +338,53 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               onChange={(e) => setFormData({ ...formData, useTrailing: e.target.checked })}
               className="h-4 w-4"
             />
-            <Label htmlFor="useTrailing">Activar trailing SL</Label>
+            <Label htmlFor="useTrailing" className="text-xs md:text-sm">Activar trailing SL</Label>
           </div>
 
           {formData.useTrailing && (
-            <div className="grid gap-4 md:grid-cols-4 pt-2">
-              <div className="space-y-2">
-                <Label htmlFor="trailingActivate">Activar (pips)</Label>
+            <div className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-4 pt-2">
+              <div className="space-y-1.5 md:space-y-2">
+                <Label htmlFor="trailingActivate" className="text-xs md:text-sm">Activar (pips)</Label>
                 <Input
                   id="trailingActivate"
                   type="number"
                   min="1"
                   value={formData.trailingActivate}
                   onChange={(e) => setFormData({ ...formData, trailingActivate: parseInt(e.target.value) })}
+                  className="h-9 md:h-10"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="trailingStep">Step (pips)</Label>
+              <div className="space-y-1.5 md:space-y-2">
+                <Label htmlFor="trailingStep" className="text-xs md:text-sm">Step (pips)</Label>
                 <Input
                   id="trailingStep"
                   type="number"
                   min="1"
                   value={formData.trailingStep}
                   onChange={(e) => setFormData({ ...formData, trailingStep: parseInt(e.target.value) })}
+                  className="h-9 md:h-10"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="trailingBack">Back (pips)</Label>
+              <div className="space-y-1.5 md:space-y-2">
+                <Label htmlFor="trailingBack" className="text-xs md:text-sm">Back (pips)</Label>
                 <Input
                   id="trailingBack"
                   type="number"
                   min="1"
                   value={formData.trailingBack}
                   onChange={(e) => setFormData({ ...formData, trailingBack: parseInt(e.target.value) })}
+                  className="h-9 md:h-10"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="trailingBuffer">Buffer (pips)</Label>
+              <div className="space-y-1.5 md:space-y-2">
+                <Label htmlFor="trailingBuffer" className="text-xs md:text-sm">Buffer (pips)</Label>
                 <Input
                   id="trailingBuffer"
                   type="number"
                   min="0"
                   value={formData.trailingBuffer}
                   onChange={(e) => setFormData({ ...formData, trailingBuffer: parseInt(e.target.value) })}
+                  className="h-9 md:h-10"
                 />
               </div>
             </div>
@@ -387,15 +394,15 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
 
       {/* Grid Config */}
       <Card>
-        <CardHeader>
-          <CardTitle>Grid de Promedios</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-2 md:pb-4">
+          <CardTitle className="text-base md:text-lg">Grid de Promedios</CardTitle>
+          <CardDescription className="text-xs md:text-sm">
             Configuración de los niveles adicionales (escalones)
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="gridStepPips">Distancia (pips)</Label>
+        <CardContent className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-3">
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="gridStepPips" className="text-xs md:text-sm">Distancia (pips)</Label>
             <Input
               id="gridStepPips"
               type="number"
@@ -403,10 +410,11 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               max="100"
               value={formData.gridStepPips}
               onChange={(e) => setFormData({ ...formData, gridStepPips: parseInt(e.target.value) })}
+              className="h-9 md:h-10"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="gridLot">Lote promedios</Label>
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="gridLot" className="text-xs md:text-sm">Lote promedios</Label>
             <Input
               id="gridLot"
               type="number"
@@ -415,10 +423,11 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               max="10"
               value={formData.gridLot}
               onChange={(e) => setFormData({ ...formData, gridLot: parseFloat(e.target.value) })}
+              className="h-9 md:h-10"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="gridMaxLevels">Máx niveles</Label>
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="gridMaxLevels" className="text-xs md:text-sm">Máx niveles</Label>
             <Input
               id="gridMaxLevels"
               type="number"
@@ -426,6 +435,7 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               max="20"
               value={formData.gridMaxLevels}
               onChange={(e) => setFormData({ ...formData, gridMaxLevels: parseInt(e.target.value) })}
+              className="h-9 md:h-10"
             />
           </div>
         </CardContent>
@@ -433,22 +443,22 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
 
       {/* Restrictions */}
       <Card>
-        <CardHeader>
-          <CardTitle>Restricciones</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-2 md:pb-4">
+          <CardTitle className="text-base md:text-lg">Restricciones</CardTitle>
+          <CardDescription className="text-xs md:text-sm">
             Límites opcionales según el tipo de señal del canal
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="restrictionType">Tipo de restricción</Label>
+        <CardContent className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2">
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="restrictionType" className="text-xs md:text-sm">Tipo de restricción</Label>
             <Select
               value={formData.restrictionType || "none"}
               onValueChange={(value) =>
                 setFormData({ ...formData, restrictionType: value === "none" ? "" : value })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className="h-9 md:h-10">
                 <SelectValue placeholder="Sin restricción" />
               </SelectTrigger>
               <SelectContent>
@@ -459,8 +469,8 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="maxLevels">Máx niveles (override)</Label>
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="maxLevels" className="text-xs md:text-sm">Máx niveles (override)</Label>
             <Input
               id="maxLevels"
               type="number"
@@ -468,6 +478,7 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               max="20"
               value={formData.maxLevels}
               onChange={(e) => setFormData({ ...formData, maxLevels: parseInt(e.target.value) })}
+              className="h-9 md:h-10"
             />
           </div>
         </CardContent>
@@ -475,18 +486,18 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
 
       {/* Daily Loss Limit */}
       <Card className="border-amber-500/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
+        <CardHeader className="pb-2 md:pb-4">
+          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+            <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-amber-500" />
             Límite de Pérdida Diaria
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs md:text-sm">
             El bot se pausará automáticamente si la pérdida del día supera este límite
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="dailyLossLimitPercent">Límite diario (%)</Label>
+        <CardContent className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2">
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="dailyLossLimitPercent" className="text-xs md:text-sm">Límite diario (%)</Label>
             <Input
               id="dailyLossLimitPercent"
               type="number"
@@ -495,16 +506,17 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               max="20"
               value={formData.dailyLossLimitPercent}
               onChange={(e) => setFormData({ ...formData, dailyLossLimitPercent: parseFloat(e.target.value) })}
+              className="h-9 md:h-10"
             />
             <p className="text-xs text-muted-foreground">
               Ejemplo: 3% significa que si pierdes más del 3% de tu balance en un día, el bot se pausa.
             </p>
           </div>
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Estado actual</Label>
+          <div className="space-y-1.5 md:space-y-2">
+            <Label className="text-xs md:text-sm font-medium">Estado actual</Label>
             {config?.dailyLossCurrent !== undefined && (
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm">
+              <div className="p-2 md:p-3 bg-muted rounded-lg">
+                <p className="text-xs md:text-sm">
                   Pérdida hoy: <span className={config.dailyLossCurrent > 0 ? "text-red-500 font-semibold" : "text-green-500 font-semibold"}>
                     ${config.dailyLossCurrent.toFixed(2)}
                   </span>
@@ -520,8 +532,8 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-3">
-        <Button type="submit" disabled={isSaving}>
+      <div className="flex justify-end gap-2 md:gap-3">
+        <Button type="submit" disabled={isSaving} size="sm" className="text-sm">
           {isSaving ? (
             <>
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -584,78 +596,78 @@ function AccountsSection({ accounts }: { accounts: BotConfig["accounts"] }) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+              <CreditCard className="h-4 w-4 md:h-5 md:w-5" />
               Cuentas MT5
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs md:text-sm">
               Cuentas de MetaTrader donde el bot ejecutará trades
             </CardDescription>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm">
+              <Button size="sm" className="text-xs md:text-sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Añadir cuenta
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Añadir cuenta MT5</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-base md:text-lg">Añadir cuenta MT5</DialogTitle>
+                <DialogDescription className="text-xs md:text-sm">
                   Las credenciales se cifran con AES-256-GCM antes de guardar
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="login" className="text-right">Login</Label>
+              <div className="grid gap-3 md:gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-2 md:gap-4">
+                  <Label htmlFor="login" className="text-right text-xs md:text-sm">Login</Label>
                   <Input
                     id="login"
                     value={newAccount.login}
                     onChange={(e) => setNewAccount({ ...newAccount, login: e.target.value })}
-                    className="col-span-3"
+                    className="col-span-3 h-9 md:h-10"
                     placeholder="12345678"
                   />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="password" className="text-right">Password</Label>
+                <div className="grid grid-cols-4 items-center gap-2 md:gap-4">
+                  <Label htmlFor="password" className="text-right text-xs md:text-sm">Password</Label>
                   <Input
                     id="password"
                     type="password"
                     value={newAccount.password}
                     onChange={(e) => setNewAccount({ ...newAccount, password: e.target.value })}
-                    className="col-span-3"
+                    className="col-span-3 h-9 md:h-10"
                   />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="server" className="text-right">Servidor</Label>
+                <div className="grid grid-cols-4 items-center gap-2 md:gap-4">
+                  <Label htmlFor="server" className="text-right text-xs md:text-sm">Servidor</Label>
                   <Input
                     id="server"
                     value={newAccount.server}
                     onChange={(e) => setNewAccount({ ...newAccount, server: e.target.value })}
-                    className="col-span-3"
+                    className="col-span-3 h-9 md:h-10"
                     placeholder="Broker-Demo"
                   />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="magic" className="text-right">Magic</Label>
+                <div className="grid grid-cols-4 items-center gap-2 md:gap-4">
+                  <Label htmlFor="magic" className="text-right text-xs md:text-sm">Magic</Label>
                   <Input
                     id="magic"
                     type="number"
                     value={newAccount.magic}
                     onChange={(e) => setNewAccount({ ...newAccount, magic: parseInt(e.target.value) })}
-                    className="col-span-3"
+                    className="col-span-3 h-9 md:h-10"
                     placeholder="20250101"
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                <Button variant="outline" size="sm" onClick={() => setIsAddDialogOpen(false)} className="text-sm">
                   Cancelar
                 </Button>
-                <Button onClick={handleAddAccount} disabled={addAccount.isPending}>
+                <Button onClick={handleAddAccount} disabled={addAccount.isPending} size="sm" className="text-sm">
                   {addAccount.isPending ? "Añadiendo..." : "Añadir cuenta"}
                 </Button>
               </DialogFooter>
@@ -665,33 +677,33 @@ function AccountsSection({ accounts }: { accounts: BotConfig["accounts"] }) {
       </CardHeader>
       <CardContent>
         {accounts.length === 0 ? (
-          <div className="text-center py-8 border-2 border-dashed rounded-lg">
-            <p className="text-muted-foreground mb-2">
+          <div className="text-center py-6 md:py-8 border-2 border-dashed rounded-lg">
+            <p className="text-muted-foreground mb-2 text-sm md:text-base">
               No hay cuentas MT5 configuradas
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs md:text-sm text-muted-foreground">
               Añade una cuenta para que el bot pueda operar
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2 md:space-y-3">
             {accounts.map((account: any) => (
               <div
                 key={account.id}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className="flex items-center justify-between p-3 md:p-4 border rounded-lg gap-2"
               >
-                <div className="flex items-center gap-4">
-                  <div className={`w-3 h-3 rounded-full ${account.isActive ? "bg-green-500" : "bg-gray-400"}`} />
-                  <div>
-                    <p className="font-medium">{account.server}</p>
-                    <p className="text-sm text-muted-foreground">
+                <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                  <div className={`w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0 ${account.isActive ? "bg-green-500" : "bg-gray-400"}`} />
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm md:text-base truncate">{account.server}</p>
+                    <p className="text-xs md:text-sm text-muted-foreground truncate">
                       {account.symbol} · Magic: {account.magic}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 md:gap-4 shrink-0">
                   {account.lastEquity && (
-                    <div className="text-right">
+                    <div className="text-right hidden sm:block">
                       <p className="text-sm font-medium">
                         ${account.lastEquity.toLocaleString()}
                       </p>
@@ -702,6 +714,7 @@ function AccountsSection({ accounts }: { accounts: BotConfig["accounts"] }) {
                     variant="ghost"
                     size="icon"
                     onClick={() => handleRemoveAccount(account.id)}
+                    className="shrink-0"
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -743,40 +756,42 @@ export default function BotPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-12 w-48" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
+      <div className="space-y-4 md:space-y-6">
+        <Skeleton className="h-10 md:h-12 w-40 md:w-48" />
+        <Skeleton className="h-24 md:h-32 w-full" />
+        <Skeleton className="h-48 md:h-64 w-full" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 md:space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Bot Operativo</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl md:text-3xl font-bold">Bot Operativo</h1>
+          <p className="text-muted-foreground mt-1 md:mt-2 text-sm md:text-base">
             Configura y controla el bot de trading automático
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/bot/monitor">
-            <Button variant="outline">
+        <div className="flex items-center gap-2 md:gap-3">
+          <Link href="/bot/monitor" className="hidden sm:block">
+            <Button variant="outline" size="sm">
               <Activity className="h-4 w-4 mr-2" />
               Monitor en vivo
             </Button>
           </Link>
           {config?.status === "PAUSED" ? (
-            <Button onClick={handleResume} disabled={resumeBot.isPending}>
-              <Play className="h-4 w-4 mr-2" />
-              Reanudar
+            <Button onClick={handleResume} disabled={resumeBot.isPending} size="sm">
+              <Play className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Reanudar</span>
+              <span className="sm:hidden">Play</span>
             </Button>
           ) : (
-            <Button variant="outline" onClick={handlePause} disabled={pauseBot.isPending}>
-              <Pause className="h-4 w-4 mr-2" />
-              Pausar
+            <Button variant="outline" onClick={handlePause} disabled={pauseBot.isPending} size="sm">
+              <Pause className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Pausar</span>
+              <span className="sm:hidden">Pause</span>
             </Button>
           )}
         </div>
@@ -784,30 +799,30 @@ export default function BotPage() {
 
       {/* Status Card */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <CardContent className="pt-4 md:pt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 md:gap-4">
               <StatusBadge status={config?.status || "OFFLINE"} lastHeartbeat={config?.lastHeartbeat || null} />
               <div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs md:text-sm text-muted-foreground">
                   Última conexión:{" "}
                   {config?.lastHeartbeat
                     ? new Date(config.lastHeartbeat.timestamp).toLocaleString()
                     : "Nunca"}
                 </p>
                 {config?.lastHeartbeat && (
-                  <p className="text-sm text-muted-foreground">
-                    {config.lastHeartbeat.openPositions} posiciones abiertas ·
+                  <p className="text-xs md:text-sm text-muted-foreground">
+                    {config.lastHeartbeat.openPositions} pos ·
                     MT5: {config.lastHeartbeat.mt5Connected ? "✅" : "❌"} ·
-                    Telegram: {config.lastHeartbeat.telegramConnected ? "✅" : "❌"}
+                    TG: {config.lastHeartbeat.telegramConnected ? "✅" : "❌"}
                   </p>
                 )}
               </div>
             </div>
             {config?.lastHeartbeat && (
-              <div className="flex gap-6 text-sm">
+              <div className="flex gap-4 md:gap-6 text-xs md:text-sm">
                 <div className="text-center">
-                  <p className="font-semibold text-lg">{config.lastHeartbeat.openPositions}</p>
+                  <p className="font-semibold text-base md:text-lg">{config.lastHeartbeat.openPositions}</p>
                   <p className="text-muted-foreground">Posiciones</p>
                 </div>
               </div>
@@ -821,8 +836,8 @@ export default function BotPage() {
 
       {/* Trading Config */}
       <div>
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <Settings className="h-5 w-5" />
+        <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 flex items-center gap-2">
+          <Settings className="h-4 w-4 md:h-5 md:w-5" />
           Configuración de Trading
         </h2>
         <TradingConfigForm
@@ -840,27 +855,27 @@ export default function BotPage() {
       {/* Telegram Config */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+            <MessageSquare className="h-4 w-4 md:h-5 md:w-5" />
             Telegram
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs md:text-sm">
             Configuración para recibir señales de canales de Telegram
           </CardDescription>
         </CardHeader>
         <CardContent>
           {config?.hasTelegramConfig ? (
             <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle2 className="h-5 w-5" />
-              <span>Telegram configurado ({Array.isArray(config.telegramChannels) ? config.telegramChannels.length : 0} canales)</span>
+              <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="text-sm md:text-base">Telegram configurado ({Array.isArray(config.telegramChannels) ? config.telegramChannels.length : 0} canales)</span>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2 md:space-y-3">
               <div className="flex items-center gap-2 text-amber-600">
-                <AlertTriangle className="h-5 w-5" />
-                <span>Telegram no configurado</span>
+                <AlertTriangle className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="text-sm md:text-base">Telegram no configurado</span>
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs md:text-sm text-muted-foreground">
                 Para configurar Telegram, necesitas obtener API ID y API Hash desde{" "}
                 <a
                   href="https://my.telegram.org"

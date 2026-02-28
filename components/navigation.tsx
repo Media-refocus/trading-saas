@@ -7,15 +7,33 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
-import { Activity, Settings, BarChart3, Bot, LogOut, Circle, Store, CreditCard, AlertTriangle, Clock, Zap } from "lucide-react";
+import { Activity, Settings, BarChart3, Bot, LogOut, Circle, Store, CreditCard, AlertTriangle, Clock, Zap, Menu, X } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
   const [isPortalLoading, setIsPortalLoading] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  // Close mobile menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleLogout = async () => {
     await signOut({ redirect: false });
@@ -86,31 +104,33 @@ export default function Navigation() {
               : "bg-red-500/10 text-red-700 dark:text-red-400 border-b border-red-500/20"
           )}
         >
-          <div className="container mx-auto flex items-center justify-center gap-2">
+          <div className="container mx-auto flex items-center justify-center gap-2 flex-wrap">
             <AlertTriangle className="h-4 w-4" />
             {subscription.isPastDue && (
               <>
-                <span>Pago pendiente. Tu suscripción será cancelada si no se completa el pago.</span>
+                <span className="hidden sm:inline">Pago pendiente. Tu suscripción será cancelada si no se completa el pago.</span>
+                <span className="sm:hidden">Pago pendiente</span>
                 <Button
                   variant="link"
                   size="sm"
                   className="text-amber-700 dark:text-amber-400 p-0 h-auto"
                   onClick={handleBillingPortal}
                 >
-                  Actualizar pago
+                  Actualizar
                 </Button>
               </>
             )}
             {subscription.isPaused && (
               <>
-                <span>Tu periodo de prueba ha finalizado.</span>
+                <span className="hidden sm:inline">Tu periodo de prueba ha finalizado.</span>
+                <span className="sm:hidden">Prueba finalizada</span>
                 <Link href="/pricing">
                   <Button
                     variant="link"
                     size="sm"
                     className="text-red-700 dark:text-red-400 p-0 h-auto"
                   >
-                    Suscribirse ahora
+                    Suscribirse
                   </Button>
                 </Link>
               </>
@@ -121,52 +141,56 @@ export default function Navigation() {
 
       <nav className="border-b bg-background">
         <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-6">
-              <Link href="/dashboard" className="text-xl font-bold flex items-center gap-2">
-                Trading Bot SaaS
-                {/* Indicador de estado del bot */}
-                {(isOnline || isPaused) && (
-                  <span className="flex items-center gap-1 ml-2">
-                    <Circle
-                      className={cn(
-                        "h-2.5 w-2.5",
-                        isPaused ? "fill-amber-500 text-amber-500" :
-                        isOnline ? "fill-green-500 text-green-500 animate-pulse" :
-                        "fill-red-500 text-red-500"
-                      )}
-                    />
-                    <span className="text-xs text-muted-foreground font-normal">
-                      {isPaused ? "Pausado" : isOnline ? "Online" : "Offline"}
-                    </span>
+          <div className="flex h-14 md:h-16 items-center justify-between">
+            {/* Logo + Status */}
+            <Link href="/dashboard" className="text-lg md:text-xl font-bold flex items-center gap-2">
+              <span className="hidden sm:inline">Trading Bot SaaS</span>
+              <span className="sm:hidden">TradingBot</span>
+              {/* Indicador de estado del bot */}
+              {(isOnline || isPaused) && (
+                <span className="flex items-center gap-1 ml-1 md:ml-2">
+                  <Circle
+                    className={cn(
+                      "h-2.5 w-2.5",
+                      isPaused ? "fill-amber-500 text-amber-500" :
+                      isOnline ? "fill-green-500 text-green-500 animate-pulse" :
+                      "fill-red-500 text-red-500"
+                    )}
+                  />
+                  <span className="text-xs text-muted-foreground font-normal hidden sm:inline">
+                    {isPaused ? "Pausado" : isOnline ? "Online" : "Offline"}
                   </span>
-                )}
-              </Link>
-              <div className="flex gap-1">
-                {links.map((link) => {
-                  const Icon = link.icon;
-                  const isActive = pathname === link.href ||
-                    (link.href === "/bot" && pathname?.startsWith("/bot"));
+                </span>
+              )}
+            </Link>
 
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className={cn(
-                        "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition",
-                        isActive
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                      )}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {link.label}
-                    </Link>
-                  );
-                })}
-              </div>
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-1">
+              {links.map((link) => {
+                const Icon = link.icon;
+                const isActive = pathname === link.href ||
+                  (link.href === "/bot" && pathname?.startsWith("/bot"));
+
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition",
+                      isActive
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {link.label}
+                  </Link>
+                );
+              })}
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Desktop Right Side */}
+            <div className="hidden md:flex items-center gap-3">
               {/* Subscription status badge */}
               {subscription && (
                 <button
@@ -230,8 +254,114 @@ export default function Navigation() {
                 Cerrar Sesion
               </Button>
             </div>
+
+            {/* Mobile Hamburger Button */}
+            <button
+              className="md:hidden p-2 rounded-md hover:bg-muted transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Menu Dropdown */}
+        {mobileMenuOpen && (
+          <div
+            ref={mobileMenuRef}
+            className="md:hidden border-t bg-background animate-in slide-in-from-top-2 duration-200"
+          >
+            <div className="container mx-auto px-4 py-3 space-y-1">
+              {/* Mobile Nav Links */}
+              {links.map((link) => {
+                const Icon = link.icon;
+                const isActive = pathname === link.href ||
+                  (link.href === "/bot" && pathname?.startsWith("/bot"));
+
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition",
+                      isActive
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {link.label}
+                  </Link>
+                );
+              })}
+
+              {/* Divider */}
+              <div className="border-t my-2" />
+
+              {/* Mobile Subscription Badge */}
+              {subscription && (
+                <button
+                  onClick={handleBillingPortal}
+                  disabled={isPortalLoading}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-muted transition-colors"
+                >
+                  <Badge
+                    variant={
+                      subscription.isPastDue
+                        ? "destructive"
+                        : subscription.isPaused
+                        ? "outline"
+                        : subscription.isTrial
+                        ? "secondary"
+                        : "default"
+                    }
+                    className={cn(
+                      "gap-1.5",
+                      subscription.isPaused && "border-red-500/50 text-red-600"
+                    )}
+                  >
+                    {subscription.isTrial && <Clock className="h-3 w-3" />}
+                    {subscription.isPastDue && <AlertTriangle className="h-3 w-3" />}
+                    {subscription.isPaused && <Zap className="h-3 w-3" />}
+                    {subscription.planName}
+                    {subscription.isTrial && subscription.trialDaysRemaining !== null && subscription.trialDaysRemaining > 0 && (
+                      <span className="text-[10px] opacity-80">({subscription.trialDaysRemaining}d)</span>
+                    )}
+                  </Badge>
+                </button>
+              )}
+
+              {/* Mobile Monitor Link */}
+              <Link
+                href="/bot/monitor"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition"
+              >
+                <Activity className="h-5 w-5" />
+                Monitor en vivo
+              </Link>
+
+              {/* Mobile Notification Bell */}
+              <div className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground">
+                <NotificationBell />
+                <span>Notificaciones</span>
+              </div>
+
+              {/* Mobile Logout */}
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+              >
+                <LogOut className="h-5 w-5" />
+                Cerrar Sesión
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
     </>
   );

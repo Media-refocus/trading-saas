@@ -43,12 +43,12 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 md:space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground mt-1 md:mt-2 text-sm md:text-base">
             Bienvenido a tu panel de control de trading
           </p>
         </div>
@@ -64,85 +64,85 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid md:grid-cols-4 gap-4">
+      {/* Quick Stats - 2x2 grid on mobile */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Señales Disponibles</p>
-                <p className="text-2xl font-bold">{signalsInfo?.total || 0}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Señales</p>
+                <p className="text-xl md:text-2xl font-bold">{signalsInfo?.total || 0}</p>
               </div>
-              <Signal className="w-8 h-8 text-blue-500/50" />
+              <Signal className="w-6 h-6 md:w-8 md:h-8 text-blue-500/50" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Operativas Publicadas</p>
-                <p className="text-2xl font-bold">{topStrategies?.length || 0}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Operativas</p>
+                <p className="text-xl md:text-2xl font-bold">{topStrategies?.length || 0}</p>
               </div>
-              <Store className="w-8 h-8 text-green-500/50" />
+              <Store className="w-6 h-6 md:w-8 md:h-8 text-green-500/50" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Bot Status</p>
-                <p className="text-2xl font-bold">{botStatus?.isOnline ? "Activo" : "Inactivo"}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Bot Status</p>
+                <p className="text-xl md:text-2xl font-bold">{botStatus?.isOnline ? "Activo" : "Inactivo"}</p>
               </div>
-              <Activity className="w-8 h-8 text-purple-500/50" />
+              <Activity className="w-6 h-6 md:w-8 md:h-8 text-purple-500/50" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Win Rate Promedio</p>
-                <p className="text-2xl font-bold">--</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Win Rate</p>
+                <p className="text-xl md:text-2xl font-bold">--</p>
               </div>
-              <TrendingUp className="w-8 h-8 text-amber-500/50" />
+              <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-amber-500/50" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-3 gap-4 md:gap-6">
         {/* Top Operativas */}
         <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Store className="w-5 h-5" />
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                <Store className="w-4 h-4 md:w-5 md:h-5" />
                 Top Operativas del Mes
               </CardTitle>
-              <CardDescription>Las estrategias más populares en el marketplace</CardDescription>
+              <CardDescription className="text-xs md:text-sm">Las estrategias más populares</CardDescription>
             </div>
-            <Link href="/operativas">
-              <Button variant="outline" size="sm">
+            <Link href="/operativas" className="shrink-0">
+              <Button variant="outline" size="sm" className="text-xs md:text-sm">
                 Ver todas
-                <ArrowRight className="w-4 h-4 ml-1" />
+                <ArrowRight className="w-3 h-3 md:w-4 md:h-4 ml-1" />
               </Button>
             </Link>
           </CardHeader>
           <CardContent>
             {topStrategies && topStrategies.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3 md:space-y-4">
                 {topStrategies.map((strategy, idx) => (
                   <div
                     key={strategy.id}
-                    className="flex items-center gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    className="flex items-center gap-3 md:gap-4 p-2 md:p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                   >
-                    <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
+                    <div className={`flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full text-xs md:text-sm font-bold shrink-0 ${
                       idx === 0 ? "bg-yellow-500/20 text-yellow-600" :
                       idx === 1 ? "bg-gray-500/20 text-gray-600" :
                       "bg-amber-700/20 text-amber-700"
@@ -150,35 +150,35 @@ export default function DashboardPage() {
                       #{idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{strategy.name}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-medium truncate text-sm md:text-base">{strategy.name}</p>
+                      <p className="text-xs md:text-sm text-muted-foreground truncate">
                         por {strategy.author?.name || "Anónimo"}
                       </p>
                     </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className={`font-mono font-bold ${
+                    <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm shrink-0">
+                      <div className={`font-mono font-bold hidden sm:block ${
                         strategy.totalProfit >= 0 ? "text-green-600" : "text-red-600"
                       }`}>
                         {formatProfit(strategy.totalProfit)}
                       </div>
                       <div className="flex items-center gap-1 text-muted-foreground">
-                        <Heart className="w-4 h-4" />
-                        {strategy.likesCount}
+                        <Heart className="w-3 h-3 md:w-4 md:h-4" />
+                        <span className="hidden sm:inline">{strategy.likesCount}</span>
                       </div>
                       <div className="flex items-center gap-1 text-muted-foreground">
-                        <Download className="w-4 h-4" />
-                        {strategy.downloadsCount}
+                        <Download className="w-3 h-3 md:w-4 md:h-4" />
+                        <span className="hidden sm:inline">{strategy.downloadsCount}</span>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Store className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No hay operativas publicadas aún</p>
+              <div className="text-center py-6 md:py-8 text-muted-foreground">
+                <Store className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">No hay operativas publicadas aún</p>
                 <Link href="/backtester">
-                  <Button variant="outline" size="sm" className="mt-3">
+                  <Button variant="outline" size="sm" className="mt-3 text-xs md:text-sm">
                     Sé el primero en publicar
                   </Button>
                 </Link>
@@ -190,67 +190,67 @@ export default function DashboardPage() {
         {/* Quick Actions */}
         <Card>
           <CardHeader>
-            <CardTitle>Acciones Rápidas</CardTitle>
-            <CardDescription>Comienza a operar en minutos</CardDescription>
+            <CardTitle className="text-base md:text-lg">Acciones Rápidas</CardTitle>
+            <CardDescription className="text-xs md:text-sm">Comienza a operar en minutos</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 md:space-y-3">
             <Link href="/backtester" className="block">
-              <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                <div className="p-2 rounded-lg bg-blue-500/10">
-                  <BarChart3 className="w-5 h-5 text-blue-500" />
+              <div className="flex items-center gap-3 md:gap-4 p-3 md:p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                <div className="p-2 rounded-lg bg-blue-500/10 shrink-0">
+                  <BarChart3 className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">Ejecutar Backtest</h3>
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm md:text-base">Ejecutar Backtest</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground truncate">
                     Prueba estrategias con datos históricos
                   </p>
                 </div>
-                <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                <ArrowRight className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground shrink-0" />
               </div>
             </Link>
 
             <Link href="/operativas" className="block">
-              <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                <div className="p-2 rounded-lg bg-green-500/10">
-                  <Store className="w-5 h-5 text-green-500" />
+              <div className="flex items-center gap-3 md:gap-4 p-3 md:p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                <div className="p-2 rounded-lg bg-green-500/10 shrink-0">
+                  <Store className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">Explorar Marketplace</h3>
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm md:text-base">Explorar Marketplace</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground truncate">
                     Descubre estrategias de otros traders
                   </p>
                 </div>
-                <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                <ArrowRight className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground shrink-0" />
               </div>
             </Link>
 
             <Link href="/bot" className="block">
-              <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                <div className="p-2 rounded-lg bg-purple-500/10">
-                  <Bot className="w-5 h-5 text-purple-500" />
+              <div className="flex items-center gap-3 md:gap-4 p-3 md:p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                <div className="p-2 rounded-lg bg-purple-500/10 shrink-0">
+                  <Bot className="w-4 h-4 md:w-5 md:h-5 text-purple-500" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">Bot Operativo</h3>
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm md:text-base">Bot Operativo</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground truncate">
                     Configura el bot de trading automático
                   </p>
                 </div>
-                <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                <ArrowRight className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground shrink-0" />
               </div>
             </Link>
 
             <Link href="/settings" className="block">
-              <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                <div className="p-2 rounded-lg bg-muted">
-                  <Settings className="w-5 h-5 text-muted-foreground" />
+              <div className="flex items-center gap-3 md:gap-4 p-3 md:p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                <div className="p-2 rounded-lg bg-muted shrink-0">
+                  <Settings className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">Configuración</h3>
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm md:text-base">Configuración</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground truncate">
                     Gestiona tu cuenta y preferencias
                   </p>
                 </div>
-                <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                <ArrowRight className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground shrink-0" />
               </div>
             </Link>
           </CardContent>
@@ -259,26 +259,26 @@ export default function DashboardPage() {
 
       {/* Recent Activity / Tips */}
       <Card>
-        <CardHeader>
-          <CardTitle>💡 Tips para Empezar</CardTitle>
+        <CardHeader className="pb-2 md:pb-4">
+          <CardTitle className="text-base md:text-lg">Tips para Empezar</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="p-4 bg-muted/30 rounded-lg">
-              <h4 className="font-semibold mb-2">1. Prueba el Backtester</h4>
-              <p className="text-sm text-muted-foreground">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+            <div className="p-3 md:p-4 bg-muted/30 rounded-lg">
+              <h4 className="font-semibold mb-1 md:mb-2 text-sm md:text-base">1. Prueba el Backtester</h4>
+              <p className="text-xs md:text-sm text-muted-foreground">
                 Usa las {signalsInfo?.total || "3,139"} señales históricas disponibles para probar tus estrategias.
               </p>
             </div>
-            <div className="p-4 bg-muted/30 rounded-lg">
-              <h4 className="font-semibold mb-2">2. Publica tu Mejor Estrategia</h4>
-              <p className="text-sm text-muted-foreground">
+            <div className="p-3 md:p-4 bg-muted/30 rounded-lg">
+              <h4 className="font-semibold mb-1 md:mb-2 text-sm md:text-base">2. Publica tu Mejor Estrategia</h4>
+              <p className="text-xs md:text-sm text-muted-foreground">
                 Comparte tus resultados y ayuda a otros traders a encontrar operativas rentables.
               </p>
             </div>
-            <div className="p-4 bg-muted/30 rounded-lg">
-              <h4 className="font-semibold mb-2">3. Conecta tu Bot</h4>
-              <p className="text-sm text-muted-foreground">
+            <div className="p-3 md:p-4 bg-muted/30 rounded-lg">
+              <h4 className="font-semibold mb-1 md:mb-2 text-sm md:text-base">3. Conecta tu Bot</h4>
+              <p className="text-xs md:text-sm text-muted-foreground">
                 Configura el bot para ejecutar automáticamente las señales en tu cuenta MT5.
               </p>
             </div>

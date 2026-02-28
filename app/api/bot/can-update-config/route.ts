@@ -9,7 +9,7 @@ import { NextRequest } from "next/server";
 import {
   authenticateBot,
   botSuccessResponse,
-} from "../../auth";
+} from "../auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
