@@ -302,7 +302,7 @@ export default function BacktesterPage() {
 
   return (
     <>
-    <div className="space-y-4 p-4 max-w-[1600px] mx-auto font-sans">
+    <div className="space-y-4 px-4 py-4 max-w-[1600px] mx-auto font-sans pb-8 md:pb-4">
       {/* Header mejorado */}
       <div className="flex items-center justify-between pb-3 border-b border-border/50">
         <div className="flex items-center gap-4">
@@ -403,7 +403,9 @@ export default function BacktesterPage() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <HelpCircle className="w-3.5 h-3.5 text-primary/50 cursor-help" />
+                        <button type="button" className="p-1.5 -m-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                          <HelpCircle className="w-4 h-4 text-primary/50 cursor-help" />
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="max-w-xs">
                         <p className="text-xs"><strong>Distancia entre niveles</strong></p>
@@ -438,7 +440,9 @@ export default function BacktesterPage() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <HelpCircle className="w-3.5 h-3.5 text-purple-500/50 cursor-help" />
+                        <button type="button" className="p-1.5 -m-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                          <HelpCircle className="w-4 h-4 text-purple-500/50 cursor-help" />
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="max-w-xs">
                         <p className="text-xs"><strong>Niveles máximos del grid</strong></p>
@@ -473,7 +477,9 @@ export default function BacktesterPage() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <HelpCircle className="w-3.5 h-3.5 text-success/50 cursor-help" />
+                        <button type="button" className="p-1.5 -m-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                          <HelpCircle className="w-4 h-4 text-success/50 cursor-help" />
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="max-w-xs">
                         <p className="text-xs"><strong>Objetivo de ganancia</strong></p>
@@ -560,7 +566,7 @@ export default function BacktesterPage() {
             </div>
 
             {/* Filtros */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <div className="space-y-1">
                 <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Sesión</Label>
                 <select
@@ -664,7 +670,7 @@ export default function BacktesterPage() {
             </Button>
 
             {/* Resumen de configuracion activa */}
-            <div className="flex items-center justify-center gap-3 pt-1 text-[10px] text-muted-foreground font-mono flex-wrap">
+            <div className="flex items-center justify-center gap-3 pt-1 text-[13px] text-muted-foreground font-mono flex-wrap">
               <span>Grid: {config.pipsDistance}p x {config.maxLevels}L</span>
               <span>•</span>
               <span>TP: {config.takeProfitPips}p</span>
@@ -1157,13 +1163,13 @@ export default function BacktesterPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-3">
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="grid grid-cols-2 sm:flex sm:gap-1 gap-1.5">
               {optimizationPresets.data?.map((preset: any) => (
                 <button
                   key={preset.id}
                   onClick={() => setSelectedPreset(preset.id)}
-                  className={`px-3 py-1.5 text-xs rounded-lg transition-all ${
+                  className={`px-3 py-2 sm:py-1.5 text-xs rounded-lg transition-all min-h-[44px] sm:min-h-0 ${
                     selectedPreset === preset.id
                       ? "bg-purple-500 text-white shadow-md shadow-purple-500/20"
                       : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -1186,7 +1192,7 @@ export default function BacktesterPage() {
                 if (result.topResults) setOptimizationResults(result.topResults);
               }}
               disabled={runOptimization.isPending}
-              className="bg-purple-500 hover:bg-purple-600"
+              className="bg-purple-500 hover:bg-purple-600 w-full sm:w-auto min-h-[44px]"
             >
               {runOptimization.isPending ? (
                 <span className="flex items-center gap-2">

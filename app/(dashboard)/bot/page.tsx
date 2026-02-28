@@ -154,10 +154,10 @@ function ApiKeySection({ onRegenerate }: { onRegenerate: () => Promise<{ apiKey?
                 (clave oculta por seguridad)
               </span>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="outline" disabled={isRegenerating} size="sm">
+                  <Button variant="outline" disabled={isRegenerating} size="sm" className="w-full sm:w-auto min-h-[44px]">
                     <RefreshCw className={`h-4 w-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
                     Regenerar clave
                   </Button>
@@ -495,7 +495,7 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
             El bot se pausará automáticamente si la pérdida del día supera este límite
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2">
+        <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2 p-4 md:pt-6 md:pb-6">
           <div className="space-y-1.5 md:space-y-2">
             <Label htmlFor="dailyLossLimitPercent" className="text-xs md:text-sm">Límite diario (%)</Label>
             <Input
@@ -532,8 +532,8 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-2 md:gap-3">
-        <Button type="submit" disabled={isSaving} size="sm" className="text-sm">
+      <div className="flex flex-col sm:flex-row sm:justify-end gap-2 md:gap-3">
+        <Button type="submit" disabled={isSaving} size="sm" className="text-sm w-full sm:w-auto min-h-[44px]">
           {isSaving ? (
             <>
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -608,7 +608,7 @@ function AccountsSection({ accounts }: { accounts: BotConfig["accounts"] }) {
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="text-xs md:text-sm">
+              <Button size="sm" className="text-xs md:text-sm w-full sm:w-auto min-h-[44px]">
                 <Plus className="h-4 w-4 mr-2" />
                 Añadir cuenta
               </Button>
@@ -714,7 +714,7 @@ function AccountsSection({ accounts }: { accounts: BotConfig["accounts"] }) {
                     variant="ghost"
                     size="icon"
                     onClick={() => handleRemoveAccount(account.id)}
-                    className="shrink-0"
+                    className="shrink-0 min-h-[44px] min-w-[44px]"
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -765,7 +765,7 @@ export default function BotPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-8">
+    <div className="space-y-4 md:space-y-8 pb-8 md:pb-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -804,14 +804,14 @@ export default function BotPage() {
             <div className="flex items-center gap-3 md:gap-4">
               <StatusBadge status={config?.status || "OFFLINE"} lastHeartbeat={config?.lastHeartbeat || null} />
               <div>
-                <p className="text-xs md:text-sm text-muted-foreground">
+                <p className="text-[13px] md:text-sm text-muted-foreground">
                   Última conexión:{" "}
                   {config?.lastHeartbeat
                     ? new Date(config.lastHeartbeat.timestamp).toLocaleString()
                     : "Nunca"}
                 </p>
                 {config?.lastHeartbeat && (
-                  <p className="text-xs md:text-sm text-muted-foreground">
+                  <p className="text-[13px] md:text-sm text-muted-foreground">
                     {config.lastHeartbeat.openPositions} pos ·
                     MT5: {config.lastHeartbeat.mt5Connected ? "✅" : "❌"} ·
                     TG: {config.lastHeartbeat.telegramConnected ? "✅" : "❌"}

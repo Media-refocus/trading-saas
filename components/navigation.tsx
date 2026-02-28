@@ -257,9 +257,9 @@ export default function Navigation() {
 
             {/* Mobile Hamburger Button */}
             <button
-              className="md:hidden p-2 rounded-md hover:bg-muted transition-colors"
+              className="md:hidden p-2.5 rounded-md hover:bg-muted transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle menu"
+              aria-label="Menu"
             >
               {mobileMenuOpen ? (
                 <X className="h-6 w-6" />
@@ -276,7 +276,7 @@ export default function Navigation() {
             ref={mobileMenuRef}
             className="md:hidden border-t bg-background animate-in slide-in-from-top-2 duration-200"
           >
-            <div className="container mx-auto px-4 py-3 space-y-1">
+            <div className="container mx-auto px-4 py-2 space-y-0.5">
               {/* Mobile Nav Links */}
               {links.map((link) => {
                 const Icon = link.icon;
@@ -288,7 +288,7 @@ export default function Navigation() {
                     key={link.href}
                     href={link.href}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition",
+                      "flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition min-h-[48px]",
                       isActive
                         ? "bg-primary/10 text-primary font-medium"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -308,7 +308,7 @@ export default function Navigation() {
                 <button
                   onClick={handleBillingPortal}
                   disabled={isPortalLoading}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-muted transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm hover:bg-muted transition-colors min-h-[48px]"
                 >
                   <Badge
                     variant={
@@ -339,14 +339,14 @@ export default function Navigation() {
               {/* Mobile Monitor Link */}
               <Link
                 href="/bot/monitor"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition"
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition min-h-[48px]"
               >
                 <Activity className="h-5 w-5" />
                 Monitor en vivo
               </Link>
 
               {/* Mobile Notification Bell */}
-              <div className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground">
+              <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-muted-foreground min-h-[48px]">
                 <NotificationBell />
                 <span>Notificaciones</span>
               </div>
@@ -354,7 +354,7 @@ export default function Navigation() {
               {/* Mobile Logout */}
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors min-h-[48px]"
               >
                 <LogOut className="h-5 w-5" />
                 Cerrar Sesión

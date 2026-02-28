@@ -125,10 +125,10 @@ function SignalRow({ signal }: { signal: Signal }) {
           {isBuy ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
         </div>
         <div>
-          <p className="font-medium">
+          <p className="font-medium text-[13px] md:text-sm">
             {signal.isCloseSignal ? "🔒 CERRAR RANGO" : `${signal.side} ${signal.symbol}`}
           </p>
-          <p className="text-xs text-muted-foreground truncate max-w-xs">
+          <p className="text-[13px] text-muted-foreground truncate max-w-xs">
             {signal.messageText.slice(0, 50)}...
           </p>
         </div>
@@ -145,7 +145,7 @@ function SignalRow({ signal }: { signal: Signal }) {
         >
           {signal.status}
         </Badge>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground">
           {new Date(signal.receivedAt).toLocaleTimeString()}
         </span>
       </div>
@@ -170,10 +170,10 @@ function TradeRow({ trade }: { trade: Trade }) {
           {isBuy ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
         </div>
         <div>
-          <p className="font-medium">
+          <p className="font-medium text-[13px] md:text-sm">
             {trade.symbol} · L{trade.level}
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[13px] text-muted-foreground">
             {isClosed ? trade.closeReason : "Abierto"} · #{trade.mt5Ticket}
           </p>
         </div>
@@ -182,10 +182,10 @@ function TradeRow({ trade }: { trade: Trade }) {
         <div className="text-right">
           {isClosed ? (
             <>
-              <p className={`font-semibold ${isProfit ? "text-green-600" : "text-red-600"}`}>
+              <p className={`font-semibold text-[13px] md:text-sm ${isProfit ? "text-green-600" : "text-red-600"}`}>
                 {isProfit ? "+" : ""}${pnl.toFixed(2)}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 {trade.profitPips?.toFixed(1)} pips
               </p>
             </>
@@ -193,7 +193,7 @@ function TradeRow({ trade }: { trade: Trade }) {
             <Badge variant="outline">Abierto</Badge>
           )}
         </div>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground">
           {new Date(isClosed ? trade.closedAt! : trade.openedAt).toLocaleTimeString()}
         </span>
       </div>
@@ -264,35 +264,33 @@ export default function BotMonitorPage() {
   const isLoading = statusLoading || signalsLoading || tradesLoading || statsLoading;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8 md:pb-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4">
+        {/* Title row */}
         <div className="flex items-center gap-4">
           <Link href="/bot">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" className="min-h-[44px]">
               ← Config
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">Monitor en vivo</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl md:text-3xl font-bold">Monitor en vivo</h1>
+            <p className="text-muted-foreground text-sm md:text-base">
               Estado del bot en tiempo real
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            Auto-refresh: {refreshInterval / 1000}s
-          </div>
 
-          {/* Kill Switch Button */}
+        {/* Controls row - stacked on mobile */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Kill Switch - prominent on its own line on mobile */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
                 variant="destructive"
                 size="sm"
-                className="gap-2"
+                className="gap-2 w-full sm:w-auto min-h-[44px]"
                 disabled={killSwitchMutation.isPending}
               >
                 <AlertTriangle className="h-4 w-4" />
@@ -329,94 +327,104 @@ export default function BotMonitorPage() {
             </AlertDialogContent>
           </AlertDialog>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            className="gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          </Button>
+          {/* Secondary controls */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              Auto: {refreshInterval / 1000}s
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              className="gap-2 min-h-[44px]"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export CSV</span>
+              <span className="sm:hidden">Export</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="min-h-[44px] min-w-[44px]"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Performance Stats */}
-      <div className="grid gap-4 md:grid-cols-5">
+      {/* Performance Stats - 2x2 on mobile, 5 cols on desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-green-500" />
-              <span className={`text-2xl font-bold ${(stats?.total.pnl || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <span className={`text-xl md:text-2xl font-bold ${(stats?.total.pnl || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {(stats?.total.pnl || 0) >= 0 ? "+" : ""}{(stats?.total.pnl || 0).toFixed(2)}
               </span>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">P&L Total</p>
+            <p className="text-[13px] text-muted-foreground mt-1">P&L Total</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center gap-2">
               <Target className="h-5 w-5 text-blue-500" />
-              <span className="text-2xl font-bold">
+              <span className="text-xl md:text-2xl font-bold">
                 {stats?.total.winRate.toFixed(1) || 0}%
               </span>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">Win Rate</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[13px] text-muted-foreground mt-1">Win Rate</p>
+            <p className="text-[13px] text-muted-foreground">
               {stats?.total.wins || 0}W / {stats?.total.losses || 0}L
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-purple-500" />
-              <span className="text-2xl font-bold">
+              <span className="text-xl md:text-2xl font-bold">
                 {stats?.total.trades || 0}
               </span>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">Total Trades</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[13px] text-muted-foreground mt-1">Total Trades</p>
+            <p className="text-[13px] text-muted-foreground">
               PF: {stats?.total.profitFactor || 0}
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-orange-500" />
-              <span className={`text-lg font-bold ${(stats?.today.pnl || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <span className={`text-lg md:text-xl font-bold ${(stats?.today.pnl || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {(stats?.today.pnl || 0) >= 0 ? "+" : ""}{(stats?.today.pnl || 0).toFixed(2)}
               </span>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">Hoy</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[13px] text-muted-foreground mt-1">Hoy</p>
+            <p className="text-[13px] text-muted-foreground">
               {stats?.today.trades || 0} trades
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="col-span-2 md:col-span-1">
+          <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-amber-500" />
-              <span className="text-2xl font-bold">
+              <span className="text-xl md:text-2xl font-bold">
                 {status?.positions.length || 0}
               </span>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">Posiciones</p>
+            <p className="text-[13px] text-muted-foreground mt-1">Posiciones</p>
           </CardContent>
         </Card>
       </div>

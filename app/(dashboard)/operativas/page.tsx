@@ -219,7 +219,7 @@ export default function OperativasPage() {
   const isLiked = (strategyId: string) => likedStrategies.has(strategyId);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-8 md:pb-0">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">Marketplace de Operativas</h1>
@@ -267,18 +267,18 @@ export default function OperativasPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar operativas..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-11"
           />
         </div>
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px] h-11">
             <ArrowUpDown className="h-4 w-4 mr-2" />
             <SelectValue placeholder="Ordenar por" />
           </SelectTrigger>
@@ -298,10 +298,10 @@ export default function OperativasPage() {
         </div>
       ) : data?.strategies.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
+          <CardContent className="py-16 md:py-12 text-center flex flex-col items-center justify-center min-h-[300px]">
             <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="font-semibold mb-2">No se encontraron operativas</h3>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-[13px]">
               Intenta con otros terminos de busqueda o filtros
             </p>
           </CardContent>
