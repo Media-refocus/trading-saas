@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  createChart,
+  IChartApi,
+  ISeriesApi,
+  CandlestickData,
+  Time,
+  ColorType,
+  CrosshairMode,
+  PriceLineSource,
+} from "lightweight-charts";
 import { getThemeColors } from "@/lib/chart-themes";
 
 // ==================== INTERFACES ====================
@@ -33,44 +43,146 @@ interface Tick {
   spread: number;
 }
 
-interface Candle {
-  time: number; // Unix timestamp en segundos del inicio de la vela
+interface OHLCCandle {
+  time: Time;
   open: number;
   high: number;
   low: number;
   close: number;
-  startTime: Date;
-  endTime: Date;
 }
 
-// Posición abierta simulada
-interface OpenPosition {
-  side: "BUY" | "SELL";
-  entryPrice: number;
-  entryTime: Date;
-  volume: number; // lotes
-  stopLoss?: number;
-  takeProfit?: number;
-}
-
-// Estado de cuenta estilo MT5
-interface AccountState {
-  balance: number;          // Balance cerrado (solo cambia al cerrar trades)
-  equity: number;           // Balance + P/L flotante
-  floatingPL: number;       // P/L no realizado de la posición actual
-  usedMargin: number;       // Margen usado
-  freeMargin: number;       // Margen libre
-  marginLevel: number;      // Nivel de margen (%)
-  realizedPL: number;       // P/L ya cerrado
-}
-
-type Timeframe = "1" | "5" | "15" | "60";
+type Timeframe = "1" | "5" | "15";
 
 // ==================== CONSTANTES ====================
 
 const PIP_VALUE = 0.10;
-const LOT_VALUE = 10; // 1 lote = $10 por pip aproximado en XAUUSD
-const LEVERAGE = 100; // Apalancamiento 1:100
+const LOT_VALUE = 10;
+const LEVERAGE = 100;
+
+// ==================== UTILIDADES ====================
+
+function getTimeframeMs(tf: Timeframe): number {
+  return parseInt(tf) * 60 * 1000;
+}
+
+function getCandleStartTime(timestamp: Date, tf: Timeframe): Date {
+  const intervalMs = getTimeframeMs(tf);
+  const tickTime = timestamp.getTime();
+  return new Date(Math.floor(tickTime / intervalMs) * intervalMs);
+}
+
+function getMidPrice(tick: Tick): number {
+  return (tick.bid + tick.ask) / 2;
+}
+
+// Generar velas OHLC históricas sintéticas antes del trade
+function generateHistoryCandles(
+  entryPrice: number,
+  entryTime: Date,
+  count: number,
+  tf: Timeframe
+): OHLCCandle[] {
+  const candles: OHLCCandle[] = [];
+  const intervalMs = getTimeframeMs(tf);
+  let currentPrice = entryPrice;
+  let currentTime = getCandleStartTime(entryTime, tf).getTime() - intervalMs;
+
+  for (let i = 0; i < count; i++) {
+    // Random walk con volatilidad realista para XAUUSD
+    const volatility = 0.5 + Math.random() * 1.5; // $0.5-$2 por vela
+    const trend = (Math.random() - 0.5) * 0.3;
+    const open = currentPrice;
+    const close = open + trend + (Math.random() - 0.5) * volatility;
+    const high = Math.max(open, close) + Math.random() * volatility * 0.5;
+    const low = Math.min(open, close) - Math.random() * volatility * 0.5;
+
+    candles.unshift({
+      time: Math.floor(currentTime / 1000) as Time,
+      open,
+      high,
+      low,
+      close,
+    });
+
+    currentPrice = close;
+    currentTime -= intervalMs;
+  }
+
+  return candles;
+}
+
+// Agregar ticks a velas OHLC
+function aggregateTicksToCandles(ticks: Tick[], tf: Timeframe): OHLCCandle[] {
+  if (ticks.length === 0) return [];
+
+  const candleMap = new Map<number, OHLCCandle>();
+
+  ticks.forEach((tick) => {
+    const price = getMidPrice(tick);
+    const candleStart = getCandleStartTime(new Date(tick.timestamp), tf);
+    const timeKey = Math.floor(candleStart.getTime() / 1000);
+
+    const existing = candleMap.get(timeKey);
+    if (existing) {
+      existing.high = Math.max(existing.high, price);
+      existing.low = Math.min(existing.low, price);
+      existing.close = price;
+    } else {
+      candleMap.set(timeKey, {
+        time: timeKey as Time,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+      });
+    }
+  });
+
+  return Array.from(candleMap.values()).sort((a, b) => (a.time as number) - (b.time as number));
+}
+
+// Generar ticks sintéticos
+function generateSyntheticTicks(
+  entryPrice: number,
+  exitPrice: number,
+  entryTime: Date,
+  exitTime: Date
+): Tick[] {
+  const entryTimeMs = entryTime.getTime();
+  const exitTimeMs = exitTime.getTime();
+  const durationMs = exitTimeMs - entryTimeMs;
+
+  if (durationMs <= 0) return [];
+
+  const avgTickInterval = 300;
+  const numTicks = Math.max(100, Math.ceil(durationMs / avgTickInterval));
+  const result: Tick[] = [];
+  const priceDiff = exitPrice - entryPrice;
+  const baseSpread = 0.02;
+
+  let currentPrice = entryPrice;
+  let lastTime = entryTimeMs;
+
+  for (let i = 0; i < numTicks; i++) {
+    const progress = numTicks > 1 ? i / (numTicks - 1) : 0;
+    const targetPrice = entryPrice + priceDiff * progress;
+    const trend = (targetPrice - currentPrice) * 0.1;
+    const noise = (Math.random() - 0.5) * 0.05;
+    currentPrice += trend + noise;
+
+    const spread = baseSpread + (Math.random() - 0.5) * 0.01;
+    lastTime += avgTickInterval + (Math.random() - 0.5) * 200;
+
+    result.push({
+      timestamp: new Date(lastTime),
+      bid: currentPrice,
+      ask: currentPrice + spread,
+      spread,
+    });
+  }
+
+  return result;
+}
 
 // ==================== COMPONENTE LEVELS STATUS ====================
 
@@ -87,31 +199,30 @@ function LevelsStatus({
   pipValue: number;
   levelColors: string[];
 }) {
-  const currentTimeMs = currentTick
-    ? new Date(currentTick.timestamp).getTime()
-    : Date.now();
+  const currentTimeMs = currentTick ? new Date(currentTick.timestamp).getTime() : Date.now();
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
       {levels.map((level) => {
-        // Si no hay openTime, asumimos que el nivel abre al inicio (level 0)
-        // Para niveles > 0, si no hay openTime, usar la fecha de entrada como base
         const entryTimeMs = levels[0]?.openTime ? new Date(levels[0].openTime).getTime() : 0;
         const openTimeMs = level.openTime
           ? new Date(level.openTime).getTime()
-          : (level.level === 0 ? entryTimeMs : Infinity);
+          : level.level === 0 ? entryTimeMs : Infinity;
         const closeTimeMs = level.closeTime ? new Date(level.closeTime).getTime() : Infinity;
 
         const isOpened = currentTimeMs >= openTimeMs && !isNaN(openTimeMs);
-        const isClosed = (currentTimeMs >= closeTimeMs && closeTimeMs !== Infinity) ||
-                         (level.closePrice != null && level.closePrice !== 0);
+        const isClosed =
+          (currentTimeMs >= closeTimeMs && closeTimeMs !== Infinity) ||
+          (level.closePrice != null && level.closePrice !== 0);
         const isPending = !isOpened && !isClosed;
 
-        const levelColor = level.level === 0
-          ? (isBuy ? "#00c853" : "#ff1744")
-          : levelColors[(level.level - 1) % levelColors.length];
+        const levelColor =
+          level.level === 0
+            ? isBuy
+              ? "#00c853"
+              : "#ff1744"
+            : levelColors[(level.level - 1) % levelColors.length];
 
-        // Calcular pips ganados si está cerrado
         let pipsGained = 0;
         if (isClosed && level.closePrice) {
           pipsGained = isBuy
@@ -132,32 +243,24 @@ function LevelsStatus({
             style={{ borderColor: isClosed || isPending ? undefined : levelColor }}
           >
             <div className="flex items-center justify-between mb-1">
-              <span
-                className="font-bold"
-                style={{ color: levelColor }}
-              >
+              <span className="font-bold" style={{ color: levelColor }}>
                 {level.level === 0 ? "ENTRY" : `L${level.level}`}
               </span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] ${
-                isPending
-                  ? "bg-gray-700 text-gray-400"
-                  : isClosed
-                  ? "bg-green-900/50 text-green-400"
-                  : "bg-blue-900/50 text-blue-400 animate-pulse"
-              }`}>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] ${
+                  isPending
+                    ? "bg-gray-700 text-gray-400"
+                    : isClosed
+                    ? "bg-green-900/50 text-green-400"
+                    : "bg-blue-900/50 text-blue-400 animate-pulse"
+                }`}
+              >
                 {isPending ? "PENDIENTE" : isClosed ? "CERRADO" : "ACTIVO"}
               </span>
             </div>
             <div className="font-mono text-gray-300">{level.openPrice.toFixed(2)}</div>
             {isClosed && (
-              <div className="text-green-400 font-mono mt-1">
-                +{pipsGained.toFixed(1)} pips
-              </div>
-            )}
-            {!isPending && !isClosed && (
-              <div className="text-gray-500 text-[10px] mt-1">
-                Esperando TP...
-              </div>
+              <div className="text-green-400 font-mono mt-1">+{pipsGained.toFixed(1)} pips</div>
             )}
           </div>
         );
@@ -168,7 +271,6 @@ function LevelsStatus({
 
 // ==================== COMPONENTE PRINCIPAL ====================
 
-// Función helper para validar trade
 function isValidTrade(trade: TradeDetail | null): trade is TradeDetail {
   if (!trade) return false;
   if (trade.entryPrice == null || isNaN(trade.entryPrice)) return false;
@@ -196,367 +298,236 @@ export default function SimpleCandleChart({
   hasRealTicks?: boolean;
   themeId?: string;
 }) {
-  // Obtener colores del tema seleccionado
   const colors = getThemeColors(themeId);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
-  // Estado del timeframe y reproducción
-  const [timeframe, setTimeframe] = useState<Timeframe>("5");
+  const [timeframe, setTimeframe] = useState<Timeframe>("1");
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(10);
   const [progress, setProgress] = useState(0);
   const [currentTickIndex, setCurrentTickIndex] = useState(0);
-
-  // Estado del gráfico
-  const [candles, setCandles] = useState<Candle[]>([]);
   const [allTicks, setAllTicks] = useState<Tick[]>([]);
-  const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [currentTick, setCurrentTick] = useState<Tick | null>(null);
-
-  // Estado del tooltip
-  const [hoveredCandle, setHoveredCandle] = useState<Candle | null>(null);
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
-
-  // Estado de la posición y cuenta (estilo MT5)
-  const [position, setPosition] = useState<OpenPosition | null>(null);
-  const [account, setAccount] = useState<AccountState>({
-    balance: 10000,      // Capital inicial
-    equity: 10000,
-    floatingPL: 0,
-    usedMargin: 0,
-    freeMargin: 10000,
-    marginLevel: 0,
-    realizedPL: 0,
-  });
+  const [displayedCandles, setDisplayedCandles] = useState<OHLCCandle[]>([]);
+  const [historyCandles, setHistoryCandles] = useState<OHLCCandle[]>([]);
 
   const speedOptions = [1, 2, 5, 10, 20, 50, 100];
 
-  // ==================== FUNCIONES AUXILIARES ====================
+  // ==================== INICIALIZACIÓN DEL CHART ====================
 
-  // Obtener precio mid de un tick
-  const getMidPrice = useCallback((tick: Tick) => {
-    return (tick.bid + tick.ask) / 2;
-  }, []);
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
 
-  // Obtener precio de ejecución (bid para sell, ask para buy)
-  const getExecutionPrice = useCallback((tick: Tick, side: "BUY" | "SELL") => {
-    return side === "BUY" ? tick.ask : tick.bid;
-  }, []);
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: colors.background },
+        textColor: colors.text,
+      },
+      grid: {
+        vertLines: { color: colors.grid, style: 1 },
+        horzLines: { color: colors.grid, style: 1 },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          color: colors.text + "50",
+          width: 1,
+          style: 2,
+        },
+        horzLine: {
+          color: colors.text + "50",
+          width: 1,
+          style: 2,
+        },
+      },
+      rightPriceScale: {
+        borderColor: colors.grid,
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.1,
+        },
+      },
+      timeScale: {
+        borderColor: colors.grid,
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: true,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true,
+      },
+    });
 
-  // Obtener timestamp de inicio de vela para un tick
-  const getCandleStartTime = useCallback((tick: Tick, tf: Timeframe): Date => {
-    const intervalMs = parseInt(tf) * 60 * 1000;
-    const tickTime = new Date(tick.timestamp).getTime();
-    return new Date(Math.floor(tickTime / intervalMs) * intervalMs);
-  }, []);
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: colors.candleUp,
+      downColor: colors.candleDown,
+      borderUpColor: colors.candleUp,
+      borderDownColor: colors.candleDown,
+      wickUpColor: colors.wickUp,
+      wickDownColor: colors.wickDown,
+    });
 
-  // Calcular P/L flotante
-  const calculateFloatingPL = useCallback((
-    pos: OpenPosition | null,
-    currentTickPrice: number
-  ): number => {
-    if (!pos) return 0;
+    chartRef.current = chart;
+    candleSeriesRef.current = candleSeries;
 
-    const priceDiff = pos.side === "BUY"
-      ? currentTickPrice - pos.entryPrice
-      : pos.entryPrice - currentTickPrice;
+    // Responsive
+    const handleResize = () => {
+      if (chartContainerRef.current) {
+        chart.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight,
+        });
+      }
+    };
 
-    const pips = priceDiff / PIP_VALUE;
-    return pips * LOT_VALUE * pos.volume;
-  }, []);
+    window.addEventListener("resize", handleResize);
+    handleResize();
 
-  // Calcular margen requerido
-  const calculateRequiredMargin = useCallback((pos: OpenPosition | null): number => {
-    if (!pos) return 0;
-    // Margen = (Volumen * Precio) / Apalancamiento
-    return (pos.volume * pos.entryPrice * 100) / LEVERAGE;
-  }, []);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      chart.remove();
+    };
+  }, [colors]);
 
   // ==================== CARGA DE TICKS ====================
 
   useEffect(() => {
     if (!trade) {
       setAllTicks([]);
-      setCandles([]);
-      setPosition(null);
-      positionClosedRef.current = false; // Resetear flag
-      setAccount({
-        balance: 10000,
-        equity: 10000,
-        floatingPL: 0,
-        usedMargin: 0,
-        freeMargin: 10000,
-        marginLevel: 0,
-        realizedPL: 0,
-      });
+      setDisplayedCandles([]);
+      setHistoryCandles([]);
+      setCurrentTickIndex(0);
+      setProgress(0);
+      setIsPlaying(false);
+      setCurrentTick(null);
       return;
     }
 
     try {
+      let loadedTicks: Tick[] = [];
       if (ticks && ticks.length > 0) {
-        setAllTicks(ticks);
-      } else if (trade.entryPrice != null && trade.exitPrice != null && trade.entryTime && trade.exitTime) {
-        const syntheticTicks = generateSyntheticTicks(
+        loadedTicks = ticks;
+      } else if (trade.entryPrice != null && trade.exitPrice != null) {
+        loadedTicks = generateSyntheticTicks(
           trade.entryPrice,
           trade.exitPrice,
           new Date(trade.entryTime),
           new Date(trade.exitTime)
         );
-        setAllTicks(syntheticTicks);
-      } else {
-        setAllTicks([]);
       }
+      setAllTicks(loadedTicks);
 
-      // Reset
-      setCandles([]);
+      // Generar velas históricas antes del trade
+      const history = generateHistoryCandles(
+        trade.entryPrice,
+        new Date(trade.entryTime),
+        75, // 75 velas de historia
+        timeframe
+      );
+      setHistoryCandles(history);
+      setDisplayedCandles(history);
+
       setCurrentTickIndex(0);
       setProgress(0);
       setIsPlaying(false);
-      setCurrentPrice(null);
       setCurrentTick(null);
-      setPosition(null);
-      positionClosedRef.current = false; // Resetear flag
-      setAccount({
-        balance: 10000,
-        equity: 10000,
-        floatingPL: 0,
-        usedMargin: 0,
-        freeMargin: 10000,
-        marginLevel: 0,
-        realizedPL: 0,
-      });
     } catch (error) {
       console.error("Error loading ticks:", error);
       setAllTicks([]);
-      setCandles([]);
     }
-  }, [trade, ticks]);
+  }, [trade, ticks, timeframe]);
 
-  // Generar ticks sintéticos realistas
-  const generateSyntheticTicks = useCallback((
-    entryPrice: number,
-    exitPrice: number,
-    entryTime: Date,
-    exitTime: Date
-  ): Tick[] => {
-    // Validar datos de entrada
-    if (entryPrice == null || exitPrice == null || isNaN(entryPrice) || isNaN(exitPrice)) {
-      return [];
+  // ==================== ACTUALIZAR CHART ====================
+
+  useEffect(() => {
+    if (!candleSeriesRef.current || displayedCandles.length === 0) return;
+
+    candleSeriesRef.current.setData(displayedCandles as CandlestickData<Time>[]);
+
+    // Ajustar vista visible
+    if (chartRef.current) {
+      chartRef.current.timeScale().fitContent();
     }
+  }, [displayedCandles]);
 
-    const entryTimeMs = entryTime instanceof Date ? entryTime.getTime() : new Date(entryTime).getTime();
-    const exitTimeMs = exitTime instanceof Date ? exitTime.getTime() : new Date(exitTime).getTime();
+  // ==================== PRICE LINES (TP, SL, ENTRY, LEVELS) ====================
 
-    if (isNaN(entryTimeMs) || isNaN(exitTimeMs)) {
-      return [];
-    }
+  useEffect(() => {
+    if (!candleSeriesRef.current || !trade) return;
 
-    const durationMs = exitTimeMs - entryTimeMs;
-    if (durationMs <= 0) {
-      return [];
-    }
+    // Limpiar price lines existentes
+    // lightweight-charts no tiene un método clearPriceLines, necesitamos recrear la serie
+    // En su lugar, creamos el chart con las líneas
 
-    // En XAUUSD, los ticks llegan aproximadamente cada 100-500ms en mercado activo
-    const avgTickInterval = 300; // 300ms promedio
-    const numTicks = Math.max(100, Math.ceil(durationMs / avgTickInterval));
-    const result: Tick[] = [];
-    const priceDiff = exitPrice - entryPrice;
-    const baseSpread = 0.02;
+    const series = candleSeriesRef.current;
+    const isBuy = trade.signalSide === "BUY";
 
-    let currentPrice = entryPrice;
-    let lastTime = entryTimeMs;
+    // Entry line
+    series.createPriceLine({
+      price: trade.entryPrice,
+      color: colors.entryLine,
+      lineWidth: 2,
+      lineStyle: 2, // Dashed
+      axisLabelVisible: true,
+      title: "Entry",
+    });
 
-    for (let i = 0; i < numTicks; i++) {
-      const progress = numTicks > 1 ? i / (numTicks - 1) : 0;
-      const targetPrice = entryPrice + priceDiff * progress;
+    // Take Profit line
+    const tpPrice = isBuy
+      ? trade.entryPrice + config.takeProfitPips * PIP_VALUE
+      : trade.entryPrice - config.takeProfitPips * PIP_VALUE;
+    series.createPriceLine({
+      price: tpPrice,
+      color: colors.tpLine,
+      lineWidth: 2,
+      lineStyle: 2,
+      axisLabelVisible: true,
+      title: "TP",
+    });
 
-      // Random walk con tendencia hacia el precio objetivo
-      const trend = (targetPrice - currentPrice) * 0.1;
-      const noise = (Math.random() - 0.5) * 0.05;
-      currentPrice += trend + noise;
+    // Stop Loss line (50 pips)
+    const slPrice = isBuy
+      ? trade.entryPrice - 50 * PIP_VALUE
+      : trade.entryPrice + 50 * PIP_VALUE;
+    series.createPriceLine({
+      price: slPrice,
+      color: colors.slLine,
+      lineWidth: 2,
+      lineStyle: 2,
+      axisLabelVisible: true,
+      title: "SL",
+    });
 
-      // Spread variable
-      const spread = baseSpread + (Math.random() - 0.5) * 0.01;
-
-      // Timestamp con intervalo variable
-      const tickInterval = avgTickInterval + (Math.random() - 0.5) * 200;
-      lastTime += tickInterval;
-
-      result.push({
-        timestamp: new Date(lastTime),
-        bid: currentPrice,
-        ask: currentPrice + spread,
-        spread,
+    // Grid levels
+    if (trade.levels) {
+      trade.levels.forEach((level) => {
+        if (level.level > 0) {
+          const levelColor = colors.levelColors[(level.level - 1) % colors.levelColors.length];
+          series.createPriceLine({
+            price: level.openPrice,
+            color: levelColor,
+            lineWidth: 1,
+            lineStyle: 3, // Dotted
+            axisLabelVisible: false,
+            title: `L${level.level}`,
+          });
+        }
       });
     }
 
-    return result;
-  }, []);
-
-  // ==================== PROCESAMIENTO DE TICKS (ESTILO MT5) ====================
-
-  // Procesar un tick y actualizar velas
-  const processTick = useCallback((
-    tick: Tick,
-    currentCandles: Candle[],
-    tf: Timeframe
-  ): Candle[] => {
-    const price = getMidPrice(tick);
-    const candleStart = getCandleStartTime(tick, tf);
-    const intervalMs = parseInt(tf) * 60 * 1000;
-    const candleEnd = new Date(candleStart.getTime() + intervalMs);
-
-    if (currentCandles.length === 0) {
-      // Primer tick: crear primera vela
-      return [{
-        time: Math.floor(candleStart.getTime() / 1000),
-        open: price,
-        high: price,
-        low: price,
-        close: price,
-        startTime: candleStart,
-        endTime: candleEnd,
-      }];
-    }
-
-    const lastCandle = currentCandles[currentCandles.length - 1];
-
-    // Verificar si el tick pertenece a la vela actual
-    if (lastCandle.startTime.getTime() === candleStart.getTime()) {
-      // Tick dentro de la vela actual: actualizar OHLC
-      return [
-        ...currentCandles.slice(0, -1),
-        {
-          ...lastCandle,
-          high: Math.max(lastCandle.high, price),
-          low: Math.min(lastCandle.low, price),
-          close: price, // Close siempre es el último precio
-        },
-      ];
-    } else {
-      // Tick de una nueva vela: crear nueva
-      return [
-        ...currentCandles,
-        {
-          time: Math.floor(candleStart.getTime() / 1000),
-          open: price,
-          high: price,
-          low: price,
-          close: price,
-          startTime: candleStart,
-          endTime: candleEnd,
-        },
-      ];
-    }
-  }, [getMidPrice, getCandleStartTime]);
-
-  // ==================== SIMULACIÓN DE TRADING ====================
-
-  // Abrir posición cuando llega el momento de entrada
-  useEffect(() => {
-    if (!trade || !currentTick || position) return;
-
-    try {
-      const tickTime = new Date(currentTick.timestamp).getTime();
-      const entryTime = new Date(trade.entryTime).getTime();
-
-      // Si llegamos al momento de entrada, abrir posición
-      if (tickTime >= entryTime && !position) {
-        const entryPrice = getExecutionPrice(currentTick, trade.signalSide);
-
-        // Calcular volúmen total basado en los niveles
-        const totalVolume = (config.maxLevels || 1) * 0.1; // 0.1 lote por nivel
-
-        setPosition({
-          side: trade.signalSide,
-          entryPrice,
-          entryTime: new Date(currentTick.timestamp),
-          volume: totalVolume,
-          stopLoss: trade.signalSide === "BUY"
-            ? entryPrice - 50 * PIP_VALUE // SL 50 pips
-            : entryPrice + 50 * PIP_VALUE,
-          takeProfit: trade.signalSide === "BUY"
-            ? entryPrice + (config.takeProfitPips || 20) * PIP_VALUE
-            : entryPrice - (config.takeProfitPips || 20) * PIP_VALUE,
-        });
-      }
-    } catch (error) {
-      console.error("Error opening position:", error);
-    }
-  }, [currentTick, trade, position, config, getExecutionPrice]);
-
-  // Cerrar posición cuando llega el momento de salida
-  // Usar ref para prevenir cierres duplicados
-  const positionClosedRef = useRef(false);
-
-  useEffect(() => {
-    if (!trade || !currentTick || !position || positionClosedRef.current) return;
-
-    try {
-      const tickTime = new Date(currentTick.timestamp).getTime();
-      const exitTime = trade.exitTime ? new Date(trade.exitTime).getTime() : Date.now();
-
-      if (tickTime >= exitTime && position) {
-        // Marcar como cerrado para prevenir duplicados
-        positionClosedRef.current = true;
-
-        const exitPrice = getExecutionPrice(currentTick, position.side === "BUY" ? "SELL" : "BUY");
-
-        // Calcular P/L realizado
-        const priceDiff = position.side === "BUY"
-          ? exitPrice - position.entryPrice
-          : position.entryPrice - exitPrice;
-
-        const pips = priceDiff / PIP_VALUE;
-        const realizedPL = pips * LOT_VALUE * position.volume;
-
-        setAccount(prev => {
-          const newBalance = prev.balance + realizedPL;
-          return {
-            ...prev,
-            balance: newBalance,
-            equity: newBalance,
-            floatingPL: 0,
-            usedMargin: 0,
-            freeMargin: newBalance,
-            marginLevel: 0,
-            realizedPL: prev.realizedPL + realizedPL,
-          };
-        });
-
-        setPosition(null);
-        // Detener la reproducción cuando se cierra la posición
-        setIsPlaying(false);
-      }
-    } catch (error) {
-      console.error("Error closing position:", error);
-    }
-  }, [currentTick, trade, position, getExecutionPrice]);
-
-  // Actualizar P/L flotante en cada tick
-  useEffect(() => {
-    if (!position || currentPrice === null) return;
-
-    const floatingPL = calculateFloatingPL(position, currentPrice);
-    const usedMargin = calculateRequiredMargin(position);
-
-    setAccount(prev => {
-      const equity = prev.balance + floatingPL;
-      const freeMargin = equity - usedMargin;
-      const marginLevel = usedMargin > 0 ? (equity / usedMargin) * 100 : 0;
-
-      return {
-        ...prev,
-        equity,
-        floatingPL,
-        usedMargin,
-        freeMargin,
-        marginLevel,
-      };
-    });
-  }, [currentPrice, position, calculateFloatingPL, calculateRequiredMargin]);
+    // Cleanup no es straightforward en lightweight-charts
+    // Las líneas persisten hasta que se destruye el chart
+  }, [trade, config, colors]);
 
   // ==================== REPRODUCCIÓN ANIMADA ====================
 
@@ -565,6 +536,7 @@ export default function SimpleCandleChart({
 
     const intervalMs = Math.max(5, 100 / speed);
     let idx = currentTickIndex;
+    let currentCandles = [...historyCandles];
 
     const interval = setInterval(() => {
       if (idx >= allTicks.length) {
@@ -575,12 +547,28 @@ export default function SimpleCandleChart({
 
       const tick = allTicks[idx];
       const price = getMidPrice(tick);
+      const candleStart = getCandleStartTime(new Date(tick.timestamp), timeframe);
+      const timeKey = Math.floor(candleStart.getTime() / 1000);
 
-      // Actualizar velas
-      setCandles(prev => processTick(tick, prev, timeframe));
+      // Actualizar o crear vela
+      const lastCandle = currentCandles[currentCandles.length - 1];
+      if (lastCandle && (lastCandle.time as number) === timeKey) {
+        // Actualizar vela existente
+        lastCandle.high = Math.max(lastCandle.high, price);
+        lastCandle.low = Math.min(lastCandle.low, price);
+        lastCandle.close = price;
+      } else {
+        // Crear nueva vela
+        currentCandles.push({
+          time: timeKey as Time,
+          open: price,
+          high: price,
+          low: price,
+          close: price,
+        });
+      }
 
-      // Actualizar estado actual
-      setCurrentPrice(price);
+      setDisplayedCandles([...currentCandles]);
       setCurrentTick(tick);
       setProgress(((idx + 1) / allTicks.length) * 100);
       setCurrentTickIndex(idx);
@@ -588,7 +576,7 @@ export default function SimpleCandleChart({
     }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [isPlaying, speed, allTicks, currentTickIndex, timeframe, getMidPrice, processTick]);
+  }, [isPlaying, speed, allTicks, currentTickIndex, timeframe, historyCandles]);
 
   // ==================== CONTROLES ====================
 
@@ -596,489 +584,28 @@ export default function SimpleCandleChart({
     setIsPlaying(false);
     setCurrentTickIndex(0);
     setProgress(0);
-    setCurrentPrice(null);
     setCurrentTick(null);
-    setCandles([]);
-    setPosition(null);
-    positionClosedRef.current = false; // Resetear flag de cierre
-    setAccount({
-      balance: 10000,
-      equity: 10000,
-      floatingPL: 0,
-      usedMargin: 0,
-      freeMargin: 10000,
-      marginLevel: 0,
-      realizedPL: 0,
-    });
-  }, []);
+    setDisplayedCandles(historyCandles);
+  }, [historyCandles]);
 
-  // ==================== RENDERIZADO DEL GRÁFICO ====================
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-
-    try {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      // Configurar tamaño
-      const dpr = window.devicePixelRatio || 1;
-      const rect = container.getBoundingClientRect();
-
-      if (rect.width === 0) return; // Evitar renderizado con width 0
-
-      canvas.width = rect.width * dpr;
-      canvas.height = 400 * dpr;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = "400px";
-      ctx.scale(dpr, dpr);
-
-      const width = rect.width;
-      const height = 400;
-      const padding = { top: 20, right: 70, bottom: 30, left: 10 };
-      const chartWidth = width - padding.left - padding.right;
-      const chartHeight = height - padding.top - padding.bottom;
-
-      // Limpiar
-      ctx.fillStyle = colors.background;
-      ctx.fillRect(0, 0, width, height);
-
-      // Si no hay velas
-      if (!candles || candles.length === 0) {
-        ctx.fillStyle = colors.text;
-        ctx.font = "14px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("Presiona Play para iniciar la simulación", width / 2, height / 2);
-        return;
-      }
-
-      // Calcular rango de precios
-      let minPrice = Math.min(...candles.map(c => c.low));
-      let maxPrice = Math.max(...candles.map(c => c.high));
-
-      // Incluir niveles del trade (con null checks)
-      if (trade && trade.entryPrice != null && trade.exitPrice != null) {
-        minPrice = Math.min(minPrice, trade.entryPrice, trade.exitPrice);
-        maxPrice = Math.max(maxPrice, trade.entryPrice, trade.exitPrice);
-
-        const isBuy = trade.signalSide === "BUY";
-        const takeProfitPips = config?.takeProfitPips || 20;
-        const tpPrice = isBuy
-          ? trade.entryPrice + takeProfitPips * PIP_VALUE
-          : trade.entryPrice - takeProfitPips * PIP_VALUE;
-        minPrice = Math.min(minPrice, tpPrice);
-        maxPrice = Math.max(maxPrice, tpPrice);
-
-        if (position?.stopLoss) {
-          minPrice = Math.min(minPrice, position.stopLoss);
-          maxPrice = Math.max(maxPrice, position.stopLoss);
-        }
-      }
-
-    // Margen
-    const priceRange = maxPrice - minPrice || 1;
-    minPrice -= priceRange * 0.08;
-    maxPrice += priceRange * 0.08;
-
-    const priceToY = (price: number) =>
-      padding.top + chartHeight - ((price - minPrice) / (maxPrice - minPrice)) * chartHeight;
-
-    // Grid horizontal
-    ctx.strokeStyle = colors.grid;
-    ctx.lineWidth = 0.5;
-    const priceStep = (maxPrice - minPrice) / 6;
-    for (let i = 0; i <= 6; i++) {
-      const price = minPrice + priceStep * i;
-      const y = priceToY(price);
-      ctx.beginPath();
-      ctx.moveTo(padding.left, y);
-      ctx.lineTo(width - padding.right, y);
-      ctx.stroke();
-
-      ctx.fillStyle = colors.text;
-      ctx.font = "10px monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(price.toFixed(2), width - padding.right + 5, y + 4);
-    }
-
-    // Líneas de niveles del trade
-    if (trade && candles.length > 0) {
-      const isBuy = trade.signalSide === "BUY";
-
-      // Entry (Level 0)
-      const entryY = priceToY(trade.entryPrice);
-      ctx.strokeStyle = colors.entryLine;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(padding.left, entryY);
-      ctx.lineTo(width - padding.right, entryY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = colors.entryLine;
-      ctx.font = "bold 10px sans-serif";
-      ctx.fillText(`L0 Entry: ${trade.entryPrice.toFixed(2)}`, padding.left + 5, entryY - 5);
-
-      // ============== NIVELES DE PROMEDIO (GRID) - PROGRESIVO ==============
-      if (trade.levels && trade.levels.length > 0) {
-        const gridDistance = (config?.pipsDistance ?? 10) * PIP_VALUE;
-        const currentTimeMs = currentTick
-          ? new Date(currentTick.timestamp).getTime()
-          : Date.now();
-
-        // Usar el tiempo del nivel 0 como referencia si no hay openTime
-        const entryTimeMs = trade.levels[0]?.openTime
-          ? new Date(trade.levels[0].openTime).getTime()
-          : 0;
-
-        trade.levels.forEach((level) => {
-          // Solo dibujar niveles de promedio (level > 0)
-          if (level.level === 0) return;
-
-          const openTimeMs = level.openTime
-            ? new Date(level.openTime).getTime()
-            : (level.level === 0 ? entryTimeMs : Infinity);
-          const closeTimeMs = level.closeTime ? new Date(level.closeTime).getTime() : Infinity;
-
-          // Solo mostrar si el nivel ya se ha abierto según el tiempo actual
-          const isOpened = currentTimeMs >= openTimeMs && !isNaN(openTimeMs);
-          const isClosed = (currentTimeMs >= closeTimeMs && closeTimeMs !== Infinity) ||
-                           (level.closePrice != null && level.closePrice !== 0);
-
-          if (!isOpened && !isClosed) return;
-          const levelColor = colors.levelColors[(level.level - 1) % colors.levelColors.length];
-
-          const levelY = priceToY(level.openPrice);
-
-          // Línea del nivel
-          ctx.strokeStyle = isClosed ? `${levelColor}60` : levelColor;
-          ctx.lineWidth = isClosed ? 1 : 2;
-          ctx.setLineDash(isClosed ? [3, 3] : []);
-          ctx.beginPath();
-          ctx.moveTo(padding.left, levelY);
-          ctx.lineTo(width - padding.right, levelY);
-          ctx.stroke();
-          ctx.setLineDash([]);
-
-          // Etiqueta del nivel con precio y estado
-          ctx.fillStyle = isClosed ? `${levelColor}80` : levelColor;
-          ctx.font = `${isClosed ? 'normal' : 'bold'} 10px sans-serif`;
-
-          let label: string;
-          if (isClosed && level.closePrice) {
-            // Calcular pips ganados en este nivel
-            const pipsGained = isBuy
-              ? (level.closePrice - level.openPrice) / PIP_VALUE
-              : (level.openPrice - level.closePrice) / PIP_VALUE;
-            label = `L${level.level}: +${pipsGained.toFixed(1)} pips`;
-          } else {
-            label = `L${level.level} @ ${level.openPrice.toFixed(2)}`;
-          }
-          ctx.fillText(label, padding.left + 5, levelY + (isBuy ? 12 : -3));
-
-          // Flecha indicadora de nivel activo
-          if (!isClosed) {
-            const arrowX = padding.left + 15;
-            ctx.beginPath();
-            if (isBuy) {
-              ctx.moveTo(arrowX, levelY - 8);
-              ctx.lineTo(arrowX - 5, levelY - 3);
-              ctx.lineTo(arrowX + 5, levelY - 3);
-            } else {
-              ctx.moveTo(arrowX, levelY + 8);
-              ctx.lineTo(arrowX - 5, levelY + 3);
-              ctx.lineTo(arrowX + 5, levelY + 3);
-            }
-            ctx.closePath();
-            ctx.fill();
-
-            // Círculo pulsante para nivel activo
-            const pulseRadius = 4 + Math.sin(Date.now() / 200) * 1.5;
-            ctx.beginPath();
-            ctx.arc(padding.left + 25, levelY, pulseRadius, 0, Math.PI * 2);
-            ctx.fillStyle = `${levelColor}40`;
-            ctx.fill();
-            ctx.strokeStyle = levelColor;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-          }
-
-          // Marca de cierre si está cerrado
-          if (isClosed && level.closePrice) {
-            const closeY = priceToY(level.closePrice);
-            ctx.fillStyle = levelColor;
-            ctx.font = "bold 8px sans-serif";
-            ctx.fillText(`×`, width - padding.right - 10, closeY + 3);
-          }
-        });
-      }
-
-      // TP
-      const takeProfitPips = config?.takeProfitPips ?? 20;
-      const tpPrice = isBuy
-        ? trade.entryPrice + takeProfitPips * PIP_VALUE
-        : trade.entryPrice - takeProfitPips * PIP_VALUE;
-      const tpY = priceToY(tpPrice);
-      ctx.strokeStyle = colors.tpLine;
-      ctx.setLineDash([3, 3]);
-      ctx.beginPath();
-      ctx.moveTo(padding.left, tpY);
-      ctx.lineTo(width - padding.right, tpY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = colors.tpLine;
-      ctx.fillText(`TP: ${tpPrice.toFixed(2)}`, padding.left + 5, tpY - 5);
-
-      // SL (si hay posición)
-      if (position?.stopLoss) {
-        const slY = priceToY(position.stopLoss);
-        ctx.strokeStyle = colors.slLine;
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath();
-        ctx.moveTo(padding.left, slY);
-        ctx.lineTo(width - padding.right, slY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = colors.slLine;
-        ctx.fillText(`SL: ${position.stopLoss.toFixed(2)}`, padding.left + 5, slY + 12);
-      }
-    }
-
-    // Dibujar velas
-    const candleWidth = Math.max(3, Math.min(25, chartWidth / Math.max(candles.length, 1) * 0.8));
-    const bodyWidth = candleWidth * 0.7;
-
-    candles.forEach((candle, i) => {
-      const x = padding.left + (i + 0.5) * (chartWidth / candles.length);
-      const isUp = candle.close >= candle.open;
-
-      // Mecha
-      ctx.strokeStyle = isUp ? colors.wickUp : colors.wickDown;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x, priceToY(candle.high));
-      ctx.lineTo(x, priceToY(candle.low));
-      ctx.stroke();
-
-      // Cuerpo
-      const bodyTop = priceToY(Math.max(candle.open, candle.close));
-      const bodyBottom = priceToY(Math.min(candle.open, candle.close));
-      const bodyHeight = Math.max(1, bodyBottom - bodyTop);
-
-      ctx.fillStyle = isUp ? colors.candleUp : colors.candleDown;
-      ctx.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
-
-      // Indicador en vela actual (última)
-      if (i === candles.length - 1) {
-        ctx.strokeStyle = colors.currentPrice;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x - bodyWidth / 2 - 2, bodyTop - 2, bodyWidth + 4, bodyHeight + 4);
-      }
-    });
-
-    // Flecha de entrada
-    if (trade && candles.length > 0) {
-      const isBuy = trade.signalSide === "BUY";
-      const x = padding.left + 0.5 * (chartWidth / candles.length);
-      const y = priceToY(trade.entryPrice);
-
-      ctx.fillStyle = isBuy ? colors.candleUp : colors.candleDown;
-      ctx.beginPath();
-
-      if (isBuy) {
-        ctx.moveTo(x, y + 12);
-        ctx.lineTo(x - 8, y + 22);
-        ctx.lineTo(x + 8, y + 22);
-      } else {
-        ctx.moveTo(x, y - 12);
-        ctx.lineTo(x - 8, y - 22);
-        ctx.lineTo(x + 8, y - 22);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.font = "bold 10px sans-serif";
-      ctx.fillText(isBuy ? "BUY" : "SELL", x + 12, isBuy ? y + 18 : y - 15);
-    }
-
-    // Marcador de cierre del trade
-    if (trade && candles.length > 0) {
-      const isBuy = trade.signalSide === "BUY";
-      const lastCandleIndex = candles.length - 1;
-      const exitX = padding.left + (lastCandleIndex + 0.5) * (chartWidth / candles.length);
-      const exitY = priceToY(trade.exitPrice);
-
-      // Color según razón de cierre
-      const exitColor =
-        trade.exitReason === "TAKE_PROFIT" ? "#22c55e" :
-        trade.exitReason === "TRAILING_SL" ? "#eab308" : "#ef4444";
-
-      // Círculo de cierre
-      ctx.beginPath();
-      ctx.arc(exitX, exitY, 8, 0, Math.PI * 2);
-      ctx.fillStyle = exitColor;
-      ctx.fill();
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // X dentro del círculo
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(exitX - 3, exitY - 3);
-      ctx.lineTo(exitX + 3, exitY + 3);
-      ctx.moveTo(exitX + 3, exitY - 3);
-      ctx.lineTo(exitX - 3, exitY + 3);
-      ctx.stroke();
-
-      // Etiqueta de cierre
-      const label =
-        trade.exitReason === "TAKE_PROFIT" ? "TP ✓" :
-        trade.exitReason === "TRAILING_SL" ? "Trail" : "SL ✗";
-
-      ctx.fillStyle = exitColor;
-      ctx.font = "bold 10px sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(label, exitX + 12, isBuy ? exitY - 8 : exitY + 12);
-
-      // Línea conectora de entrada a salida
-      const entryX = padding.left + 0.5 * (chartWidth / candles.length);
-      const entryY = priceToY(trade.entryPrice);
-
-      ctx.strokeStyle = trade.totalProfit >= 0 ? "#22c55e50" : "#ef444450";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(entryX, entryY);
-      ctx.lineTo(exitX, exitY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Pips ganados/perdidos en el medio de la línea
-      const midX = (entryX + exitX) / 2;
-      const midY = (entryY + exitY) / 2;
-      const pipsDiff = isBuy
-        ? (trade.exitPrice - trade.entryPrice) / PIP_VALUE
-        : (trade.entryPrice - trade.exitPrice) / PIP_VALUE;
-
-      ctx.fillStyle = trade.totalProfit >= 0 ? "#22c55e" : "#ef4444";
-      ctx.font = "bold 11px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(
-        `${pipsDiff >= 0 ? "+" : ""}${pipsDiff.toFixed(1)} pips`,
-        midX,
-        midY - 8
+  const handleTimeframeChange = useCallback((tf: Timeframe) => {
+    setTimeframe(tf);
+    // Recalcular velas con nuevo timeframe
+    if (trade && allTicks.length > 0) {
+      const history = generateHistoryCandles(
+        trade.entryPrice,
+        new Date(trade.entryTime),
+        75,
+        tf
       );
+      setHistoryCandles(history);
+      setDisplayedCandles(history);
+      setCurrentTickIndex(0);
+      setProgress(0);
+      setIsPlaying(false);
+      setCurrentTick(null);
     }
-
-    // Tooltip de vela hovereada
-    if (hoveredCandle && candles.length > 0) {
-      const tooltipX = 10;
-      const tooltipY = 10;
-      const tooltipWidth = 140;
-      const tooltipHeight = 75;
-
-      // Fondo del tooltip
-      ctx.fillStyle = "#1e293b";
-      ctx.strokeStyle = "#475569";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 6);
-      ctx.fill();
-      ctx.stroke();
-
-      // Contenido del tooltip
-      ctx.fillStyle = "#e2e8f0";
-      ctx.font = "bold 11px sans-serif";
-      ctx.textAlign = "left";
-
-      const timeStr = new Date(hoveredCandle.startTime).toLocaleTimeString("es-ES", {
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-
-      ctx.fillText(`Time: ${timeStr}`, tooltipX + 8, tooltipY + 18);
-      ctx.fillStyle = "#22c55e";
-      ctx.fillText(`O: ${hoveredCandle.open.toFixed(2)}`, tooltipX + 8, tooltipY + 34);
-      ctx.fillStyle = "#ef4444";
-      ctx.fillText(`H: ${hoveredCandle.high.toFixed(2)}`, tooltipX + 70, tooltipY + 34);
-      ctx.fillStyle = "#ef4444";
-      ctx.fillText(`L: ${hoveredCandle.low.toFixed(2)}`, tooltipX + 8, tooltipY + 50);
-      ctx.fillStyle = "#22c55e";
-      ctx.fillText(`C: ${hoveredCandle.close.toFixed(2)}`, tooltipX + 70, tooltipY + 50);
-
-      // Cambio
-      const change = hoveredCandle.close - hoveredCandle.open;
-      const changeColor = change >= 0 ? "#22c55e" : "#ef4444";
-      ctx.fillStyle = changeColor;
-      ctx.fillText(`${change >= 0 ? "+" : ""}${(change / PIP_VALUE).toFixed(1)} pips`, tooltipX + 8, tooltipY + 66);
-    }
-
-    // Línea de precio actual
-    if (currentPrice !== null && candles.length > 0) {
-      const currentY = priceToY(currentPrice);
-      ctx.strokeStyle = colors.currentPrice;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([3, 3]);
-      ctx.beginPath();
-      ctx.moveTo(padding.left, currentY);
-      ctx.lineTo(width - padding.right, currentY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      ctx.fillStyle = colors.currentPrice;
-      ctx.font = "bold 11px monospace";
-      ctx.textAlign = "right";
-      ctx.fillText(currentPrice.toFixed(2), width - 5, currentY - 5);
-    }
-    } catch (error) {
-      console.error("Error rendering chart:", error);
-    }
-  }, [candles, trade, config, currentPrice, position, currentTick, hoveredCandle]);
-
-  // Resize
-  useEffect(() => {
-    const handleResize = () => setCandles(c => [...c]);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // Mouse move para tooltip
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container || candles.length === 0) {
-      setHoveredCandle(null);
-      setMousePos(null);
-      return;
-    }
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const padding = { top: 20, right: 70, bottom: 30, left: 10 };
-    const chartWidth = rect.width - padding.left - padding.right;
-
-    // Calcular qué vela está bajo el mouse
-    const candleIndex = Math.floor((x - padding.left) / (chartWidth / candles.length));
-
-    if (candleIndex >= 0 && candleIndex < candles.length) {
-      setHoveredCandle(candles[candleIndex]);
-      setMousePos({ x: e.clientX, y: e.clientY });
-    } else {
-      setHoveredCandle(null);
-      setMousePos(null);
-    }
-  }, [candles]);
-
-  const handleMouseLeave = useCallback(() => {
-    setHoveredCandle(null);
-    setMousePos(null);
-  }, []);
+  }, [trade, allTicks]);
 
   // ==================== RENDER ====================
 
@@ -1090,194 +617,211 @@ export default function SimpleCandleChart({
     );
   }
 
-  const tfLabel = { "1": "M1", "5": "M5", "15": "M15", "60": "H1" }[timeframe];
+  const isBuy = trade.signalSide === "BUY";
+  const tpPrice = isBuy
+    ? trade.entryPrice + config.takeProfitPips * PIP_VALUE
+    : trade.entryPrice - config.takeProfitPips * PIP_VALUE;
+  const slPrice = isBuy
+    ? trade.entryPrice - 50 * PIP_VALUE
+    : trade.entryPrice + 50 * PIP_VALUE;
 
   return (
     <div className="space-y-4">
-      {/* Panel de Cuenta estilo MT5 */}
-      <div className="bg-slate-800 rounded-lg p-4">
-        <div className="text-xs text-gray-400 mb-2 uppercase tracking-wider">Terminal - Cuenta</div>
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-4 text-sm">
-          <div>
-            <div className="text-gray-400 text-xs">Balance</div>
-            <div className="font-mono text-white">{account.balance.toFixed(2)} €</div>
+      {/* Header con info del trade */}
+      <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-slate-800 rounded-lg">
+        <div className="flex items-center gap-4">
+          <span
+            className={`px-3 py-1 rounded font-bold text-sm ${
+              isBuy ? "bg-green-600 text-white" : "bg-red-600 text-white"
+            }`}
+          >
+            {trade.signalSide}
+          </span>
+          <div className="text-sm">
+            <span className="text-gray-400">Entry: </span>
+            <span className="font-mono text-white">{trade.entryPrice.toFixed(2)}</span>
           </div>
-          <div>
-            <div className="text-gray-400 text-xs">Equity</div>
-            <div className={`font-mono ${account.equity >= account.balance ? "text-green-400" : "text-red-400"}`}>
-              {account.equity.toFixed(2)} €
-            </div>
+          <div className="text-sm">
+            <span className="text-gray-400">Exit: </span>
+            <span className="font-mono text-white">{trade.exitPrice.toFixed(2)}</span>
           </div>
-          <div>
-            <div className="text-gray-400 text-xs">Floating P/L</div>
-            <div className={`font-mono ${account.floatingPL >= 0 ? "text-green-400" : "text-red-400"}`}>
-              {account.floatingPL >= 0 ? "+" : ""}{account.floatingPL.toFixed(2)} €
-            </div>
-          </div>
-          <div>
-            <div className="text-gray-400 text-xs">Margin</div>
-            <div className="font-mono text-white">{account.usedMargin.toFixed(2)} €</div>
-          </div>
-          <div>
-            <div className="text-gray-400 text-xs">Free Margin</div>
-            <div className="font-mono text-white">{account.freeMargin.toFixed(2)} €</div>
-          </div>
-          <div>
-            <div className="text-gray-400 text-xs">Margin Level</div>
-            <div className={`font-mono ${account.marginLevel > 200 ? "text-green-400" : account.marginLevel > 100 ? "text-yellow-400" : "text-red-400"}`}>
-              {account.marginLevel > 0 ? account.marginLevel.toFixed(0) + "%" : "-"}
-            </div>
+          <div className="text-sm">
+            <span className="text-gray-400">P/L: </span>
+            <span
+              className={`font-bold ${
+                trade.totalProfit >= 0 ? "text-green-400" : "text-red-400"
+              }`}
+            >
+              {trade.totalProfit >= 0 ? "+" : ""}
+              {trade.totalProfit.toFixed(2)}€
+            </span>
           </div>
         </div>
-
-        {/* Posición actual */}
-        {position && (
-          <div className="mt-3 pt-3 border-t border-slate-700">
-            <div className="text-xs text-gray-400 mb-2 uppercase tracking-wider">Posición Abierta</div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-              <div>
-                <div className="text-gray-400 text-xs">Symbol</div>
-                <div className="font-mono text-white">XAUUSD</div>
-              </div>
-              <div>
-                <div className="text-gray-400 text-xs">Side</div>
-                <div className={`font-bold ${position.side === "BUY" ? "text-green-400" : "text-red-400"}`}>
-                  {position.side}
-                </div>
-              </div>
-              <div>
-                <div className="text-gray-400 text-xs">Volume</div>
-                <div className="font-mono text-white">{position.volume.toFixed(2)}</div>
-              </div>
-              <div>
-                <div className="text-gray-400 text-xs">Entry Price</div>
-                <div className="font-mono text-white">{position.entryPrice.toFixed(2)}</div>
-              </div>
-              <div>
-                <div className="text-gray-400 text-xs">Current P/L</div>
-                <div className={`font-bold ${account.floatingPL >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  {account.floatingPL >= 0 ? "+" : ""}{account.floatingPL.toFixed(2)} €
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <div
+          className={`text-xs px-2 py-1 rounded ${
+            trade.exitReason === "TAKE_PROFIT"
+              ? "bg-green-900/50 text-green-400"
+              : trade.exitReason === "TRAILING_SL"
+              ? "bg-yellow-900/50 text-yellow-400"
+              : "bg-red-900/50 text-red-400"
+          }`}
+        >
+          {trade.exitReason === "TAKE_PROFIT"
+            ? "TP Hit"
+            : trade.exitReason === "TRAILING_SL"
+            ? "Trailing SL"
+            : "Stop Loss"}
+        </div>
       </div>
 
-      {/* Controles del gráfico */}
-      <div className="flex flex-wrap items-center gap-4 p-4 bg-slate-800 rounded-lg">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-400">TF:</span>
-          <select
-            value={timeframe}
-            onChange={(e) => { setTimeframe(e.target.value as Timeframe); handleReset(); }}
-            className="px-2 py-1 bg-slate-700 rounded text-sm border-0 text-white"
-          >
-            <option value="1">M1</option>
-            <option value="5">M5</option>
-            <option value="15">M15</option>
-            <option value="60">H1</option>
-          </select>
+      {/* Controles */}
+      <div className="flex flex-wrap items-center gap-3 p-3 bg-slate-800 rounded-lg">
+        {/* Timeframe buttons */}
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-gray-400 mr-2">TF:</span>
+          {(["1", "5", "15"] as Timeframe[]).map((tf) => (
+            <button
+              key={tf}
+              onClick={() => handleTimeframeChange(tf)}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                timeframe === tf
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-700 text-gray-300 hover:bg-slate-600"
+              }`}
+            >
+              M{tf}
+            </button>
+          ))}
         </div>
 
+        {/* Speed selector */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-400">Speed:</span>
+          <span className="text-xs text-gray-400">Speed:</span>
           <select
             value={speed}
             onChange={(e) => setSpeed(Number(e.target.value))}
             className="px-2 py-1 bg-slate-700 rounded text-sm border-0 text-white"
           >
-            {speedOptions.map(s => <option key={s} value={s}>{s}x</option>)}
+            {speedOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}x
+              </option>
+            ))}
           </select>
         </div>
 
+        {/* Play/Pause */}
         <button
           onClick={() => setIsPlaying(!isPlaying)}
-          className={`px-4 py-1.5 rounded font-medium text-white ${
+          className={`px-4 py-1.5 rounded font-medium text-white flex items-center gap-2 ${
             isPlaying ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"
           }`}
         >
-          {isPlaying ? "⏸ Pausar" : "▶ Play"}
+          {isPlaying ? (
+            <>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              Pausar
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+              </svg>
+              Play
+            </>
+          )}
         </button>
 
+        {/* Reset */}
         <button
           onClick={handleReset}
-          className="px-4 py-1.5 bg-slate-600 hover:bg-slate-500 rounded font-medium text-white"
+          className="px-4 py-1.5 bg-slate-600 hover:bg-slate-500 rounded font-medium text-white flex items-center gap-2"
         >
-          ⟲ Reset
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Reset
         </button>
 
-        {currentPrice && (
+        {/* Current price */}
+        {currentTick && (
           <div className="ml-auto text-sm">
             <span className="text-gray-400">Precio: </span>
-            <span className="font-mono text-yellow-400">{currentPrice.toFixed(2)}</span>
+            <span className="font-mono text-yellow-400">
+              {getMidPrice(currentTick).toFixed(2)}
+            </span>
           </div>
         )}
       </div>
 
-      {/* Progreso */}
+      {/* Progress bar */}
       <div className="space-y-1">
         <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 transition-all" style={{ width: `${progress}%` }} />
+          <div
+            className="h-full bg-blue-500 transition-all duration-100"
+            style={{ width: `${progress}%` }}
+          />
         </div>
         <div className="flex justify-between text-xs text-gray-500">
           <span>{allTicks.length.toLocaleString()} ticks</span>
           <span>{currentTickIndex.toLocaleString()} procesados</span>
-          <span>TF: {tfLabel} ({parseInt(timeframe) * 60}s por vela)</span>
         </div>
       </div>
 
-      {/* Canvas del gráfico */}
-      <div ref={containerRef} className="w-full rounded-lg overflow-hidden bg-slate-900">
-        <canvas
-          ref={canvasRef}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          className="cursor-crosshair"
-        />
+      {/* Chart container */}
+      <div
+        ref={chartContainerRef}
+        className="w-full rounded-lg overflow-hidden"
+        style={{
+          backgroundColor: colors.background,
+          height: typeof window !== "undefined" && window.innerWidth < 640 ? "350px" : "500px",
+          minHeight: "350px",
+        }}
+      />
+
+      {/* Price levels legend */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-slate-800 rounded-lg text-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-0.5" style={{ backgroundColor: colors.entryLine }} />
+          <span className="text-gray-400">Entry:</span>
+          <span className="font-mono text-white">{trade.entryPrice.toFixed(2)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-0.5" style={{ backgroundColor: colors.tpLine }} />
+          <span className="text-gray-400">TP:</span>
+          <span className="font-mono text-green-400">{tpPrice.toFixed(2)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-0.5" style={{ backgroundColor: colors.slLine }} />
+          <span className="text-gray-400">SL:</span>
+          <span className="font-mono text-red-400">{slPrice.toFixed(2)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-gray-400">Pips:</span>
+          <span
+            className={`font-mono font-bold ${
+              trade.totalProfit >= 0 ? "text-green-400" : "text-red-400"
+            }`}
+          >
+            {isBuy
+              ? ((trade.exitPrice - trade.entryPrice) / PIP_VALUE).toFixed(1)
+              : ((trade.entryPrice - trade.exitPrice) / PIP_VALUE).toFixed(1)}
+          </span>
+        </div>
       </div>
 
-      {/* Info del trade */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 bg-slate-800 rounded-lg text-sm">
-        <div>
-          <span className="text-gray-400 text-xs">Side</span>
-          <div className={`font-bold ${trade.signalSide === "BUY" ? "text-green-400" : "text-red-400"}`}>
-            {trade.signalSide}
-          </div>
-        </div>
-        <div>
-          <span className="text-gray-400 text-xs">Entrada</span>
-          <div className="font-mono text-white">{trade.entryPrice.toFixed(2)}</div>
-        </div>
-        <div>
-          <span className="text-gray-400 text-xs">Salida</span>
-          <div className="font-mono text-white">{trade.exitPrice.toFixed(2)}</div>
-        </div>
-        <div>
-          <span className="text-gray-400 text-xs">Profit</span>
-          <div className={`font-bold ${trade.totalProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {trade.totalProfit >= 0 ? "+" : ""}{trade.totalProfit.toFixed(2)}€
-          </div>
-        </div>
-        <div>
-          <span className="text-gray-400 text-xs">Cierre</span>
-          <div className={`${
-            trade.exitReason === "TAKE_PROFIT" ? "text-green-400" :
-            trade.exitReason === "TRAILING_SL" ? "text-yellow-400" : "text-red-400"
-          }`}>
-            {trade.exitReason === "TAKE_PROFIT" ? "TP" : trade.exitReason === "TRAILING_SL" ? "Trail" : "SL"}
-          </div>
-        </div>
-      </div>
-
-      {/* Panel de Niveles de Grid */}
+      {/* Grid levels status */}
       {trade.levels && trade.levels.length > 0 && (
         <div className="bg-slate-800 rounded-lg p-3">
-          <div className="text-xs text-gray-400 mb-2 uppercase tracking-wider">Niveles de Grid</div>
+          <div className="text-xs text-gray-400 mb-2 uppercase tracking-wider">
+            Niveles de Grid
+          </div>
           <LevelsStatus
             levels={trade.levels}
             currentTick={currentTick}
-            isBuy={trade.signalSide === "BUY"}
+            isBuy={isBuy}
             pipValue={PIP_VALUE}
             levelColors={colors.levelColors}
           />
