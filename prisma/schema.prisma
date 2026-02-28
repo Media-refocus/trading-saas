@@ -184,8 +184,8 @@ model Subscription {
   plan               PlanType           // BASIC, PRO, ENTERPRISE
   stripePriceId      String?
   stripeSubId        String?            @unique
-  status             SubscriptionStatus @default(TRIAL) // TRIAL, ACTIVE, PAST_DUE, CANCELED, PAUSED
-  trialEnd           DateTime?          // When trial ends
+  status             String @default("TRIAL")
+  trialEnd           DateTime?
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
   createdAt          DateTime           @default(now())

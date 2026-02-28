@@ -108,7 +108,7 @@ export default function RegisterPage() {
               onChange={(e) => setName(e.target.value)}
               required
               disabled={isLoading}
-              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500"
+              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500 h-11"
             />
           </div>
           <div className="space-y-2">
@@ -123,7 +123,7 @@ export default function RegisterPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={isLoading}
-              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500"
+              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500 h-11"
             />
           </div>
           <div className="space-y-2">
@@ -139,7 +139,7 @@ export default function RegisterPage() {
               required
               minLength={6}
               disabled={isLoading}
-              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500"
+              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500 h-11"
             />
           </div>
           <div className="space-y-2">
@@ -155,7 +155,7 @@ export default function RegisterPage() {
               required
               minLength={6}
               disabled={isLoading}
-              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500"
+              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500 h-11"
             />
           </div>
         </CardContent>
@@ -163,11 +163,11 @@ export default function RegisterPage() {
           <Button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11"
           >
             {isLoading ? "Creando cuenta..." : "Crear Cuenta"}
           </Button>
-          <p className="text-center text-slate-400 text-sm">
+          <p className="text-center text-slate-400 text-[13px]">
             Ya tienes cuenta?{" "}
             <Link
               href="/login"

@@ -77,7 +77,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={isLoading}
-              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500"
+              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500 h-11"
             />
           </div>
           <div className="space-y-2">
@@ -87,7 +87,7 @@ export default function LoginPage() {
               </Label>
               <Link
                 href="/forgot-password"
-                className="text-sm text-blue-400 hover:text-blue-300"
+                className="text-[13px] text-blue-400 hover:text-blue-300 py-2 px-1 -mr-1 min-h-[44px] flex items-center"
               >
                 Olvidaste tu contraseña?
               </Link>
@@ -100,7 +100,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={isLoading}
-              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500"
+              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500 h-11"
             />
           </div>
         </CardContent>
@@ -108,11 +108,11 @@ export default function LoginPage() {
           <Button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11"
           >
             {isLoading ? "Iniciando sesion..." : "Iniciar Sesion"}
           </Button>
-          <p className="text-center text-slate-400 text-sm">
+          <p className="text-center text-slate-400 text-[13px]">
             No tienes cuenta?{" "}
             <Link
               href="/register"

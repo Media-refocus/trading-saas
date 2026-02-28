@@ -136,11 +136,11 @@ export default function PricingPage() {
                   </span>
                   <span className="text-slate-400">/mes</span>
                 </div>
-                <ul className="space-y-3 text-left">
+                <ul className="space-y-0 text-left">
                   {plan.features.map((feature, index) => (
                     <li
                       key={index}
-                      className={`flex items-center gap-2 ${
+                      className={`flex items-center gap-2.5 py-2 ${
                         feature.included ? "text-slate-300" : "text-slate-500"
                       }`}
                     >
@@ -149,7 +149,7 @@ export default function PricingPage() {
                       ) : (
                         <X className="h-4 w-4 text-slate-600 flex-shrink-0" />
                       )}
-                      <span className="text-sm">{feature.name}</span>
+                      <span className="text-[13px]">{feature.name}</span>
                     </li>
                   ))}
                 </ul>
@@ -195,7 +195,7 @@ export default function PricingPage() {
               <div className="text-3xl font-bold text-green-400 mb-2">
                 700-1,750 EUR
               </div>
-              <p className="text-slate-400 text-sm">
+              <p className="text-slate-400 text-[13px]">
                 Ahorrados al mes con Daily Loss Limit activo
               </p>
             </div>
@@ -203,7 +203,7 @@ export default function PricingPage() {
               <div className="text-3xl font-bold text-green-400 mb-2">
                 Infinite
               </div>
-              <p className="text-slate-400 text-sm">
+              <p className="text-slate-400 text-[13px]">
                 Proteccion de cuenta con Kill Switch de emergencia
               </p>
             </div>
@@ -211,7 +211,7 @@ export default function PricingPage() {
               <div className="text-3xl font-bold text-green-400 mb-2">
                 57 EUR/mes
               </div>
-              <p className="text-slate-400 text-sm">
+              <p className="text-slate-400 text-[13px]">
                 Menos de 2 EUR/dia para proteccion profesional
               </p>
             </div>

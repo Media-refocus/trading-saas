@@ -56,6 +56,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -209,7 +211,17 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    trailing: true,
+    grid: true,
+    restrictions: false,
+    dailyLoss: true,
+  });
   const utils = trpc.useUtils();
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   useEffect(() => {
     if (config) {
@@ -274,8 +286,8 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
-      {/* Entry Config */}
+    <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5 pb-20">
+      {/* Entry Config - Always visible */}
       <Card>
         <CardHeader className="pb-2 md:pb-4">
           <CardTitle className="text-base md:text-lg">Entrada (Level 0)</CardTitle>
@@ -290,7 +302,7 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               id="symbol"
               value={formData.symbol}
               onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
-              className="h-9 md:h-10"
+              className="h-11 min-h-[44px]"
             />
           </div>
           <div className="space-y-1.5 md:space-y-2">
@@ -303,7 +315,7 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               max="10"
               value={formData.entryLot}
               onChange={(e) => setFormData({ ...formData, entryLot: parseFloat(e.target.value) })}
-              className="h-9 md:h-10"
+              className="h-11 min-h-[44px]"
             />
           </div>
           <div className="space-y-1.5 md:space-y-2">
@@ -315,225 +327,300 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
               max="5"
               value={formData.entryNumOrders}
               onChange={(e) => setFormData({ ...formData, entryNumOrders: parseInt(e.target.value) })}
-              className="h-9 md:h-10"
+              className="h-11 min-h-[44px]"
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Trailing SL */}
+      {/* Trailing SL - Collapsible */}
       <Card>
-        <CardHeader className="pb-2 md:pb-4">
-          <CardTitle className="text-base md:text-lg">Trailing Stop Loss Virtual</CardTitle>
-          <CardDescription className="text-xs md:text-sm">
-            SL que se mueve con el precio para proteger ganancias
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 md:space-y-4">
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="useTrailing"
-              checked={formData.useTrailing}
-              onChange={(e) => setFormData({ ...formData, useTrailing: e.target.checked })}
-              className="h-4 w-4"
-            />
-            <Label htmlFor="useTrailing" className="text-xs md:text-sm">Activar trailing SL</Label>
+        <button
+          type="button"
+          onClick={() => toggleSection('trailing')}
+          className="w-full flex items-center justify-between p-4 md:px-6 md:py-4 text-left"
+        >
+          <div>
+            <CardTitle className="text-base md:text-lg flex items-center gap-2">
+              Trailing Stop Loss Virtual
+              {formData.useTrailing && (
+                <Badge variant="secondary" className="text-[10px]">Activo</Badge>
+              )}
+            </CardTitle>
+            <CardDescription className="text-xs md:text-sm mt-0.5">
+              SL que se mueve con el precio para proteger ganancias
+            </CardDescription>
           </div>
-
-          {formData.useTrailing && (
-            <div className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-4 pt-2">
-              <div className="space-y-1.5 md:space-y-2">
-                <Label htmlFor="trailingActivate" className="text-xs md:text-sm">Activar (pips)</Label>
-                <Input
-                  id="trailingActivate"
-                  type="number"
-                  min="1"
-                  value={formData.trailingActivate}
-                  onChange={(e) => setFormData({ ...formData, trailingActivate: parseInt(e.target.value) })}
-                  className="h-9 md:h-10"
-                />
-              </div>
-              <div className="space-y-1.5 md:space-y-2">
-                <Label htmlFor="trailingStep" className="text-xs md:text-sm">Step (pips)</Label>
-                <Input
-                  id="trailingStep"
-                  type="number"
-                  min="1"
-                  value={formData.trailingStep}
-                  onChange={(e) => setFormData({ ...formData, trailingStep: parseInt(e.target.value) })}
-                  className="h-9 md:h-10"
-                />
-              </div>
-              <div className="space-y-1.5 md:space-y-2">
-                <Label htmlFor="trailingBack" className="text-xs md:text-sm">Back (pips)</Label>
-                <Input
-                  id="trailingBack"
-                  type="number"
-                  min="1"
-                  value={formData.trailingBack}
-                  onChange={(e) => setFormData({ ...formData, trailingBack: parseInt(e.target.value) })}
-                  className="h-9 md:h-10"
-                />
-              </div>
-              <div className="space-y-1.5 md:space-y-2">
-                <Label htmlFor="trailingBuffer" className="text-xs md:text-sm">Buffer (pips)</Label>
-                <Input
-                  id="trailingBuffer"
-                  type="number"
-                  min="0"
-                  value={formData.trailingBuffer}
-                  onChange={(e) => setFormData({ ...formData, trailingBuffer: parseInt(e.target.value) })}
-                  className="h-9 md:h-10"
-                />
-              </div>
-            </div>
+          {expandedSections.trailing ? (
+            <ChevronUp className="h-5 w-5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
           )}
-        </CardContent>
-      </Card>
+        </button>
+        {expandedSections.trailing && (
+          <CardContent className="space-y-3 md:space-y-4 pt-0 border-t">
+            <div className="flex items-center gap-3 pt-4">
+              <input
+                type="checkbox"
+                id="useTrailing"
+                checked={formData.useTrailing}
+                onChange={(e) => setFormData({ ...formData, useTrailing: e.target.checked })}
+                className="h-5 w-5 min-h-[20px] min-w-[20px] rounded"
+              />
+              <Label htmlFor="useTrailing" className="text-sm cursor-pointer">Activar trailing SL</Label>
+            </div>
 
-      {/* Grid Config */}
-      <Card>
-        <CardHeader className="pb-2 md:pb-4">
-          <CardTitle className="text-base md:text-lg">Grid de Promedios</CardTitle>
-          <CardDescription className="text-xs md:text-sm">
-            Configuración de los niveles adicionales (escalones)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-3">
-          <div className="space-y-1.5 md:space-y-2">
-            <Label htmlFor="gridStepPips" className="text-xs md:text-sm">Distancia (pips)</Label>
-            <Input
-              id="gridStepPips"
-              type="number"
-              min="1"
-              max="100"
-              value={formData.gridStepPips}
-              onChange={(e) => setFormData({ ...formData, gridStepPips: parseInt(e.target.value) })}
-              className="h-9 md:h-10"
-            />
-          </div>
-          <div className="space-y-1.5 md:space-y-2">
-            <Label htmlFor="gridLot" className="text-xs md:text-sm">Lote promedios</Label>
-            <Input
-              id="gridLot"
-              type="number"
-              step="0.01"
-              min="0.01"
-              max="10"
-              value={formData.gridLot}
-              onChange={(e) => setFormData({ ...formData, gridLot: parseFloat(e.target.value) })}
-              className="h-9 md:h-10"
-            />
-          </div>
-          <div className="space-y-1.5 md:space-y-2">
-            <Label htmlFor="gridMaxLevels" className="text-xs md:text-sm">Máx niveles</Label>
-            <Input
-              id="gridMaxLevels"
-              type="number"
-              min="1"
-              max="20"
-              value={formData.gridMaxLevels}
-              onChange={(e) => setFormData({ ...formData, gridMaxLevels: parseInt(e.target.value) })}
-              className="h-9 md:h-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Restrictions */}
-      <Card>
-        <CardHeader className="pb-2 md:pb-4">
-          <CardTitle className="text-base md:text-lg">Restricciones</CardTitle>
-          <CardDescription className="text-xs md:text-sm">
-            Límites opcionales según el tipo de señal del canal
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2">
-          <div className="space-y-1.5 md:space-y-2">
-            <Label htmlFor="restrictionType" className="text-xs md:text-sm">Tipo de restricción</Label>
-            <Select
-              value={formData.restrictionType || "none"}
-              onValueChange={(value) =>
-                setFormData({ ...formData, restrictionType: value === "none" ? "" : value })
-              }
-            >
-              <SelectTrigger className="h-9 md:h-10">
-                <SelectValue placeholder="Sin restricción" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sin restricción</SelectItem>
-                <SelectItem value="RIESGO">RIESGO (muy conservador)</SelectItem>
-                <SelectItem value="SIN_PROMEDIOS">Sin promedios</SelectItem>
-                <SelectItem value="SOLO_1_PROMEDIO">Solo 1 promedio</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5 md:space-y-2">
-            <Label htmlFor="maxLevels" className="text-xs md:text-sm">Máx niveles (override)</Label>
-            <Input
-              id="maxLevels"
-              type="number"
-              min="1"
-              max="20"
-              value={formData.maxLevels}
-              onChange={(e) => setFormData({ ...formData, maxLevels: parseInt(e.target.value) })}
-              className="h-9 md:h-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Daily Loss Limit */}
-      <Card className="border-amber-500/50">
-        <CardHeader className="pb-2 md:pb-4">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-amber-500" />
-            Límite de Pérdida Diaria
-          </CardTitle>
-          <CardDescription className="text-xs md:text-sm">
-            El bot se pausará automáticamente si la pérdida del día supera este límite
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2 p-4 md:pt-6 md:pb-6">
-          <div className="space-y-1.5 md:space-y-2">
-            <Label htmlFor="dailyLossLimitPercent" className="text-xs md:text-sm">Límite diario (%)</Label>
-            <Input
-              id="dailyLossLimitPercent"
-              type="number"
-              step="0.5"
-              min="0.5"
-              max="20"
-              value={formData.dailyLossLimitPercent}
-              onChange={(e) => setFormData({ ...formData, dailyLossLimitPercent: parseFloat(e.target.value) })}
-              className="h-9 md:h-10"
-            />
-            <p className="text-xs text-muted-foreground">
-              Ejemplo: 3% significa que si pierdes más del 3% de tu balance en un día, el bot se pausa.
-            </p>
-          </div>
-          <div className="space-y-1.5 md:space-y-2">
-            <Label className="text-xs md:text-sm font-medium">Estado actual</Label>
-            {config?.dailyLossCurrent !== undefined && (
-              <div className="p-2 md:p-3 bg-muted rounded-lg">
-                <p className="text-xs md:text-sm">
-                  Pérdida hoy: <span className={config.dailyLossCurrent > 0 ? "text-red-500 font-semibold" : "text-green-500 font-semibold"}>
-                    ${config.dailyLossCurrent.toFixed(2)}
-                  </span>
-                </p>
-                {config.dailyLossLimitPercent && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Límite: {config.dailyLossLimitPercent}% del balance
-                  </p>
-                )}
+            {formData.useTrailing && (
+              <div className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-4 pt-2">
+                <div className="space-y-1.5 md:space-y-2">
+                  <Label htmlFor="trailingActivate" className="text-xs md:text-sm">Activar (pips)</Label>
+                  <Input
+                    id="trailingActivate"
+                    type="number"
+                    min="1"
+                    value={formData.trailingActivate}
+                    onChange={(e) => setFormData({ ...formData, trailingActivate: parseInt(e.target.value) })}
+                    className="h-11 min-h-[44px]"
+                  />
+                </div>
+                <div className="space-y-1.5 md:space-y-2">
+                  <Label htmlFor="trailingStep" className="text-xs md:text-sm">Step (pips)</Label>
+                  <Input
+                    id="trailingStep"
+                    type="number"
+                    min="1"
+                    value={formData.trailingStep}
+                    onChange={(e) => setFormData({ ...formData, trailingStep: parseInt(e.target.value) })}
+                    className="h-11 min-h-[44px]"
+                  />
+                </div>
+                <div className="space-y-1.5 md:space-y-2">
+                  <Label htmlFor="trailingBack" className="text-xs md:text-sm">Back (pips)</Label>
+                  <Input
+                    id="trailingBack"
+                    type="number"
+                    min="1"
+                    value={formData.trailingBack}
+                    onChange={(e) => setFormData({ ...formData, trailingBack: parseInt(e.target.value) })}
+                    className="h-11 min-h-[44px]"
+                  />
+                </div>
+                <div className="space-y-1.5 md:space-y-2">
+                  <Label htmlFor="trailingBuffer" className="text-xs md:text-sm">Buffer (pips)</Label>
+                  <Input
+                    id="trailingBuffer"
+                    type="number"
+                    min="0"
+                    value={formData.trailingBuffer}
+                    onChange={(e) => setFormData({ ...formData, trailingBuffer: parseInt(e.target.value) })}
+                    className="h-11 min-h-[44px]"
+                  />
+                </div>
               </div>
             )}
-          </div>
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
 
-      <div className="flex flex-col sm:flex-row sm:justify-end gap-2 md:gap-3">
-        <Button type="submit" disabled={isSaving} size="sm" className="text-sm w-full sm:w-auto min-h-[44px]">
+      {/* Grid Config - Collapsible */}
+      <Card>
+        <button
+          type="button"
+          onClick={() => toggleSection('grid')}
+          className="w-full flex items-center justify-between p-4 md:px-6 md:py-4 text-left"
+        >
+          <div>
+            <CardTitle className="text-base md:text-lg">Grid de Promedios</CardTitle>
+            <CardDescription className="text-xs md:text-sm mt-0.5">
+              Configuración de los niveles adicionales (escalones)
+            </CardDescription>
+          </div>
+          {expandedSections.grid ? (
+            <ChevronUp className="h-5 w-5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
+          )}
+        </button>
+        {expandedSections.grid && (
+          <CardContent className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-3 pt-0 border-t">
+            <div className="space-y-1.5 md:space-y-2 pt-4">
+              <Label htmlFor="gridStepPips" className="text-xs md:text-sm">Distancia (pips)</Label>
+              <Input
+                id="gridStepPips"
+                type="number"
+                min="1"
+                max="100"
+                value={formData.gridStepPips}
+                onChange={(e) => setFormData({ ...formData, gridStepPips: parseInt(e.target.value) })}
+                className="h-11 min-h-[44px]"
+              />
+            </div>
+            <div className="space-y-1.5 md:space-y-2 pt-4">
+              <Label htmlFor="gridLot" className="text-xs md:text-sm">Lote promedios</Label>
+              <Input
+                id="gridLot"
+                type="number"
+                step="0.01"
+                min="0.01"
+                max="10"
+                value={formData.gridLot}
+                onChange={(e) => setFormData({ ...formData, gridLot: parseFloat(e.target.value) })}
+                className="h-11 min-h-[44px]"
+              />
+            </div>
+            <div className="space-y-1.5 md:space-y-2 pt-4">
+              <Label htmlFor="gridMaxLevels" className="text-xs md:text-sm">Máx niveles</Label>
+              <Input
+                id="gridMaxLevels"
+                type="number"
+                min="1"
+                max="20"
+                value={formData.gridMaxLevels}
+                onChange={(e) => setFormData({ ...formData, gridMaxLevels: parseInt(e.target.value) })}
+                className="h-11 min-h-[44px]"
+              />
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Restrictions - Collapsible */}
+      <Card>
+        <button
+          type="button"
+          onClick={() => toggleSection('restrictions')}
+          className="w-full flex items-center justify-between p-4 md:px-6 md:py-4 text-left"
+        >
+          <div>
+            <CardTitle className="text-base md:text-lg">Restricciones</CardTitle>
+            <CardDescription className="text-xs md:text-sm mt-0.5">
+              Límites opcionales según el tipo de señal del canal
+            </CardDescription>
+          </div>
+          {expandedSections.restrictions ? (
+            <ChevronUp className="h-5 w-5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
+          )}
+        </button>
+        {expandedSections.restrictions && (
+          <CardContent className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 pt-0 border-t">
+            <div className="space-y-1.5 md:space-y-2 pt-4">
+              <Label htmlFor="restrictionType" className="text-xs md:text-sm">Tipo de restricción</Label>
+              <Select
+                value={formData.restrictionType || "none"}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, restrictionType: value === "none" ? "" : value })
+                }
+              >
+                <SelectTrigger className="h-11 min-h-[44px]">
+                  <SelectValue placeholder="Sin restricción" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin restricción</SelectItem>
+                  <SelectItem value="RIESGO">RIESGO (muy conservador)</SelectItem>
+                  <SelectItem value="SIN_PROMEDIOS">Sin promedios</SelectItem>
+                  <SelectItem value="SOLO_1_PROMEDIO">Solo 1 promedio</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 md:space-y-2 pt-4">
+              <Label htmlFor="maxLevels" className="text-xs md:text-sm">Máx niveles (override)</Label>
+              <Input
+                id="maxLevels"
+                type="number"
+                min="1"
+                max="20"
+                value={formData.maxLevels}
+                onChange={(e) => setFormData({ ...formData, maxLevels: parseInt(e.target.value) })}
+                className="h-11 min-h-[44px]"
+              />
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Daily Loss Limit - Collapsible */}
+      <Card className="border-amber-500/50">
+        <button
+          type="button"
+          onClick={() => toggleSection('dailyLoss')}
+          className="w-full flex items-center justify-between p-4 md:px-6 md:py-4 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-amber-500" />
+            <div>
+              <CardTitle className="text-base md:text-lg">Límite de Pérdida Diaria</CardTitle>
+              <CardDescription className="text-xs md:text-sm mt-0.5">
+                El bot se pausará si se supera el límite
+              </CardDescription>
+            </div>
+          </div>
+          {expandedSections.dailyLoss ? (
+            <ChevronUp className="h-5 w-5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
+          )}
+        </button>
+        {expandedSections.dailyLoss && (
+          <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2 pt-0 border-t p-4 md:pt-6 md:pb-6">
+            <div className="space-y-1.5 md:space-y-2 pt-2">
+              <Label htmlFor="dailyLossLimitPercent" className="text-xs md:text-sm">Límite diario (%)</Label>
+              <Input
+                id="dailyLossLimitPercent"
+                type="number"
+                step="0.5"
+                min="0.5"
+                max="20"
+                value={formData.dailyLossLimitPercent}
+                onChange={(e) => setFormData({ ...formData, dailyLossLimitPercent: parseFloat(e.target.value) })}
+                className="h-11 min-h-[44px]"
+              />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Ejemplo: 3% significa que si pierdes más del 3% de tu balance en un día, el bot se pausa.
+              </p>
+            </div>
+            <div className="space-y-1.5 md:space-y-2 pt-2">
+              <Label className="text-xs md:text-sm font-medium">Estado actual</Label>
+              {config?.dailyLossCurrent !== undefined && (
+                <div className="p-3 md:p-4 bg-muted rounded-lg">
+                  <p className="text-sm">
+                    Pérdida hoy: <span className={config.dailyLossCurrent > 0 ? "text-red-500 font-semibold" : "text-green-500 font-semibold"}>
+                      ${config.dailyLossCurrent.toFixed(2)}
+                    </span>
+                  </p>
+                  {config.dailyLossLimitPercent && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Límite: {config.dailyLossLimitPercent}% del balance
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Sticky Save Button */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t p-4 md:hidden z-50 shadow-lg">
+        <Button type="submit" disabled={isSaving} className="w-full h-12 text-base">
+          {isSaving ? (
+            <>
+              <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+              Guardando...
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="h-5 w-5 mr-2" />
+              Guardar configuración
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Desktop Save Button */}
+      <div className="hidden md:flex md:justify-end gap-3">
+        <Button type="submit" disabled={isSaving} size="sm" className="text-sm min-h-[44px]">
           {isSaving ? (
             <>
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -811,11 +898,27 @@ export default function BotPage() {
                     : "Nunca"}
                 </p>
                 {config?.lastHeartbeat && (
-                  <p className="text-[13px] md:text-sm text-muted-foreground">
-                    {config.lastHeartbeat.openPositions} pos ·
-                    MT5: {config.lastHeartbeat.mt5Connected ? "✅" : "❌"} ·
-                    TG: {config.lastHeartbeat.telegramConnected ? "✅" : "❌"}
-                  </p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="flex items-center gap-1 text-[13px]">
+                      {config.lastHeartbeat.mt5Connected ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                      ) : (
+                        <XCircle className="h-3.5 w-3.5 text-red-500" />
+                      )}
+                      <span className={config.lastHeartbeat.mt5Connected ? "text-green-600" : "text-red-500"}>MT5</span>
+                    </span>
+                    <span className="flex items-center gap-1 text-[13px]">
+                      {config.lastHeartbeat.telegramConnected ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                      ) : (
+                        <XCircle className="h-3.5 w-3.5 text-red-500" />
+                      )}
+                      <span className={config.lastHeartbeat.telegramConnected ? "text-green-600" : "text-red-500"}>TG</span>
+                    </span>
+                    <span className="text-[13px] text-muted-foreground">
+                      {config.lastHeartbeat.openPositions} pos
+                    </span>
+                  </div>
                 )}
               </div>
             </div>

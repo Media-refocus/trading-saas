@@ -43,7 +43,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6 pb-8 md:pb-0">
+    <div className="space-y-5 pb-8 md:pb-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -65,8 +65,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Stats - 2x2 grid on mobile */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20 min-h-[80px]">
           <CardContent className="p-4 md:pt-6 md:pb-6">
             <div className="flex items-center justify-between">
               <div>
@@ -78,7 +78,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20 min-h-[80px]">
           <CardContent className="p-4 md:pt-6 md:pb-6">
             <div className="flex items-center justify-between">
               <div>
@@ -90,7 +90,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
+        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20 min-h-[80px]">
           <CardContent className="p-4 md:pt-6 md:pb-6">
             <div className="flex items-center justify-between">
               <div>
@@ -102,7 +102,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
+        <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20 min-h-[80px]">
           <CardContent className="p-4 md:pt-6 md:pb-6">
             <div className="flex items-center justify-between">
               <div>
@@ -116,7 +116,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Main Grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-3 gap-5">
         {/* Top Operativas */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between gap-2">
@@ -174,11 +174,11 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-6 md:py-8 text-muted-foreground">
+              <div className="text-center py-6 px-4 text-muted-foreground">
                 <Store className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">No hay operativas publicadas aún</p>
+                <p className="text-[13px]">No hay operativas publicadas aún</p>
                 <Link href="/backtester">
-                  <Button variant="outline" size="sm" className="mt-3 text-xs md:text-sm">
+                  <Button variant="outline" size="sm" className="mt-3 text-xs md:text-sm min-h-[44px]">
                     Sé el primero en publicar
                   </Button>
                 </Link>
@@ -205,7 +205,7 @@ export default function DashboardPage() {
                     Prueba estrategias con datos históricos
                   </p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
+                <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0 self-center" />
               </div>
             </Link>
 
@@ -220,7 +220,7 @@ export default function DashboardPage() {
                     Descubre estrategias de otros traders
                   </p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
+                <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0 self-center" />
               </div>
             </Link>
 
@@ -235,7 +235,7 @@ export default function DashboardPage() {
                     Configura el bot de trading automático
                   </p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
+                <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0 self-center" />
               </div>
             </Link>
 
@@ -250,7 +250,7 @@ export default function DashboardPage() {
                     Gestiona tu cuenta y preferencias
                   </p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
+                <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0 self-center" />
               </div>
             </Link>
           </CardContent>

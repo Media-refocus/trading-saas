@@ -348,7 +348,7 @@ export default function BacktesterPage() {
             variant="ghost"
             size="icon"
             onClick={toggleDark}
-            className="ml-2"
+            className="ml-2 min-h-[44px] min-w-[44px]"
           >
             {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </Button>
@@ -543,22 +543,22 @@ export default function BacktesterPage() {
             {/* Lot Size Input */}
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
-                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Lot Size</Label>
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Lot Size</Label>
                 <Input
                   type="number"
                   step="0.01"
                   min="0.01"
                   max="1.0"
-                  className="h-9 text-sm font-mono"
+                  className="h-10 text-sm font-mono min-h-[44px]"
                   value={config.lotajeBase}
                   onChange={(e) => updateConfig("lotajeBase", parseFloat(e.target.value) || 0.1)}
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Capital €</Label>
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Capital €</Label>
                 <Input
                   type="number"
-                  className="h-9 text-sm font-mono"
+                  className="h-10 text-sm font-mono min-h-[44px]"
                   value={config.initialCapital}
                   onChange={(e) => updateConfig("initialCapital", parseFloat(e.target.value) || 10000)}
                 />
@@ -568,9 +568,9 @@ export default function BacktesterPage() {
             {/* Filtros */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Sesión</Label>
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Sesión</Label>
                 <select
-                  className="w-full px-2 py-1.5 text-xs border rounded-lg bg-background/50 hover:bg-background transition-colors"
+                  className="w-full px-2.5 py-2.5 text-xs border rounded-lg bg-background/50 hover:bg-background transition-colors min-h-[44px]"
                   value={config.filters?.session || ""}
                   onChange={(e) => updateConfig("filters", { ...config.filters, session: e.target.value as any || undefined })}
                 >
@@ -581,9 +581,9 @@ export default function BacktesterPage() {
                 </select>
               </div>
               <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Dirección</Label>
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Dirección</Label>
                 <select
-                  className="w-full px-2 py-1.5 text-xs border rounded-lg bg-background/50 hover:bg-background transition-colors"
+                  className="w-full px-2.5 py-2.5 text-xs border rounded-lg bg-background/50 hover:bg-background transition-colors min-h-[44px]"
                   value={config.filters?.side || ""}
                   onChange={(e) => updateConfig("filters", { ...config.filters, side: e.target.value as any || undefined })}
                 >
@@ -592,12 +592,12 @@ export default function BacktesterPage() {
                   <option value="SELL">SELL</option>
                 </select>
               </div>
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Límite</Label>
+              <div className="space-y-1 col-span-2 sm:col-span-1">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Límite</Label>
                 <Input
                   type="number"
                   min="1"
-                  className="h-8 text-xs font-mono bg-background/50 hover:bg-background transition-colors"
+                  className="h-11 text-xs font-mono bg-background/50 hover:bg-background transition-colors min-h-[44px]"
                   value={signalLimit}
                   onChange={(e) => setSignalLimit(parseInt(e.target.value) || 0)}
                 />
@@ -605,7 +605,7 @@ export default function BacktesterPage() {
             </div>
 
             {/* Toggle: Trailing SL */}
-            <div className={`flex items-center gap-3 p-2.5 rounded-lg transition-all ${
+            <div className={`flex items-center gap-2 p-2.5 rounded-lg transition-all ${
               config.useTrailingSL
                 ? "bg-amber-500/10 border border-amber-500/20"
                 : "bg-muted/30 border border-transparent"
@@ -623,7 +623,7 @@ export default function BacktesterPage() {
                     type="number"
                     min="10"
                     max="90"
-                    className="w-16 h-7 text-xs font-mono"
+                    className="w-14 min-w-[56px] h-9 text-xs font-mono"
                     value={config.trailingSLPercent}
                     onChange={(e) => updateConfig("trailingSLPercent", parseInt(e.target.value) || 50)}
                   />
@@ -670,7 +670,7 @@ export default function BacktesterPage() {
             </Button>
 
             {/* Resumen de configuracion activa */}
-            <div className="flex items-center justify-center gap-3 pt-1 text-[13px] text-muted-foreground font-mono flex-wrap">
+            <div className="flex items-center justify-center gap-2 pt-1 text-xs text-muted-foreground flex-wrap">
               <span>Grid: {config.pipsDistance}p x {config.maxLevels}L</span>
               <span>•</span>
               <span>TP: {config.takeProfitPips}p</span>
@@ -1158,20 +1158,20 @@ export default function BacktesterPage() {
       <Card className="border-border/50 shadow-sm">
         <CardHeader className="pb-2 pt-3 bg-gradient-to-r from-card to-muted/20">
           <CardTitle className="text-base flex items-center gap-2">
-            <Zap className="w-4 h-4 text-purple-500" />
+            <Zap className="w-4 h-4 text-blue-500" />
             Optimizador
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-3">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="grid grid-cols-2 sm:flex sm:gap-1 gap-1.5">
+            <div className="flex gap-1 flex-wrap">
               {optimizationPresets.data?.map((preset: any) => (
                 <button
                   key={preset.id}
                   onClick={() => setSelectedPreset(preset.id)}
-                  className={`px-3 py-2 sm:py-1.5 text-xs rounded-lg transition-all min-h-[44px] sm:min-h-0 ${
+                  className={`px-3 py-2 text-[13px] rounded-lg transition-all min-h-[44px] sm:min-h-0 sm:py-1.5 ${
                     selectedPreset === preset.id
-                      ? "bg-purple-500 text-white shadow-md shadow-purple-500/20"
+                      ? "bg-blue-500 text-white shadow-md shadow-blue-500/20"
                       : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -1192,7 +1192,7 @@ export default function BacktesterPage() {
                 if (result.topResults) setOptimizationResults(result.topResults);
               }}
               disabled={runOptimization.isPending}
-              className="bg-purple-500 hover:bg-purple-600 w-full sm:w-auto min-h-[44px]"
+              className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto min-h-[44px]"
             >
               {runOptimization.isPending ? (
                 <span className="flex items-center gap-2">

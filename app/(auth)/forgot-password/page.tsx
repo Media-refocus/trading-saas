@@ -97,7 +97,7 @@ export default function ForgotPasswordPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={isLoading}
-              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500"
+              className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500 h-11"
             />
           </div>
         </CardContent>
@@ -105,14 +105,14 @@ export default function ForgotPasswordPage() {
           <Button
             type="submit"
             disabled={isLoading || !email}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11"
           >
             {isLoading ? "Enviando..." : "Enviar Enlace"}
           </Button>
-          <p className="text-center text-slate-400 text-sm">
+          <p className="text-center text-slate-400 text-[13px]">
             <Link
               href="/login"
-              className="text-blue-400 hover:text-blue-300 font-medium inline-flex items-center gap-1"
+              className="text-blue-400 hover:text-blue-300 font-medium inline-flex items-center gap-1 py-2 min-h-[44px]"
             >
               <ArrowLeft className="h-3 w-3" />
               Volver al login
