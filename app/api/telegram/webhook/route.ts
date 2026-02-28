@@ -337,7 +337,18 @@ Las notificaciones de Telegram requieren plan PRO o ENTERPRISE.
     return;
   }
 
-  const botConfig = tenant.botConfigs;
+  const botConfig = tenant.botConfigs[0];
+  if (!botConfig) {
+    await sendTelegramReply(
+      chatId,
+      `
+⚠️ <b>Bot no configurado</b>
+
+No tienes configuración de bot. Ve al dashboard para configurarlo.
+      `.trim()
+    );
+    return;
+  }
   const lastHeartbeat = botConfig.heartbeats[0];
 
   const statusData = {
@@ -487,7 +498,7 @@ Las notificaciones de Telegram requieren plan PRO o ENTERPRISE.
 
   const accounts = await prisma.botAccount.findMany({
     where: {
-      botConfigId: tenant.botConfigs.id,
+      botConfigId: tenant.botConfigs[0]?.id,
       isActive: true,
     },
   });
@@ -571,7 +582,19 @@ Las notificaciones de Telegram requieren plan PRO o ENTERPRISE.
     return;
   }
 
-  const botConfig = tenant.botConfigs;
+  const botConfig = tenant.botConfigs[0];
+
+  if (!botConfig) {
+    await sendTelegramReply(
+      chatId,
+      `
+⚠️ <b>Bot no configurado</b>
+
+No tienes configuración de bot.
+      `.trim()
+    );
+    return;
+  }
 
   // Activar kill switch
   await prisma.botConfig.update({

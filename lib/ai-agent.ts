@@ -185,8 +185,8 @@ export async function getTradingContext(tenantId: string): Promise<TradingContex
     tenantId: tenant.id,
     tenantName: tenant.name,
     plan: tenant.subscriptions[0]?.plan ?? tenant.plan,
-    botStatus: tenant.botConfigs?.status ?? "OFFLINE",
-    openPositions: tenant.botConfigs?.heartbeats[0]?.openPositions ?? 0,
+    botStatus: tenant.botConfigs?.[0]?.status ?? "OFFLINE",
+    openPositions: tenant.botConfigs?.[0]?.heartbeats[0]?.openPositions ?? 0,
     balance,
     equity,
     dailyPnL,
@@ -206,13 +206,13 @@ export async function getTradingContext(tenantId: string): Promise<TradingContex
       profitPips: t.profitPips,
       closeReason: t.closeReason,
     })),
-    botConfig: tenant.botConfigs
+    botConfig: tenant.botConfigs?.[0]
       ? {
-          symbol: tenant.botConfigs.symbol,
-          entryLot: tenant.botConfigs.entryLot,
-          gridStepPips: tenant.botConfigs.gridStepPips,
-          gridMaxLevels: tenant.botConfigs.gridMaxLevels,
-          dailyLossLimitPercent: tenant.botConfigs.dailyLossLimitPercent,
+          symbol: tenant.botConfigs[0].symbol,
+          entryLot: tenant.botConfigs[0].entryLot,
+          gridStepPips: tenant.botConfigs[0].gridStepPips,
+          gridMaxLevels: tenant.botConfigs[0].gridMaxLevels,
+          dailyLossLimitPercent: tenant.botConfigs[0].dailyLossLimitPercent,
         }
       : null,
   };
@@ -445,19 +445,7 @@ ${context.winRate > 50 ? "✅ Vas por buen camino!" : "⚠️ Tu win rate está 
 _Nota: Modo demo - Configura OPENAI_API_KEY o ANTHROPIC_API_KEY para respuestas inteligentes._`;
   }
 
-  if (lowerMessage.includes("lote") || lowerMessage.includes("lot")) {
-    const recommendedLot = Math.max(0.01, Math.floor((context.balance * 0.01) / 1000) / 100);
-    return `🎯 **Recomendación de Lote**
-
-Con tu balance de ${context.balance.toFixed(2)} EUR, te recomiendo:
-
-- **Conservador:** 0.01 - 0.02 (riesgo ~1% por operación)
-- **Moderado:** ${recommendedLot.toFixed(2)} (riesgo ~2%)
-- **Actual:** ${context.botConfig?.entryLot ?? "No configurado"}
-
-Para cambiar tu lote, escribe: "cambia el lote a 0.02"`;
-  }
-
+  // Verificar comandos de cambio ANTES de consultas sobre lote
   if (lowerMessage.includes("cambia") || lowerMessage.includes("cambiar")) {
     // Intentar parsear cambio de lote
     const lotMatch = lowerMessage.match(/lote?\s*(?:a\s*)?(\d+\.?\d*)/);
@@ -476,6 +464,19 @@ Para cambiar tu lote, escribe: "cambia el lote a 0.02"`;
 
 {"action": "UPDATE_CONFIG", "params": {"gridMaxLevels": ${newLevels}}}`;
     }
+  }
+
+  if (lowerMessage.includes("lote") || lowerMessage.includes("lot")) {
+    const recommendedLot = Math.max(0.01, Math.floor((context.balance * 0.01) / 1000) / 100);
+    return `🎯 **Recomendación de Lote**
+
+Con tu balance de ${context.balance.toFixed(2)} EUR, te recomiendo:
+
+- **Conservador:** 0.01 - 0.02 (riesgo ~1% por operación)
+- **Moderado:** ${recommendedLot.toFixed(2)} (riesgo ~2%)
+- **Actual:** ${context.botConfig?.entryLot ?? "No configurado"}
+
+Para cambiar tu lote, escribe: "cambia el lote a 0.02"`;
   }
 
   if (lowerMessage.includes("pausa") || lowerMessage.includes("parar") || lowerMessage.includes("stop")) {
