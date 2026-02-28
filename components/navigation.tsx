@@ -259,7 +259,7 @@ export default function Navigation() {
             <button
               className="md:hidden p-2.5 rounded-md hover:bg-muted transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Menu"
+              aria-label="Toggle menu"
             >
               {mobileMenuOpen ? (
                 <X className="h-6 w-6" />
@@ -270,11 +270,19 @@ export default function Navigation() {
           </div>
         </div>
 
+        {/* Mobile Menu Backdrop */}
+        {mobileMenuOpen && (
+          <div
+            className="md:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+
         {/* Mobile Menu Dropdown */}
         {mobileMenuOpen && (
           <div
             ref={mobileMenuRef}
-            className="md:hidden border-t bg-background animate-in slide-in-from-top-2 duration-200"
+            className="md:hidden border-t bg-background animate-in slide-in-from-top-2 duration-200 relative z-50"
           >
             <div className="container mx-auto px-4 py-2 space-y-0.5">
               {/* Mobile Nav Links */}

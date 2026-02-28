@@ -302,7 +302,7 @@ export default function BacktesterPage() {
 
   return (
     <>
-    <div className="space-y-4 px-4 py-4 max-w-[1600px] mx-auto font-sans pb-8 md:pb-4">
+    <div className="space-y-4 max-w-[1600px] mx-auto font-sans pb-8">
       {/* Header mejorado */}
       <div className="flex items-center justify-between pb-3 border-b border-border/50">
         <div className="flex items-center gap-4">

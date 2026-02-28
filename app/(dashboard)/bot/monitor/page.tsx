@@ -119,21 +119,21 @@ function SignalRow({ signal }: { signal: Signal }) {
   const isBuy = signal.side === "BUY";
 
   return (
-    <div className="flex items-center justify-between py-3 border-b last:border-0">
-      <div className="flex items-center gap-3">
-        <div className={`p-1.5 rounded ${isBuy ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>
+    <div className="flex items-center justify-between py-3 border-b last:border-0 gap-2">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className={`p-1.5 rounded shrink-0 ${isBuy ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>
           {isBuy ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
         </div>
-        <div>
-          <p className="font-medium text-[13px] md:text-sm">
+        <div className="min-w-0">
+          <p className="font-medium text-sm">
             {signal.isCloseSignal ? "🔒 CERRAR RANGO" : `${signal.side} ${signal.symbol}`}
           </p>
-          <p className="text-[13px] text-muted-foreground truncate max-w-xs">
-            {signal.messageText.slice(0, 50)}...
+          <p className="text-[13px] text-muted-foreground break-words line-clamp-2">
+            {signal.messageText.length > 80 ? signal.messageText.slice(0, 80) + '...' : signal.messageText}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0">
         <Badge
           variant={
             signal.status === "EXECUTED"
@@ -145,7 +145,7 @@ function SignalRow({ signal }: { signal: Signal }) {
         >
           {signal.status}
         </Badge>
-        <span className="text-[12px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {new Date(signal.receivedAt).toLocaleTimeString()}
         </span>
       </div>
@@ -170,7 +170,7 @@ function TradeRow({ trade }: { trade: Trade }) {
           {isBuy ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
         </div>
         <div>
-          <p className="font-medium text-[13px] md:text-sm">
+          <p className="font-medium text-sm">
             {trade.symbol} · L{trade.level}
           </p>
           <p className="text-[13px] text-muted-foreground">
@@ -182,10 +182,10 @@ function TradeRow({ trade }: { trade: Trade }) {
         <div className="text-right">
           {isClosed ? (
             <>
-              <p className={`font-semibold text-[13px] md:text-sm ${isProfit ? "text-green-600" : "text-red-600"}`}>
+              <p className={`font-semibold text-sm ${isProfit ? "text-green-600" : "text-red-600"}`}>
                 {isProfit ? "+" : ""}${pnl.toFixed(2)}
               </p>
-              <p className="text-[13px] text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 {trade.profitPips?.toFixed(1)} pips
               </p>
             </>
@@ -193,7 +193,7 @@ function TradeRow({ trade }: { trade: Trade }) {
             <Badge variant="outline">Abierto</Badge>
           )}
         </div>
-        <span className="text-[12px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {new Date(isClosed ? trade.closedAt! : trade.openedAt).toLocaleTimeString()}
         </span>
       </div>
@@ -282,15 +282,15 @@ export default function BotMonitorPage() {
           </div>
         </div>
 
-        {/* Controls row - stacked on mobile */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          {/* Kill Switch - prominent on its own line on mobile */}
+        {/* Controls row */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Kill Switch - normal button, not full-width */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
                 variant="destructive"
                 size="sm"
-                className="gap-2 w-full sm:w-auto min-h-[44px]"
+                className="gap-2 min-h-[44px]"
                 disabled={killSwitchMutation.isPending}
               >
                 <AlertTriangle className="h-4 w-4" />
@@ -357,7 +357,7 @@ export default function BotMonitorPage() {
         </div>
       </div>
 
-      {/* Performance Stats - 2x2 on mobile, 5 cols on desktop */}
+      {/* Performance Stats - 2x2 + 1 full-width on mobile, 5 cols on desktop */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
         <Card>
           <CardContent className="pt-4 md:pt-6">
@@ -401,13 +401,21 @@ export default function BotMonitorPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Hoy card merged with Posiciones on mobile */}
+        <Card className="col-span-2 md:col-span-1">
           <CardContent className="pt-4 md:pt-6">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-orange-500" />
-              <span className={`text-lg md:text-xl font-bold ${(stats?.today.pnl || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {(stats?.today.pnl || 0) >= 0 ? "+" : ""}{(stats?.today.pnl || 0).toFixed(2)}
-              </span>
+            <div className="flex items-center justify-between md:flex-col md:items-start md:gap-0">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-orange-500" />
+                <span className={`text-lg md:text-xl font-bold ${(stats?.today.pnl || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  {(stats?.today.pnl || 0) >= 0 ? "+" : ""}{(stats?.today.pnl || 0).toFixed(2)}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-muted-foreground md:hidden">
+                <Zap className="h-4 w-4 text-amber-500" />
+                <span className="font-bold">{status?.positions.length || 0}</span>
+                <span className="text-sm">pos</span>
+              </div>
             </div>
             <p className="text-[13px] text-muted-foreground mt-1">Hoy</p>
             <p className="text-[13px] text-muted-foreground">
@@ -416,7 +424,8 @@ export default function BotMonitorPage() {
           </CardContent>
         </Card>
 
-        <Card className="col-span-2 md:col-span-1">
+        {/* Posiciones - desktop only, hidden on mobile since merged above */}
+        <Card className="hidden md:block">
           <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-amber-500" />
