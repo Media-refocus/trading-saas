@@ -18,6 +18,7 @@ import {
   unlinkTelegramChat,
   canUseTelegramNotifications,
 } from "@/lib/telegram";
+import { processAIMessage, executeAIAction, canUseAIAgent } from "@/lib/ai-agent";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -609,9 +610,157 @@ async function handleHelp(chatId: number): Promise<void> {
 /stop - Activar Kill Switch (emergencia)
 /help - Mostrar esta ayuda
 
+🤖 <b>AI Agent (solo VIP)</b>
+Escribe cualquier mensaje para chatear con Xisco, tu asistente de trading.
+
 ⚠️ <b>Nota:</b> Los comandos requieren plan PRO o ENTERPRISE.
     `.trim()
   );
+}
+
+/**
+ * Mostrar info del AI Agent
+ */
+async function handleAIInfo(chatId: number): Promise<void> {
+  const tenant = await prisma.tenant.findFirst({
+    where: { telegramChatId: String(chatId) },
+  });
+
+  if (!tenant) {
+    await sendTelegramReply(
+      chatId,
+      `
+⚠️ <b>Sin cuenta vinculada</b>
+
+Usa /link TU_CODIGO para vincular tu cuenta.
+      `.trim()
+    );
+    return;
+  }
+
+  const canUseAI = await canUseAIAgent(tenant.id);
+
+  if (!canUseAI) {
+    await sendTelegramReply(
+      chatId,
+      `
+🔒 <b>AI Agent - Exclusivo VIP</b>
+
+El asistente de trading inteligente está disponible solo para el plan VIP (197 EUR/mes).
+
+<b>Beneficios del plan VIP:</b>
+• Asistente IA personal (Xisco)
+• Análisis de tu operativa
+• Recomendaciones de riesgo
+• Configuración via chat
+• Soporte prioritario
+
+Actualiza tu plan en el dashboard para acceder.
+      `.trim()
+    );
+    return;
+  }
+
+  await sendTelegramReply(
+    chatId,
+    `
+🤖 <b>AI Agent Activo</b>
+
+Hola! Soy Xisco, tu asistente de trading inteligente.
+
+Puedo ayudarte con:
+• 📊 Análisis de tu operativa
+• 🎯 Gestión de riesgo
+• ⚙️ Configuración del bot
+• 📚 Conceptos de trading
+
+<b>Ejemplos:</b>
+• "Cómo voy esta semana?"
+• "Qué lote me recomiendas?"
+• "Cambia el lote a 0.02"
+• "Analiza mis operaciones"
+
+Escribe tu pregunta y te responderé!
+    `.trim()
+  );
+}
+
+/**
+ * Manejar mensaje con AI Agent
+ */
+async function handleAIMessage(chatId: number, message: string): Promise<void> {
+  const tenant = await prisma.tenant.findFirst({
+    where: { telegramChatId: String(chatId) },
+  });
+
+  if (!tenant) {
+    await sendTelegramReply(
+      chatId,
+      `
+⚠️ <b>Sin cuenta vinculada</b>
+
+Usa /link TU_CODIGO para vincular tu cuenta primero.
+      `.trim()
+    );
+    return;
+  }
+
+  const canUseAI = await canUseAIAgent(tenant.id);
+
+  if (!canUseAI) {
+    await sendTelegramReply(
+      chatId,
+      `
+🔒 El AI Agent está disponible solo para el plan VIP.
+
+Usa /help para ver comandos disponibles en tu plan.
+      `.trim()
+    );
+    return;
+  }
+
+  // Procesar mensaje con AI
+  const response = await processAIMessage(tenant.id, message);
+
+  if (!response.success) {
+    await sendTelegramReply(
+      chatId,
+      `
+❌ <b>Error</b>
+
+${response.message}
+      `.trim()
+    );
+    return;
+  }
+
+  // Enviar respuesta
+  await sendTelegramReply(chatId, response.message);
+
+  // Ejecutar acción si hay
+  if (response.action) {
+    const actionResult = await executeAIAction(tenant.id, response.action);
+
+    if (actionResult.success) {
+      await sendTelegramReply(
+        chatId,
+        `
+✅ <b>Acción ejecutada</b>
+
+${actionResult.message}
+        `.trim()
+      );
+    } else {
+      await sendTelegramReply(
+        chatId,
+        `
+❌ <b>Error al ejecutar</b>
+
+${actionResult.message}
+        `.trim()
+      );
+    }
+  }
 }
 
 /**
@@ -670,15 +819,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         await handleHelp(chatId);
         break;
 
+      case "/ai":
+        // Activar modo IA o mostrar info
+        await handleAIInfo(chatId);
+        break;
+
       default:
-        await sendTelegramReply(
-          chatId,
-          `
+        // Si no es un comando, procesar con AI Agent
+        if (!command.startsWith("/")) {
+          await handleAIMessage(chatId, text);
+        } else {
+          await sendTelegramReply(
+            chatId,
+            `
 ❓ <b>Comando no reconocido</b>
 
 Usa /help para ver los comandos disponibles.
           `.trim()
-        );
+          );
+        }
     }
 
     return NextResponse.json({ ok: true });
