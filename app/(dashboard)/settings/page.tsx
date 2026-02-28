@@ -5,13 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2, MessageCircle, Copy, Check, XCircle } from "lucide-react";
 
 export default function SettingsPage() {
   const [name, setName] = useState("");
   const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Obtener datos del usuario
   const { data: user, isLoading } = trpc.auth.me.useQuery();
@@ -37,6 +39,17 @@ export default function SettingsPage() {
       console.error("Error guardando perfil:", error);
     }
   };
+
+  const copyLinkCode = () => {
+    if (user?.tenant?.id) {
+      navigator.clipboard.writeText(user.tenant.id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // Verificar si tiene plan compatible con Telegram
+  const canUseTelegram = user?.tenant?.plan === "PRO" || user?.tenant?.plan === "ENTERPRISE";
 
   if (isLoading) {
     return (
@@ -184,6 +197,104 @@ export default function SettingsPage() {
             <Link href="/login" className="block">
               <Button variant="outline" className="w-full sm:w-auto min-h-[44px]">Cerrar Sesión</Button>
             </Link>
+          </CardContent>
+        </Card>
+
+        {/* Telegram */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Notificaciones Telegram
+            </CardTitle>
+            <CardDescription>
+              Recibe alertas de trading en Telegram
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!canUseTelegram ? (
+              <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
+                <XCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium">Plan no compatible</p>
+                  <p className="text-sm text-muted-foreground">
+                    Las notificaciones de Telegram requieren plan PRO o ENTERPRISE.
+                  </p>
+                  <Link href="/pricing">
+                    <Button size="sm" className="mt-2">
+                      Mejorar Plan
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start gap-3 p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-green-700 dark:text-green-400">Plan compatible</p>
+                    <p className="text-sm text-muted-foreground">
+                      Tu plan incluye notificaciones de Telegram.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    Código de Vinculación
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Copia este código y envíalo a tu bot de Telegram para vincular tu cuenta.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={user?.tenant?.id || ""}
+                      className="font-mono text-sm bg-muted"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={copyLinkCode}
+                      className="shrink-0"
+                    >
+                      {copied ? (
+                        <Check className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Instrucciones</Label>
+                  <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                    <li>Abre Telegram y busca tu bot</li>
+                    <li>Inicia una conversación con <code className="bg-muted px-1 rounded">/start</code></li>
+                    <li>Envía <code className="bg-muted px-1 rounded">/link {user?.tenant?.id?.slice(0, 8)}...</code></li>
+                    <li>Recibirás confirmación de vinculación</li>
+                  </ol>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Notificaciones incluidas</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary">Operaciones abiertas</Badge>
+                    <Badge variant="secondary">Operaciones cerradas</Badge>
+                    <Badge variant="secondary">Daily Loss Limit</Badge>
+                    <Badge variant="secondary">Kill Switch</Badge>
+                    <Badge variant="secondary">Errores del bot</Badge>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <p className="text-xs text-muted-foreground">
+                    El bot te enviará alertas en tiempo real sobre tu actividad de trading.
+                    Puedes desvincularlo en cualquier momento enviando <code className="bg-muted px-1 rounded">/unlink</code> al bot.
+                  </p>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

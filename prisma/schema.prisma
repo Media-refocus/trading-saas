@@ -25,26 +25,27 @@ enum SubscriptionStatus {
 
 // Multi-tenancy: Cada cliente tiene su tenant
 model Tenant {
-  id              String         @id @default(cuid())
-  name            String
-  email           String         @unique
-  stripeCustomerId String?       @unique
-  plan            String         @default("TRIAL") // TRIAL, BASIC, PRO, ENTERPRISE
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id               String              @id @default(cuid())
+  name             String
+  email            String              @unique
+  stripeCustomerId String?             @unique
+  plan             String              @default("TRIAL") // TRIAL, BASIC, PRO, ENTERPRISE
+  telegramChatId   String?             @unique
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
-  users           User[]
-  tradingAccounts TradingAccount[]
-  signals         Signal[]
-  positions       Position[]
-  subscriptions   Subscription[]
-  backtests       Backtest[]
-  simulatedTrades SimulatedTrade[]
-  strategies      Strategy[]
+  users            User[]
+  tradingAccounts  TradingAccount[]
+  signals          Signal[]
+  positions        Position[]
+  subscriptions    Subscription[]
+  backtests        Backtest[]
+  simulatedTrades  SimulatedTrade[]
+  strategies       Strategy[]
 
   // Bot Operativa
-  botConfigs      BotConfig[]
-  trades          Trade[]
+  botConfigs       BotConfig[]
+  trades           Trade[]
 
   // Marketplace
   publishedStrategies PublishedStrategy[]
@@ -183,9 +184,14 @@ model Subscription {
   plan               PlanType           // BASIC, PRO, ENTERPRISE
   stripePriceId      String?
   stripeSubId        String?            @unique
+<<<<<<< HEAD
   status             SubscriptionStatus @default(TRIAL) // TRIAL, ACTIVE, PAST_DUE, CANCELED, PAUSED
   trialEnd           DateTime?          // When trial ends
 
+=======
+  status             SubscriptionStatus @default(TRIAL)
+  trialEnd           DateTime?
+>>>>>>> 953a5c5 (feat: implementar notificaciones Telegram (Fase 7))
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
   createdAt          DateTime           @default(now())
