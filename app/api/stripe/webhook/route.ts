@@ -120,7 +120,7 @@ async function handleCheckoutCompleted(session: any) {
   console.log(`Checkout completed for tenant ${tenantId}, plan: ${planId}`);
 
   // Determine plan from metadata or price
-  let plan: string = "PRO"; // default
+  let plan: PlanType = "PRO"; // default
   if (planId) {
     const planMap: Record<string, PlanType> = {
       basic: "BASIC",
@@ -205,7 +205,7 @@ async function handleSubscriptionUpdated(subscription: any) {
   const mappedStatus = STRIPE_STATUS_MAP[status] ?? "ACTIVE";
 
   // Determine plan from price
-  let plan: string = "PRO";
+  let plan: PlanType = "PRO";
   if (priceId && PRICE_TO_PLAN[priceId]) {
     plan = PRICE_TO_PLAN[priceId];
   }
@@ -213,7 +213,7 @@ async function handleSubscriptionUpdated(subscription: any) {
   await prisma.subscription.updateMany({
     where: { stripeSubId: subscriptionId },
     data: {
-      plan,
+      plan: plan as string,
       stripePriceId: priceId,
       status: mappedStatus,
       currentPeriodStart: new Date(subscription.current_period_start * 1000),
@@ -257,10 +257,10 @@ async function handleSubscriptionDeleted(subscription: any) {
     },
   });
 
-  // Downgrade tenant to TRIAL
+  // Downgrade tenant to BASIC
   await prisma.tenant.update({
     where: { id: tenant.id },
-    data: { plan: "TRIAL" },
+    data: { plan: "BASIC" },
   });
 
   console.log(`Subscription canceled: ${subscriptionId}`);

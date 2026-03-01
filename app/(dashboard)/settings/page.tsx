@@ -41,15 +41,16 @@ export default function SettingsPage() {
   };
 
   const copyLinkCode = () => {
-    if (user?.Tenant?.id || "") {
-      navigator.clipboard.writeText(user?.Tenant?.id || "");
+    if (user?.tenantId) {
+      navigator.clipboard.writeText(user.tenantId);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
   // Verificar si tiene plan compatible con Telegram
-  const canUseTelegram = false; // TODO: implement plan check
+  // TODO: Obtener plan del tenant desde una query separada
+  const canUseTelegram = false;
 
   if (isLoading) {
     return (
@@ -250,7 +251,7 @@ export default function SettingsPage() {
                   <div className="flex gap-2">
                     <Input
                       readOnly
-                      value={user?.Tenant?.id || "" || ""}
+                      value={user?.tenantId || ""}
                       className="font-mono text-sm bg-muted"
                     />
                     <Button
@@ -272,7 +273,7 @@ export default function SettingsPage() {
                   <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
                     <li>Abre Telegram y busca tu bot</li>
                     <li>Inicia una conversación con <code className="bg-muted px-1 rounded">/start</code></li>
-                    <li>Envía <code className="bg-muted px-1 rounded">/link {user?.Tenant?.id?.slice(0, 8)}...</code></li>
+                    <li>Envía <code className="bg-muted px-1 rounded">/link {user?.tenantId?.slice(0, 8)}...</code></li>
                     <li>Recibirás confirmación de vinculación</li>
                   </ol>
                 </div>

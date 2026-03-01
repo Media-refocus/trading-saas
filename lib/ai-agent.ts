@@ -45,7 +45,7 @@ interface TradingContext {
     profitPips: number | null;
     closeReason: string | null;
   }>;
-  BotConfig: {
+  botConfig: {
     symbol: string;
     entryLot: number;
     gridStepPips: number;
@@ -184,9 +184,9 @@ export async function getTradingContext(tenantId: string): Promise<TradingContex
   return {
     tenantId: tenant.id,
     tenantName: tenant.name,
-    plan: tenant.Subscription[0]?.plan ?? tenant.plan,
-    botStatus: tenant.BotConfig?.[0]?.status ?? "OFFLINE",
-    openPositions: tenant.BotConfig?.[0]?.heartbeats[0]?.openPositions ?? 0,
+    plan: (tenant as any).Subscription[0]?.plan ?? tenant.plan,
+    botStatus: (tenant as any).BotConfig?.[0]?.status ?? "OFFLINE",
+    openPositions: (tenant as any).BotConfig?.[0]?.BotHeartbeat[0]?.openPositions ?? 0,
     balance,
     equity,
     dailyPnL,
@@ -206,13 +206,13 @@ export async function getTradingContext(tenantId: string): Promise<TradingContex
       profitPips: t.profitPips,
       closeReason: t.closeReason,
     })),
-    BotConfig: tenant.BotConfig?.[0]
+    botConfig: (tenant as any).BotConfig?.[0]
       ? {
-          symbol: tenant.BotConfig[0].symbol,
-          entryLot: tenant.BotConfig[0].entryLot,
-          gridStepPips: tenant.BotConfig[0].gridStepPips,
-          gridMaxLevels: tenant.BotConfig[0].gridMaxLevels,
-          dailyLossLimitPercent: tenant.BotConfig[0].dailyLossLimitPercent,
+          symbol: (tenant as any).BotConfig[0].symbol,
+          entryLot: (tenant as any).BotConfig[0].entryLot,
+          gridStepPips: (tenant as any).BotConfig[0].gridStepPips,
+          gridMaxLevels: (tenant as any).BotConfig[0].gridMaxLevels,
+          dailyLossLimitPercent: (tenant as any).BotConfig[0].dailyLossLimitPercent,
         }
       : null,
   };
@@ -245,12 +245,12 @@ function buildSystemPrompt(context: TradingContext): string {
 
 ### Configuración del Bot
 ${
-  context.BotConfig
-    ? `- Símbolo: ${context.BotConfig.symbol}
-- Lote entrada: ${context.BotConfig.entryLot}
-- Grid Step: ${context.BotConfig.gridStepPips} pips
-- Niveles máximos: ${context.BotConfig.gridMaxLevels}
-- Daily Loss Limit: ${context.BotConfig.dailyLossLimitPercent ?? "No configurado"}%`
+  context.botConfig
+    ? `- Símbolo: ${context.botConfig.symbol}
+- Lote entrada: ${context.botConfig.entryLot}
+- Grid Step: ${context.botConfig.gridStepPips} pips
+- Niveles máximos: ${context.botConfig.gridMaxLevels}
+- Daily Loss Limit: ${context.botConfig.dailyLossLimitPercent ?? "No configurado"}%`
     : "Bot no configurado"
 }
 
@@ -293,7 +293,7 @@ Usuario: "Cómo voy esta semana?"
 Respuesta: "📊 Esta semana vas +${context.weeklyPnL.toFixed(2)} EUR con ${context.totalTrades} operaciones. Tu win rate del ${context.winRate.toFixed(1)}% está ${context.winRate > 50 ? "bien" : "por debajo del 50%, quizás convenga revisar la estrategia"}. Recuerda mantener el Daily Loss Limit activo."
 
 Usuario: "Qué lote me recomiendas?"
-Respuesta: "Con tu balance de ${context.balance.toFixed(2)} EUR, te recomendaría no superar el 1-2% de riesgo por operación. Con tu configuración actual de ${context.BotConfig?.gridMaxLevels ?? 4} niveles, un lote de 0.01-0.02 sería conservador. ¿Quieres que lo ajuste?"`;
+Respuesta: "Con tu balance de ${context.balance.toFixed(2)} EUR, te recomendaría no superar el 1-2% de riesgo por operación. Con tu configuración actual de ${context.botConfig?.gridMaxLevels ?? 4} niveles, un lote de 0.01-0.02 sería conservador. ¿Quieres que lo ajuste?"`;
 }
 
 /**
@@ -474,7 +474,7 @@ Con tu balance de ${context.balance.toFixed(2)} EUR, te recomiendo:
 
 - **Conservador:** 0.01 - 0.02 (riesgo ~1% por operación)
 - **Moderado:** ${recommendedLot.toFixed(2)} (riesgo ~2%)
-- **Actual:** ${context.BotConfig?.entryLot ?? "No configurado"}
+- **Actual:** ${context.botConfig?.entryLot ?? "No configurado"}
 
 Para cambiar tu lote, escribe: "cambia el lote a 0.02"`;
   }

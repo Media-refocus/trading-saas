@@ -16,6 +16,7 @@ export const authRouter = router({
         name: true,
         image: true,
         role: true,
+        tenantId: true,
         createdAt: true,
         Tenant: {
           select: {

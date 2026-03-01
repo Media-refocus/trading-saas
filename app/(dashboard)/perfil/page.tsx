@@ -167,8 +167,7 @@ export default function PerfilPage() {
                   {getPlanName("")}
                 </Badge>
                 <Badge variant="outline" className="flex items-center gap-1">
-                  {getRoleIcon(user?.role || "USER")}
-                  {user?.role === "ADMIN" ? "Administrador" : "Usuario"}
+                  Usuario
                 </Badge>
               </div>
               <p className="text-muted-foreground flex items-center gap-2 text-[13px] md:text-sm">

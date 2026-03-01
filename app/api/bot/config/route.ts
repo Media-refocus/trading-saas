@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Descifrar credenciales de cuentas MT5
-  const accounts = fullConfig.BotAccount.map((account) => ({
+  const accounts = (fullConfig.BotAccount ?? []).map((account: { id: string; loginEnc: string; passwordEnc: string; serverEnc: string; pathEnc: string | null; symbol: string; magic: number }) => ({
     id: account.id,
     login: decryptCredential(account.loginEnc),
     password: decryptCredential(account.passwordEnc),

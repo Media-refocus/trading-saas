@@ -114,7 +114,7 @@ export const botRouter = router({
       dailyLossResetAt: botConfig.dailyLossResetAt,
       hasTelegramConfig: !!(botConfig.telegramApiIdEnc && botConfig.telegramApiHashEnc),
       telegramChannels: botConfig.telegramChannels,
-      accounts: botConfig.BotAccount.map((acc) => ({
+      accounts: botConfig.BotAccount.map((acc: { id: string; serverEnc: string; symbol: string; magic: number; isActive: boolean; lastSyncAt: Date | null; lastBalance: number | null; lastEquity: number | null }) => ({
         id: acc.id,
         server: "***", // No mostrar server real
         symbol: acc.symbol,
@@ -454,7 +454,7 @@ export const botRouter = router({
             uptimeSeconds: lastHeartbeat.uptimeSeconds,
           }
         : null,
-      BotPosition: botConfig.BotAccount.flatMap((acc) =>
+      BotPosition: botConfig.BotAccount.flatMap((acc: { BotPosition: any[] }) =>
         acc.BotPosition.map((pos: any) => ({
           id: pos.id,
           mt5Ticket: pos.mt5Ticket,
