@@ -2,8 +2,13 @@
   "hooks": {
     "PostToolUse": [
       {
-        "type": "command",
-        "command": "bash /home/refocus/scripts/cc-hook-notify.sh"
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/refocus/scripts/cc-hook-notify.sh"
+          }
+        ]
       }
     ]
   }

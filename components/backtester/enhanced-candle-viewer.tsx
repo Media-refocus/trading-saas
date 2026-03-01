@@ -75,14 +75,18 @@ export function EnhancedCandleViewer({
   const [speed, setSpeed] = useState(1);
   const [progress, setProgress] = useState(0);
   const [currentCandleIndex, setCurrentCandleIndex] = useState(0);
+  // isMobile: false inicial para SSR consistente, actualizado en cliente
   const [isMobile, setIsMobile] = useState(false);
+  // mounted: para evitar hydration mismatch en contenido dependiente del cliente
+  const [mounted, setMounted] = useState(false);
 
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
   const playbackRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Detect mobile
+  // Detect mobile - solo después del mount para evitar hydration mismatch
   useEffect(() => {
+    setMounted(true);
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener("resize", checkMobile);
@@ -446,24 +450,39 @@ export function EnhancedCandleViewer({
 // ==================== HELPER HOOK ====================
 
 /**
+ * Generador de números pseudo-aleatorios con semilla (determinístico para SSR)
+ * Algoritmo: Linear Congruential Generator (LCG)
+ */
+function seededRandom(seed: number): () => number {
+  return function () {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+}
+
+/**
  * Hook para generar datos de ejemplo para testing
+ * NOTA: Usa semilla fija para ser determinístico entre server y client (SSR hydration)
  */
 export function useDemoCandles(count: number = 10000): OHLC[] {
   return useMemo(() => {
     const candles: OHLC[] = [];
-    let price = 2000 + Math.random() * 100; // XAUUSD around 2000-2100
-    const now = Math.floor(Date.now() / 1000);
+    // Semilla fija para datos determinísticos (evita hydration mismatch)
+    const random = seededRandom(42);
+    let price = 2000 + random() * 100; // XAUUSD around 2000-2100
+    // Usar fecha fija en lugar de Date.now() para consistencia SSR
+    const baseTime = 1704067200; // 2024-01-01 00:00:00 UTC
     const interval = 60; // 1 min candles
 
     for (let i = 0; i < count; i++) {
-      const time = now - (count - i) * interval;
-      const volatility = 0.5 + Math.random() * 2;
-      const change = (Math.random() - 0.5) * volatility;
+      const time = baseTime - (count - i) * interval;
+      const volatility = 0.5 + random() * 2;
+      const change = (random() - 0.5) * volatility;
 
       const open = price;
       const close = price + change;
-      const high = Math.max(open, close) + Math.random() * volatility * 0.5;
-      const low = Math.min(open, close) - Math.random() * volatility * 0.5;
+      const high = Math.max(open, close) + random() * volatility * 0.5;
+      const low = Math.min(open, close) - random() * volatility * 0.5;
 
       candles.push({
         time,

@@ -1,0 +1,25 @@
+[     781ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/auth/session:0
+[     782ms] [ERROR] ClientFetchError: There was a problem with the server configuration. Check the server logs for more information.. Read more at https://errors.authjs.dev#autherror
+    at fetchData (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/lib/client.js:49:22)
+    at async getSession (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/react.js:123:21)
+    at async SessionProvider.useEffect [as _getSession] (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/react.js:289:51) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:56
+[     944ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/auth/session:0
+[     947ms] [ERROR] ClientFetchError: There was a problem with the server configuration. Check the server logs for more information.. Read more at https://errors.authjs.dev#autherror
+    at fetchData (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/lib/client.js:49:22)
+    at async getSession (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/react.js:123:21)
+    at async SessionProvider.useEffect [as _getSession] (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/react.js:289:51) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:56
+[   18420ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/auth/providers:0
+[   18421ms] [ERROR] ClientFetchError: There was a problem with the server configuration. Check the server logs for more information.. Read more at https://errors.authjs.dev#autherror
+    at fetchData (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/lib/client.js:49:22)
+    at async signIn (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/react.js:153:23)
+    at async handleSubmit (webpack-internal:///(app-pages-browser)/./app/(auth)/register/page.tsx:77:28) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:56
+[   19414ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/auth/session:0
+[   19415ms] [ERROR] ClientFetchError: There was a problem with the server configuration. Check the server logs for more information.. Read more at https://errors.authjs.dev#autherror
+    at fetchData (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/lib/client.js:49:22)
+    at async getSession (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/react.js:123:21)
+    at async SessionProvider.useEffect [as _getSession] (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/react.js:289:51) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:56
+[   19464ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/auth/session:0
+[   19464ms] [ERROR] ClientFetchError: There was a problem with the server configuration. Check the server logs for more information.. Read more at https://errors.authjs.dev#autherror
+    at fetchData (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/lib/client.js:49:22)
+    at async getSession (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/react.js:123:21)
+    at async SessionProvider.useEffect [as _getSession] (webpack-internal:///(app-pages-browser)/./node_modules/next-auth/react.js:289:51) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:56

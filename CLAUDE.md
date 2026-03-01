@@ -57,6 +57,8 @@ docs/                 — Analysis, historical data, guides
 - Bot API endpoints validate per-tenant API key
 - Data NEVER leaks between tenants
 
+**Por qué:** Es una app financiera multi-cliente. Un leak de datos entre tenants = pérdida de confianza + problemas legales. Cada cliente debe ver SOLO sus datos.
+
 ## Workflow Orchestration (Injected by launch-cc.sh)
 
 ### 1. Plan First

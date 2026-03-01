@@ -10,6 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, Zap } from "lucide-react";
 
+// Generador de números pseudo-aleatorios con semilla (determinístico para SSR)
+function seededRandom(seed: number): () => number {
+  return function () {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+}
+
 export default function DemoViewerPage() {
   const [candleCount, setCandleCount] = useState(5000);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -17,9 +25,12 @@ export default function DemoViewerPage() {
   // Generate demo candles
   const candles = useDemoCandles(candleCount);
 
-  // Generate some demo trades
+  // Generate some demo trades (determinístico para evitar hydration mismatch)
   const trades = useMemo(() => {
     if (candles.length === 0) return [];
+
+    // Semilla fija para consistencia SSR
+    const random = seededRandom(12345);
 
     const result = [];
     let i = 100;
@@ -27,12 +38,12 @@ export default function DemoViewerPage() {
 
     while (i < candles.length - 50) {
       const entryCandle = candles[i];
-      const holdTime = 20 + Math.floor(Math.random() * 60);
+      const holdTime = 20 + Math.floor(random() * 60);
       const exitCandle = candles[Math.min(i + holdTime, candles.length - 1)];
 
-      const isBuy = Math.random() > 0.4;
+      const isBuy = random() > 0.4;
       const pipValue = 0.1;
-      const pipsMove = (Math.random() - 0.4) * 30; // Slight bullish bias
+      const pipsMove = (random() - 0.4) * 30; // Slight bullish bias
       const exitPrice = isBuy
         ? entryCandle.close + pipsMove * pipValue
         : entryCandle.close - pipsMove * pipValue;
@@ -57,7 +68,7 @@ export default function DemoViewerPage() {
               : ("TRAILING_SL" as const),
       });
 
-      i += holdTime + 10 + Math.floor(Math.random() * 30);
+      i += holdTime + 10 + Math.floor(random() * 30);
     }
 
     return result;

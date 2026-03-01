@@ -7,79 +7,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User roles for access control
-enum UserRole {
-  USER
-  ADMIN
-}
-
-// Plan types for subscriptions
-enum PlanType {
-  BASIC
-  PRO
-  ENTERPRISE
-}
-
-// Subscription status
-enum SubscriptionStatus {
-  TRIAL
-  ACTIVE
-  PAST_DUE
-  CANCELED
-  PAUSED
-}
-
-// Multi-tenancy: Cada cliente tiene su tenant
-model Tenant {
-  id               String              @id @default(cuid())
-  name             String
-  email            String              @unique
-  stripeCustomerId String?             @unique
-  plan             String              @default("TRIAL") // TRIAL, BASIC, PRO, ENTERPRISE
-  telegramChatId   String?             @unique
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-
-  users            User[]
-  tradingAccounts  TradingAccount[]
-  signals          Signal[]
-  positions        Position[]
-  subscriptions    Subscription[]
-  backtests        Backtest[]
-  simulatedTrades  SimulatedTrade[]
-  strategies       Strategy[]
-
-  // Bot Operativa
-  botConfigs       BotConfig[]
-  trades           Trade[]
-
-  // Marketplace
-  publishedStrategies PublishedStrategy[]
-}
-
-model User {
-  id                  String              @id @default(cuid())
-  tenantId            String
-  email               String              @unique
-  name                String?
-  emailVerified       DateTime?
-  image               String?
-  password            String?
-  role                UserRole            @default(USER)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  accounts            Account[]
-  notifications       Notification[]
-  publishedStrategies PublishedStrategy[]
-  sessions            Session[]
-  strategyComments    StrategyComment[]
-  strategyLikes       StrategyLike[]
-  tradingAccounts     TradingAccount[]
-  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-}
-
 model Account {
-  id                String  @id @default(cuid())
+  id                String  @id
   userId            String
   type              String
   provider          String
@@ -91,116 +20,13 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
 
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-model TradingAccount {
-  id                 String     @id @default(cuid())
-  tenantId           String
-  userId             String?
-  broker             String
-  accountNumber      String
-  platform           String
-  server             String?
-  encryptedApiKey    String
-  encryptedApiSecret String?
-  isActive           Boolean    @default(true)
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
-  positions          Position[]
-  user               User?      @relation(fields: [userId], references: [id])
-  tenant             Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-}
-
-model Signal {
-  id              String     @id @default(cuid())
-  tenantId        String
-  botConfigId     String?
-  side            String
-  price           Float?
-  symbol          String
-  messageText     String
-  receivedAt      DateTime   @default(now())
-  channelId       String?
-  channelName     String?
-  messageId       String?
-  status          String     @default("PENDING")
-  processedAt     DateTime?
-  isCloseSignal   Boolean    @default(false)
-  restrictionType String?
-  maxLevels       Int        @default(4)
-  errorMessage    String?
-  createdAt       DateTime   @default(now())
-  positions       Position[]
-  botConfig       BotConfig? @relation(fields: [botConfigId], references: [id])
-  tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  trades          Trade[]
-
-  @@index([tenantId, receivedAt])
-  @@index([botConfigId, status])
-}
-
-model Position {
-  id               String          @id @default(cuid())
-  tenantId         String
-  signalId         String?
-  tradingAccountId String?
-  side             String
-  symbol           String
-  lotSize          Float
-  openPrice        Float
-  closePrice       Float?
-  stopLoss         Float?
-  takeProfit       Float?
-  status           String          @default("OPEN")
-  openedAt         DateTime        @default(now())
-  closedAt         DateTime?
-  profitPips       Float?
-  profitMoney      Float?
-  level            Int             @default(0)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  tradingAccount   TradingAccount? @relation(fields: [tradingAccountId], references: [id])
-  signal           Signal?         @relation(fields: [signalId], references: [id])
-  tenant           Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-}
-
-model Subscription {
-  id                 String             @id @default(cuid())
-  tenantId           String
-  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  plan               PlanType           // BASIC, PRO, ENTERPRISE
-  stripePriceId      String?
-  stripeSubId        String?            @unique
-  status             SubscriptionStatus @default(TRIAL)
-  trialEnd           DateTime?
-  currentPeriodStart DateTime?
-  currentPeriodEnd   DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-}
-
 model Backtest {
-  id              String           @id @default(cuid())
+  id              String           @id
   tenantId        String
   name            String?
   strategyName    String
@@ -218,119 +44,36 @@ model Backtest {
   ticksProcessed  Int              @default(0)
   totalTicks      Int              @default(0)
   createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  trades          SimulatedTrade[]
+  updatedAt       DateTime
+  Tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  SimulatedTrade  SimulatedTrade[]
 }
 
-model SimulatedTrade {
-  id          String   @id @default(cuid())
-  tenantId    String
-  backtestId  String
-  signalIndex Int
-  type        String
-  side        String
-  price       Float
-  lotSize     Float
-  level       Int      @default(0)
-  profit      Float
-  profitPips  Float
-  timestamp   DateTime
-  createdAt   DateTime @default(now())
-  backtest    Backtest @relation(fields: [backtestId], references: [id], onDelete: Cascade)
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-}
+model BotAccount {
+  id          String        @id
+  botConfigId String
+  loginEnc    String
+  passwordEnc String
+  serverEnc   String
+  pathEnc     String?
+  symbol      String        @default("XAUUSD")
+  magic       Int
+  isActive    Boolean       @default(true)
+  lastSyncAt  DateTime?
+  lastBalance Float?
+  lastEquity  Float?
+  lastMargin  Float?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime
+  BotConfig   BotConfig     @relation(fields: [botConfigId], references: [id], onDelete: Cascade)
+  BotPosition BotPosition[]
+  Trade       Trade[]
 
-model TickData {
-  id        Int      @id @default(autoincrement())
-  symbol    String
-  timestamp DateTime
-  bid       Float
-  ask       Float
-  spread    Float
-
-  @@index([symbol, timestamp])
-  @@index([timestamp])
-  @@index([timestamp], map: "idx_tick_data_timestamp")
-}
-
-model Strategy {
-  id                String    @id @default(cuid())
-  tenantId          String
-  name              String
-  description       String?
-  strategyName      String    @default("Custom")
-  lotajeBase        Float     @default(0.1)
-  numOrders         Int       @default(1)
-  pipsDistance      Int       @default(10)
-  maxLevels         Int       @default(4)
-  takeProfitPips    Int       @default(20)
-  stopLossPips      Int?
-  useStopLoss       Boolean   @default(false)
-  useTrailingSL     Boolean   @default(true)
-  trailingSLPercent Int       @default(50)
-  restrictionType   String?
-  lastTotalTrades   Int?
-  lastTotalProfit   Float?
-  lastWinRate       Float?
-  lastMaxDrawdown   Float?
-  lastTestedAt      DateTime?
-  isFavorite        Boolean   @default(false)
-  isActive          Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-}
-
-model PublishedStrategy {
-  id                String              @id @default(cuid())
-  tenantId          String
-  authorId          String
-  parentStrategyId  String?
-  name              String
-  description       String?
-  version           Int                 @default(1)
-  strategyName      String              @default("Custom")
-  lotajeBase        Float               @default(0.1)
-  numOrders         Int                 @default(1)
-  pipsDistance      Int                 @default(10)
-  maxLevels         Int                 @default(4)
-  takeProfitPips    Int                 @default(20)
-  stopLossPips      Int?
-  useStopLoss       Boolean             @default(false)
-  useTrailingSL     Boolean             @default(true)
-  trailingSLPercent Int                 @default(50)
-  restrictionType   String?
-  totalTrades       Int                 @default(0)
-  totalProfit       Float               @default(0)
-  winRate           Float               @default(0)
-  maxDrawdown       Float               @default(0)
-  profitFactor      Float               @default(0)
-  likesCount        Int                 @default(0)
-  forksCount        Int                 @default(0)
-  downloadsCount    Int                 @default(0)
-  tags              Json?
-  isPublic          Boolean             @default(true)
-  publishedAt       DateTime            @default(now())
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  parentStrategy    PublishedStrategy?  @relation("StrategyForks", fields: [parentStrategyId], references: [id])
-  forks             PublishedStrategy[] @relation("StrategyForks")
-  author            User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  comments          StrategyComment[]
-  likes             StrategyLike[]
-
-  @@index([tenantId])
-  @@index([authorId])
-  @@index([parentStrategyId])
-  @@index([isPublic])
+  @@index([botConfigId])
 }
 
 model BotConfig {
-  id                    String         @id @default(cuid())
+  id                    String         @id
   tenantId              String         @unique
   apiKeyHash            String
   status                String         @default("OFFLINE")
@@ -357,42 +100,19 @@ model BotConfig {
   dailyLossCurrent      Float          @default(0)
   dailyLossResetAt      DateTime?
   createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
-  botAccounts           BotAccount[]
-  tenant                Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  heartbeats            BotHeartbeat[]
-  signals               Signal[]
-  trades                Trade[]
+  updatedAt             DateTime
+  BotAccount            BotAccount[]
+  Tenant                Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  BotHeartbeat          BotHeartbeat[]
+  Signal                Signal[]
+  Trade                 Trade[]
 
-  @@index([tenantId])
   @@index([apiKeyHash])
-}
-
-model BotAccount {
-  id          String        @id @default(cuid())
-  botConfigId String
-  loginEnc    String
-  passwordEnc String
-  serverEnc   String
-  pathEnc     String?
-  symbol      String        @default("XAUUSD")
-  magic       Int
-  isActive    Boolean       @default(true)
-  lastSyncAt  DateTime?
-  lastBalance Float?
-  lastEquity  Float?
-  lastMargin  Float?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  botConfig   BotConfig     @relation(fields: [botConfigId], references: [id], onDelete: Cascade)
-  positions   BotPosition[]
-  trades      Trade[]
-
-  @@index([botConfigId])
+  @@index([tenantId])
 }
 
 model BotHeartbeat {
-  id                String    @id @default(cuid())
+  id                String    @id
   botConfigId       String
   timestamp         DateTime  @default(now())
   version           String?
@@ -404,13 +124,282 @@ model BotHeartbeat {
   memoryMB          Float?
   cpuPercent        Float?
   errorMessage      String?
-  botConfig         BotConfig @relation(fields: [botConfigId], references: [id], onDelete: Cascade)
+  BotConfig         BotConfig @relation(fields: [botConfigId], references: [id], onDelete: Cascade)
 
   @@index([botConfigId, timestamp])
 }
 
+model BotPosition {
+  id             String     @id
+  botAccountId   String
+  tradeId        String?    @unique
+  mt5Ticket      Int
+  symbol         String
+  side           String
+  level          Int        @default(0)
+  openPrice      Float
+  currentPrice   Float?
+  lotSize        Float
+  stopLoss       Float?
+  takeProfit     Float?
+  virtualSL      Float?
+  unrealizedPL   Float?
+  unrealizedPips Float?
+  openedAt       DateTime
+  lastSyncAt     DateTime   @default(now())
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime
+  BotAccount     BotAccount @relation(fields: [botAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([botAccountId, mt5Ticket])
+  @@index([botAccountId])
+}
+
+model Notification {
+  id        String   @id
+  userId    String
+  type      String
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, isRead])
+}
+
+model Position {
+  id               String          @id
+  tenantId         String
+  signalId         String?
+  tradingAccountId String?
+  side             String
+  symbol           String
+  lotSize          Float
+  openPrice        Float
+  closePrice       Float?
+  stopLoss         Float?
+  takeProfit       Float?
+  status           String          @default("OPEN")
+  openedAt         DateTime        @default(now())
+  closedAt         DateTime?
+  profitPips       Float?
+  profitMoney      Float?
+  level            Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime
+  TradingAccount   TradingAccount? @relation(fields: [tradingAccountId], references: [id])
+  Signal           Signal?         @relation(fields: [signalId], references: [id])
+  Tenant           Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model PublishedStrategy {
+  id                      String              @id
+  tenantId                String
+  authorId                String
+  parentStrategyId        String?
+  name                    String
+  description             String?
+  version                 Int                 @default(1)
+  strategyName            String              @default("Custom")
+  lotajeBase              Float               @default(0.1)
+  numOrders               Int                 @default(1)
+  pipsDistance            Int                 @default(10)
+  maxLevels               Int                 @default(4)
+  takeProfitPips          Int                 @default(20)
+  stopLossPips            Int?
+  useStopLoss             Boolean             @default(false)
+  useTrailingSL           Boolean             @default(true)
+  trailingSLPercent       Int                 @default(50)
+  restrictionType         String?
+  totalTrades             Int                 @default(0)
+  totalProfit             Float               @default(0)
+  winRate                 Float               @default(0)
+  maxDrawdown             Float               @default(0)
+  profitFactor            Float               @default(0)
+  likesCount              Int                 @default(0)
+  forksCount              Int                 @default(0)
+  downloadsCount          Int                 @default(0)
+  tags                    Json?
+  isPublic                Boolean             @default(true)
+  publishedAt             DateTime            @default(now())
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime
+  PublishedStrategy       PublishedStrategy?  @relation("PublishedStrategyToPublishedStrategy", fields: [parentStrategyId], references: [id])
+  other_PublishedStrategy PublishedStrategy[] @relation("PublishedStrategyToPublishedStrategy")
+  User                    User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  Tenant                  Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  StrategyComment         StrategyComment[]
+  StrategyLike            StrategyLike[]
+
+  @@index([isPublic])
+  @@index([parentStrategyId])
+  @@index([authorId])
+  @@index([tenantId])
+}
+
+model Session {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Signal {
+  id              String     @id
+  tenantId        String
+  botConfigId     String?
+  side            String
+  price           Float?
+  symbol          String
+  messageText     String
+  receivedAt      DateTime   @default(now())
+  channelId       String?
+  channelName     String?
+  messageId       String?
+  status          String     @default("PENDING")
+  processedAt     DateTime?
+  isCloseSignal   Boolean    @default(false)
+  restrictionType String?
+  maxLevels       Int        @default(4)
+  errorMessage    String?
+  createdAt       DateTime   @default(now())
+  Position        Position[]
+  BotConfig       BotConfig? @relation(fields: [botConfigId], references: [id])
+  Tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  Trade           Trade[]
+
+  @@index([botConfigId, status])
+  @@index([tenantId, receivedAt])
+}
+
+model SimulatedTrade {
+  id          String   @id
+  tenantId    String
+  backtestId  String
+  signalIndex Int
+  type        String
+  side        String
+  price       Float
+  lotSize     Float
+  level       Int      @default(0)
+  profit      Float
+  profitPips  Float
+  timestamp   DateTime
+  createdAt   DateTime @default(now())
+  Backtest    Backtest @relation(fields: [backtestId], references: [id], onDelete: Cascade)
+  Tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Strategy {
+  id                String    @id
+  tenantId          String
+  name              String
+  description       String?
+  strategyName      String    @default("Custom")
+  lotajeBase        Float     @default(0.1)
+  numOrders         Int       @default(1)
+  pipsDistance      Int       @default(10)
+  maxLevels         Int       @default(4)
+  takeProfitPips    Int       @default(20)
+  stopLossPips      Int?
+  useStopLoss       Boolean   @default(false)
+  useTrailingSL     Boolean   @default(true)
+  trailingSLPercent Int       @default(50)
+  restrictionType   String?
+  lastTotalTrades   Int?
+  lastTotalProfit   Float?
+  lastWinRate       Float?
+  lastMaxDrawdown   Float?
+  lastTestedAt      DateTime?
+  isFavorite        Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime
+  Tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model StrategyComment {
+  id                  String            @id
+  userId              String
+  publishedStrategyId String
+  content             String
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime
+  PublishedStrategy   PublishedStrategy @relation(fields: [publishedStrategyId], references: [id], onDelete: Cascade)
+  User                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([publishedStrategyId])
+}
+
+model StrategyLike {
+  id                  String            @id
+  userId              String
+  publishedStrategyId String
+  createdAt           DateTime          @default(now())
+  PublishedStrategy   PublishedStrategy @relation(fields: [publishedStrategyId], references: [id], onDelete: Cascade)
+  User                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, publishedStrategyId])
+  @@index([publishedStrategyId])
+}
+
+model Subscription {
+  id                 String    @id
+  tenantId           String
+  plan               String
+  stripePriceId      String?
+  stripeSubId        String?   @unique
+  status             String    @default("TRIAL")
+  trialEnd           DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime
+  Tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Tenant {
+  id                String              @id
+  name              String
+  email             String              @unique
+  stripeCustomerId  String?             @unique
+  plan              String              @default("TRIAL")
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  telegramChatId    String?             @unique
+  Backtest          Backtest[]
+  BotConfig         BotConfig?
+  Position          Position[]
+  PublishedStrategy PublishedStrategy[]
+  Signal            Signal[]
+  SimulatedTrade    SimulatedTrade[]
+  Strategy          Strategy[]
+  Subscription      Subscription[]
+  Trade             Trade[]
+  TradingAccount    TradingAccount[]
+  User              User[]
+}
+
+model TickData {
+  id        Int      @id @default(autoincrement())
+  symbol    String
+  timestamp DateTime
+  bid       Float
+  ask       Float
+  spread    Float
+
+  @@index([timestamp])
+  @@index([symbol, timestamp])
+}
+
 model Trade {
-  id           String      @id @default(cuid())
+  id           String      @id
   tenantId     String
   botConfigId  String?
   botAccountId String?
@@ -435,79 +424,60 @@ model Trade {
   status       String      @default("OPEN")
   errorMessage String?
   createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  signal       Signal?     @relation(fields: [signalId], references: [id])
-  botAccount   BotAccount? @relation(fields: [botAccountId], references: [id])
-  botConfig    BotConfig?  @relation(fields: [botConfigId], references: [id])
-  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedAt    DateTime
+  Signal       Signal?     @relation(fields: [signalId], references: [id])
+  BotAccount   BotAccount? @relation(fields: [botAccountId], references: [id])
+  BotConfig    BotConfig?  @relation(fields: [botConfigId], references: [id])
+  Tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@index([tenantId, openedAt])
-  @@index([botConfigId, status])
   @@index([signalId])
+  @@index([botConfigId, status])
+  @@index([tenantId, openedAt])
 }
 
-model BotPosition {
-  id             String     @id @default(cuid())
-  botAccountId   String
-  tradeId        String?    @unique
-  mt5Ticket      Int
-  symbol         String
-  side           String
-  level          Int        @default(0)
-  openPrice      Float
-  currentPrice   Float?
-  lotSize        Float
-  stopLoss       Float?
-  takeProfit     Float?
-  virtualSL      Float?
-  unrealizedPL   Float?
-  unrealizedPips Float?
-  openedAt       DateTime
-  lastSyncAt     DateTime   @default(now())
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  botAccount     BotAccount @relation(fields: [botAccountId], references: [id], onDelete: Cascade)
-
-  @@unique([botAccountId, mt5Ticket])
-  @@index([botAccountId])
+model TradingAccount {
+  id                 String     @id
+  tenantId           String
+  userId             String?
+  broker             String
+  accountNumber      String
+  platform           String
+  server             String?
+  encryptedApiKey    String
+  encryptedApiSecret String?
+  isActive           Boolean    @default(true)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime
+  Position           Position[]
+  User               User?      @relation(fields: [userId], references: [id])
+  Tenant             Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
-model StrategyLike {
-  id                  String            @id @default(cuid())
-  userId              String
-  publishedStrategyId String
-  createdAt           DateTime          @default(now())
-  publishedStrategy   PublishedStrategy @relation(fields: [publishedStrategyId], references: [id], onDelete: Cascade)
-  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, publishedStrategyId])
-  @@index([publishedStrategyId])
+model User {
+  id                String              @id
+  tenantId          String
+  email             String              @unique
+  name              String?
+  emailVerified     DateTime?
+  image             String?
+  password          String?
+  role              String              @default("USER")
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  Account           Account[]
+  Notification      Notification[]
+  PublishedStrategy PublishedStrategy[]
+  Session           Session[]
+  StrategyComment   StrategyComment[]
+  StrategyLike      StrategyLike[]
+  TradingAccount    TradingAccount[]
+  Tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
-model StrategyComment {
-  id                  String            @id @default(cuid())
-  userId              String
-  publishedStrategyId String
-  content             String
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  publishedStrategy   PublishedStrategy @relation(fields: [publishedStrategyId], references: [id], onDelete: Cascade)
-  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-  @@index([publishedStrategyId])
-}
-
-model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  type      String
-  title     String
-  message   String
-  link      String?
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, isRead])
-  @@index([userId, createdAt])
+  @@unique([identifier, token])
 }
