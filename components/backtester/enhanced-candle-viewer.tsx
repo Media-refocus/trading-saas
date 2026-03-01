@@ -17,6 +17,7 @@ import {
   type TimeframeMinutes,
 } from "@/lib/candle-compression";
 import { useVirtualCandles } from "@/hooks/use-virtual-candles";
+import { CandleChartCanvas } from "./candle-chart-canvas";
 
 // ==================== TYPES ====================
 
@@ -327,7 +328,7 @@ export function EnhancedCandleViewer({
         />
       )}
 
-      {/* Chart Area - Placeholder for now */}
+      {/* Chart Area */}
       <div
         ref={containerRef}
         className="flex-1 min-h-[300px] md:min-h-[400px] relative overflow-hidden"
@@ -346,36 +347,31 @@ export function EnhancedCandleViewer({
           </div>
         ) : (
           <div className="relative w-full h-full">
-            {/* Virtual scroll container */}
-            <div
-              className="absolute inset-0"
-              style={{
-                transform: `translateX(${-virtualScroll.scrollState.scrollX}px)`,
+            {/* Candle Chart Canvas */}
+            <CandleChartCanvas
+              candles={compressedData.candles}
+              visibleStart={virtualScroll.virtualRange.startIndex}
+              visibleCount={Math.min(
+                virtualScroll.virtualRange.endIndex - virtualScroll.virtualRange.startIndex + 1,
+                100
+              )}
+              currentCandleIndex={currentCandleIndex}
+              tradeMarkers={filteredTrades.slice(0, 1).map((t) => ({
+                entryPrice: t.entryPrice,
+                exitPrice: t.exitPrice,
+                entryTime: t.entryTime,
+                exitTime: t.exitTime,
+                side: t.side,
+              }))}
+              config={{
+                takeProfitPips: config.takeProfitPips ?? 50,
               }}
-            >
-              {/* Candle rendering would go here */}
-              {/* For now, show info about visible candles */}
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center text-[#888888]">
-                  <div className="text-lg font-mono">
-                    {virtualScroll.virtualRange.startIndex} -{" "}
-                    {virtualScroll.virtualRange.endIndex} /{" "}
-                    {compressedData.candles.length}
-                  </div>
-                  <div className="text-xs mt-1">
-                    {virtualScroll.virtualRange.visibleCandles.length} velas
-                    visibles
-                  </div>
-                  <div className="text-xs mt-2 text-[#0078D4]">
-                    Zoom: {virtualScroll.scrollState.zoom.toFixed(1)}x
-                  </div>
-                </div>
-              </div>
-            </div>
+              className="absolute inset-0"
+            />
 
             {/* Trade markers overlay */}
             {mode !== "overview" && filteredTrades.length > 0 && (
-              <div className="absolute top-2 right-2 flex flex-col gap-1">
+              <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
                 {filteredTrades.slice(0, 5).map((trade, i) => (
                   <div
                     key={trade.id}
