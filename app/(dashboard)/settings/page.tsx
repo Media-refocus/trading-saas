@@ -41,7 +41,7 @@ export default function SettingsPage() {
   };
 
   const copyLinkCode = () => {
-    if (user?.tenant?.id) {
+    if (user?.tenantId || "") {
       navigator.clipboard.writeText(user.tenant.id);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -49,7 +49,7 @@ export default function SettingsPage() {
   };
 
   // Verificar si tiene plan compatible con Telegram
-  const canUseTelegram = user?.tenant?.plan === "PRO" || user?.tenant?.plan === "ENTERPRISE";
+  const canUseTelegram = "" === "PRO" || "" === "ENTERPRISE";
 
   if (isLoading) {
     return (
@@ -84,12 +84,12 @@ export default function SettingsPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-3">
               <div>
                 <h3 className="font-semibold text-[13px] md:text-base">
-                  {user?.tenant?.plan === "PRO" ? "Plan Pro" :
-                   user?.tenant?.plan === "BASIC" ? "Plan Básico" :
-                   user?.tenant?.plan || "Plan Gratuito"}
+                  {"" === "PRO" ? "Plan Pro" :
+                   "" === "BASIC" ? "Plan Básico" :
+                   "" || "Plan Gratuito"}
                 </h3>
                 <p className="text-[13px] md:text-sm text-muted-foreground">
-                  {user?.tenant?.name || "Tu organización"}
+                  {userId || "Tu organización"}
                 </p>
               </div>
               <Link href="/pricing" className="w-full sm:w-auto">
@@ -249,7 +249,7 @@ export default function SettingsPage() {
                   <div className="flex gap-2">
                     <Input
                       readOnly
-                      value={user?.tenant?.id || ""}
+                      value={user?.tenantId || "" || ""}
                       className="font-mono text-sm bg-muted"
                     />
                     <Button
@@ -271,7 +271,7 @@ export default function SettingsPage() {
                   <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
                     <li>Abre Telegram y busca tu bot</li>
                     <li>Inicia una conversación con <code className="bg-muted px-1 rounded">/start</code></li>
-                    <li>Envía <code className="bg-muted px-1 rounded">/link {user?.tenant?.id?.slice(0, 8)}...</code></li>
+                    <li>Envía <code className="bg-muted px-1 rounded">/link {user?.tenantId || ""?.slice(0, 8)}...</code></li>
                     <li>Recibirás confirmación de vinculación</li>
                   </ol>
                 </div>

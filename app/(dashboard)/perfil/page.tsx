@@ -163,8 +163,8 @@ export default function PerfilPage() {
             <div className="flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-xl font-semibold">{user?.name || "Sin nombre"}</h2>
-                <Badge variant={getPlanBadgeVariant(user?.tenant?.plan || "")}>
-                  {getPlanName(user?.tenant?.plan || "")}
+                <Badge variant={getPlanBadgeVariant("")}>
+                  {getPlanName("")}
                 </Badge>
                 <Badge variant="outline" className="flex items-center gap-1">
                   {getRoleIcon(user?.role || "USER")}
@@ -200,19 +200,19 @@ export default function PerfilPage() {
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground text-[13px] md:text-sm">Nombre</span>
-              <span className="font-medium text-[13px] md:text-sm">{user?.tenant?.name}</span>
+              <span className="font-medium text-[13px] md:text-sm">{user?.id || ""}</span>
             </div>
             <Separator />
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground text-[13px] md:text-sm">Plan</span>
-              <Badge variant={getPlanBadgeVariant(user?.tenant?.plan || "")}>
-                {getPlanName(user?.tenant?.plan || "")}
+              <Badge variant={getPlanBadgeVariant("")}>
+                {getPlanName("")}
               </Badge>
             </div>
             <Separator />
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground text-[13px] md:text-sm">Creada</span>
-              <span className="text-[13px] md:text-sm">{formatDate(user?.tenant?.createdAt || new Date())}</span>
+              <span className="text-[13px] md:text-sm">{formatDate(new Date() || new Date())}</span>
             </div>
           </CardContent>
         </Card>
@@ -231,17 +231,17 @@ export default function PerfilPage() {
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground text-[13px] md:text-sm">Cuentas de Trading</span>
-              <span className="font-medium text-[13px] md:text-sm">{user?.tenant?._count?.tradingAccounts || 0}</span>
+              <span className="font-medium text-[13px] md:text-sm">{0}</span>
             </div>
             <Separator />
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground text-[13px] md:text-sm">Señales Recibidas</span>
-              <span className="font-medium text-[13px] md:text-sm">{user?.tenant?._count?.signals || 0}</span>
+              <span className="font-medium text-[13px] md:text-sm">{0}</span>
             </div>
             <Separator />
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground text-[13px] md:text-sm">Operaciones</span>
-              <span className="font-medium text-[13px] md:text-sm">{user?.tenant?._count?.trades || 0}</span>
+              <span className="font-medium text-[13px] md:text-sm">{0}</span>
             </div>
           </CardContent>
         </Card>

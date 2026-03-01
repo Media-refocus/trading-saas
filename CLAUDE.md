@@ -67,17 +67,23 @@ docs/                 — Analysis, historical data, guides
 - Incluye pasos de verificación en el plan, no solo implementación
 - Specs detalladas upfront → menos ambigüedad
 
+**Por qué:** Sin plan, CC tiende a "yak shaving" — arreglar cosas periféricas mientras la tarea principal se olvida. Un plan escrito mantiene el foco y permite a Guillermo verificar dirección antes de gastar tokens.
+
 ### 2. Self-Improvement Loop
 - Después de CUALQUIER corrección → actualiza `tasks/lessons.md` con el patrón
 - Escribe reglas que prevengan el mismo error
 - Revisa lessons.md al inicio de cada sesión
 - Itera hasta que la tasa de errores baje
 
+**Por qué:** Los mismos errores se repiten si no se documentan. Lessons.md convierte bugs en reglas preventivas.
+
 ### 3. Verification Before Done
 - NUNCA marcar tarea como completada sin demostrar que funciona
 - Diff entre comportamiento esperado vs actual
 - Pregúntate: "¿Un staff engineer aprobaría esto?"
 - Ejecuta tests, revisa logs, demuestra que es correcto
+
+**Por qué:** Es una app financiera — bugs = dinero real perdido para clientes. "Parece que funciona" no es suficiente. Verificar antes de done evita retrabajo y frustración.
 
 ### 4. Demand Elegance (Balanced)
 - Para cambios no triviales: "¿hay una forma más elegante?"
@@ -88,6 +94,8 @@ docs/                 — Analysis, historical data, guides
 - Si ves un bug → arréglalo directamente. No pidas permiso
 - Apunta a logs, errores, tests que fallan → resuélvelos
 - Zero context switching para el usuario
+
+**Por qué:** Guillermo delega para no micro-gestionar. Pedir permiso para cada bug rompe el flujo. Si ves el problema, tienes el contexto — arréglalo.
 
 ### 6. Task Management
 1. **Plan First**: Escribe plan en `tasks/todo.md` con items checkeables

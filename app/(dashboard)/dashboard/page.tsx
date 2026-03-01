@@ -152,7 +152,7 @@ export default function DashboardPage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate text-sm md:text-base">{strategy.name}</p>
                       <p className="text-xs md:text-sm text-muted-foreground truncate">
-                        por {strategy.author?.name || "Anónimo"}
+                        por {"Usuario"}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm shrink-0">

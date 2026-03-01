@@ -319,7 +319,7 @@ export default function OperativasPage() {
                   <div>
                     <CardTitle className="text-lg">{strategy.name}</CardTitle>
                     <CardDescription className="flex items-center gap-1 mt-1">
-                      <span>por {strategy.author?.name || "Anonimo"}</span>
+                      <span>por {"Usuario"}</span>
                     </CardDescription>
                   </div>
                   {strategy.totalProfit >= 0 ? (
@@ -392,7 +392,7 @@ export default function OperativasPage() {
               <DialogHeader className="p-6 pb-4 border-b shrink-0">
                 <DialogTitle className="text-xl">{selectedStrategy.name}</DialogTitle>
                 <DialogDescription>
-                  por {selectedStrategy.author?.name || "Anonimo"} - Publicado {formatDate(selectedStrategy.publishedAt)}
+                  por {selectedStrategy.authorId || "Anonimo"} - Publicado {formatDate(selectedStrategy.publishedAt)}
                 </DialogDescription>
               </DialogHeader>
 
@@ -578,7 +578,7 @@ export default function OperativasPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="font-medium text-sm">
-                                  {comment.author.name ?? "Anonimo"}
+                                  {"Usuario"}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
                                   {formatRelativeDate(comment.createdAt)}
@@ -613,7 +613,7 @@ export default function OperativasPage() {
                               <CardContent className="p-3">
                                 <div className="font-medium truncate mb-1">{related.name}</div>
                                 <div className="text-sm text-muted-foreground mb-2">
-                                  por {related.author?.name ?? "Anonimo"}
+                                  por {"Usuario"}
                                 </div>
                                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                   <span className={`font-medium ${related.totalProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>

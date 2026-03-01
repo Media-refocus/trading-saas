@@ -143,7 +143,7 @@ export default function OperativaDetailPage() {
         <div className="flex-1">
           <h1 className="text-3xl font-bold">{strategy.name}</h1>
           <p className="text-muted-foreground mt-1">
-            por {strategy.author?.name || "Anonimo"} - Publicado el {formatDate(strategy.publishedAt)}
+            por {"Usuario"} - Publicado el {formatDate(strategy.publishedAt)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -313,10 +313,10 @@ export default function OperativaDetailPage() {
                     <div key={c.id} className="p-3 bg-muted/30 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                          {c.author?.name?.[0] || "?"}
+                          {c.authorId?.[0] || "?"}
                         </div>
                         <div>
-                          <span className="font-medium">{c.author?.name || "Anonimo"}</span>
+                          <span className="font-medium">{c.authorId || "Anonimo"}</span>
                           <span className="text-xs text-muted-foreground ml-2">
                             {formatRelativeTime(c.createdAt)}
                           </span>

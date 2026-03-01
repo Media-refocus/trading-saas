@@ -539,7 +539,7 @@ export default function BotMonitorPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {status.positions.map((position) => (
+                {status.positions.map((position: Position) => (
                   <PositionCard key={position.id} position={position} />
                 ))}
               </div>
