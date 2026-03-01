@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { getThemeColors } from "@/lib/chart-themes";
 
 // ==================== TYPES ====================
@@ -59,8 +59,16 @@ interface SimpleCandleChartProps {
 
 const PIP_VALUE = 0.1;
 const HISTORY_CANDLES = 50;
-const DEFAULT_SPEED = 10;
-const SPEED_OPTIONS = [1, 2, 5, 10, 20, 50, 100];
+const SPEED_INTERVALS: Record<number, number> = {
+  1: 500,
+  2: 250,
+  5: 100,
+  10: 50,
+};
+const DEFAULT_SPEED = 1;
+const CANDLE_BODY_RATIO = 0.65;
+const MIN_CANDLES_VISIBLE = 20;
+const MAX_CANDLES_VISIBLE = 200;
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -90,8 +98,9 @@ function generateHistoryCandles(
   let currentTime = getCandleTime(entryTime, tf) - intervalMs;
 
   for (let i = 0; i < count; i++) {
-    const volatility = 0.5 + Math.random() * 1.5;
-    const trend = (Math.random() - 0.5) * 0.3;
+    // XAUUSD realistic volatility: 0.5-2 pips per candle
+    const volatility = 0.05 + Math.random() * 0.15;
+    const trend = (Math.random() - 0.5) * 0.03;
     const open = currentPrice;
     const close = open + trend + (Math.random() - 0.5) * volatility;
     const high = Math.max(open, close) + Math.random() * volatility * 0.5;
@@ -291,146 +300,108 @@ export default function SimpleCandleChart({
 }: SimpleCandleChartProps) {
   const colors = getThemeColors(themeId);
 
-  // Refs for chart
+  // Refs
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<any>(null);
-  const seriesRef = useRef<any>(null);
-  const priceLinesRef = useRef<any[]>([]);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number | null>(null);
+  const replayIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // State
+  // Chart state
   const [timeframe, setTimeframe] = useState<Timeframe>("1");
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(DEFAULT_SPEED);
   const [progress, setProgress] = useState(0);
   const [currentTickIndex, setCurrentTickIndex] = useState(0);
-  const [allTicks, setAllTicks] = useState<Tick[]>([]);
   const [currentTick, setCurrentTick] = useState<Tick | null>(null);
-  const [displayedCandles, setDisplayedCandles] = useState<OHLC[]>([]);
-  const [historyCandles, setHistoryCandles] = useState<OHLC[]>([]);
-  const [isChartReady, setIsChartReady] = useState(false);
 
-  // ==================== CHART INITIALIZATION ====================
+  // View state
+  const [visibleStart, setVisibleStart] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(60);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [dragStartVisibleStart, setDragStartVisibleStart] = useState(0);
+
+  // Touch zoom state
+  const [lastPinchDistance, setLastPinchDistance] = useState<number | null>(null);
+
+  // Crosshair state
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+
+  // Dimensions
+  const [dimensions, setDimensions] = useState({ width: 800, height: 450 });
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Derived data
+  const [allTicks, setAllTicks] = useState<Tick[]>([]);
+  const [historyCandles, setHistoryCandles] = useState<OHLC[]>([]);
+  const [tradeCandles, setTradeCandles] = useState<OHLC[]>([]);
+  const [displayedCandles, setDisplayedCandles] = useState<OHLC[]>([]);
+
+  // Price range for visible candles
+  const priceRange = useMemo(() => {
+    const visible = displayedCandles.slice(visibleStart, visibleStart + visibleCount);
+    if (visible.length === 0) return { min: 0, max: 1 };
+
+    let min = Infinity;
+    let max = -Infinity;
+    for (const c of visible) {
+      min = Math.min(min, c.low);
+      max = Math.max(max, c.high);
+    }
+
+    // Include trade markers in range
+    if (trade) {
+      const isBuy = trade.signalSide === "BUY";
+      const tpPrice = isBuy
+        ? trade.entryPrice + config.takeProfitPips * PIP_VALUE
+        : trade.entryPrice - config.takeProfitPips * PIP_VALUE;
+      const slPrice = isBuy
+        ? trade.entryPrice - 50 * PIP_VALUE
+        : trade.entryPrice + 50 * PIP_VALUE;
+
+      min = Math.min(min, trade.entryPrice, tpPrice, slPrice);
+      max = Math.max(max, trade.entryPrice, tpPrice, slPrice);
+
+      if (trade.levels) {
+        for (const level of trade.levels) {
+          min = Math.min(min, level.openPrice);
+          max = Math.max(max, level.openPrice);
+        }
+      }
+    }
+
+    const padding = (max - min) * 0.1;
+    return { min: min - padding, max: max + padding };
+  }, [displayedCandles, visibleStart, visibleCount, trade, config]);
+
+  // ==================== RESPONSIVE HANDLING ====================
 
   useEffect(() => {
-    if (!containerRef.current) return;
-
-    let mounted = true;
-    let chart: any = null;
-    let series: any = null;
-
-    (async () => {
-      try {
-        const lc = await import("lightweight-charts");
-
-        if (!mounted || !containerRef.current) return;
-
-        chart = lc.createChart(containerRef.current, {
-          layout: {
-            background: { type: lc.ColorType.Solid, color: colors.background },
-            textColor: colors.text,
-          },
-          grid: {
-            vertLines: { color: colors.grid, style: 1 },
-            horzLines: { color: colors.grid, style: 1 },
-          },
-          crosshair: {
-            mode: lc.CrosshairMode.Normal,
-            vertLine: {
-              color: colors.text + "50",
-              width: 1,
-              style: 2,
-            },
-            horzLine: {
-              color: colors.text + "50",
-              width: 1,
-              style: 2,
-            },
-          },
-          rightPriceScale: {
-            borderColor: colors.grid,
-            scaleMargins: { top: 0.1, bottom: 0.1 },
-          },
-          timeScale: {
-            borderColor: colors.grid,
-            timeVisible: true,
-            secondsVisible: false,
-          },
-          handleScale: {
-            mouseWheel: true,
-            pinch: true,
-            axisPressedMouseMove: true,
-          },
-          handleScroll: {
-            mouseWheel: true,
-            pressedMouseMove: true,
-            horzTouchDrag: true,
-            vertTouchDrag: true,
-          },
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const mobile = rect.width < 768;
+        setIsMobile(mobile);
+        setDimensions({
+          width: rect.width,
+          height: mobile ? 300 : 450,
         });
-
-        series = chart.addCandlestickSeries({
-          upColor: colors.candleUp,
-          downColor: colors.candleDown,
-          borderUpColor: colors.candleUp,
-          borderDownColor: colors.candleDown,
-          wickUpColor: colors.wickUp,
-          wickDownColor: colors.wickDown,
-        });
-
-        if (!mounted) {
-          chart.remove();
-          return;
-        }
-
-        chartRef.current = chart;
-        seriesRef.current = series;
-        setIsChartReady(true);
-
-        // Handle resize
-        const handleResize = () => {
-          if (containerRef.current && chart) {
-            chart.applyOptions({
-              width: containerRef.current.clientWidth,
-              height: containerRef.current.clientHeight,
-            });
-          }
-        };
-
-        window.addEventListener("resize", handleResize);
-        handleResize();
-
-        // Cleanup on unmount
-        return () => {
-          window.removeEventListener("resize", handleResize);
-        };
-      } catch (error) {
-        console.error("Error initializing chart:", error);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-      if (chartRef.current) {
-        try {
-          chartRef.current.remove();
-        } catch (e) {
-          // Ignore cleanup errors
-        }
-        chartRef.current = null;
-        seriesRef.current = null;
-        priceLinesRef.current = [];
-        setIsChartReady(false);
       }
     };
-  }, [colors]);
+
+    updateDimensions();
+    window.addEventListener("resize", updateDimensions);
+    return () => window.removeEventListener("resize", updateDimensions);
+  }, []);
 
   // ==================== LOAD TICKS ====================
 
   useEffect(() => {
     if (!trade) {
       setAllTicks([]);
-      setDisplayedCandles([]);
       setHistoryCandles([]);
+      setTradeCandles([]);
+      setDisplayedCandles([]);
       setCurrentTickIndex(0);
       setProgress(0);
       setIsPlaying(false);
@@ -459,119 +430,41 @@ export default function SimpleCandleChart({
       timeframe
     );
     setHistoryCandles(history);
+
+    const tradeCndl = aggregateTicksToCandles(loadedTicks, timeframe);
+    setTradeCandles(tradeCndl);
+
     setDisplayedCandles(history);
     setCurrentTickIndex(0);
     setProgress(0);
     setIsPlaying(false);
     setCurrentTick(null);
+    setVisibleStart(0);
+    setVisibleCount(60);
   }, [trade, ticks, timeframe]);
-
-  // ==================== UPDATE CHART DATA ====================
-
-  useEffect(() => {
-    if (!seriesRef.current || displayedCandles.length === 0 || !isChartReady)
-      return;
-
-    seriesRef.current.setData(displayedCandles);
-
-    if (chartRef.current) {
-      chartRef.current.timeScale().fitContent();
-    }
-  }, [displayedCandles, isChartReady]);
-
-  // ==================== PRICE LINES ====================
-
-  useEffect(() => {
-    if (!seriesRef.current || !trade || !isChartReady) return;
-
-    // Remove existing price lines
-    for (const line of priceLinesRef.current) {
-      try {
-        seriesRef.current.removePriceLine(line);
-      } catch (e) {
-        // Ignore errors
-      }
-    }
-    priceLinesRef.current = [];
-
-    const isBuy = trade.signalSide === "BUY";
-    const newLines: any[] = [];
-
-    // Entry line
-    const entryLine = seriesRef.current.createPriceLine({
-      price: trade.entryPrice,
-      color: colors.entryLine,
-      lineWidth: 2,
-      lineStyle: 2,
-      axisLabelVisible: true,
-      title: "Entry",
-    });
-    newLines.push(entryLine);
-
-    // Take Profit line
-    const tpPrice = isBuy
-      ? trade.entryPrice + config.takeProfitPips * PIP_VALUE
-      : trade.entryPrice - config.takeProfitPips * PIP_VALUE;
-    const tpLine = seriesRef.current.createPriceLine({
-      price: tpPrice,
-      color: colors.tpLine,
-      lineWidth: 2,
-      lineStyle: 2,
-      axisLabelVisible: true,
-      title: "TP",
-    });
-    newLines.push(tpLine);
-
-    // Stop Loss line (50 pips default)
-    const slPrice = isBuy
-      ? trade.entryPrice - 50 * PIP_VALUE
-      : trade.entryPrice + 50 * PIP_VALUE;
-    const slLine = seriesRef.current.createPriceLine({
-      price: slPrice,
-      color: colors.slLine,
-      lineWidth: 2,
-      lineStyle: 2,
-      axisLabelVisible: true,
-      title: "SL",
-    });
-    newLines.push(slLine);
-
-    // Level lines
-    if (trade.levels) {
-      for (const level of trade.levels) {
-        if (level.level > 0) {
-          const levelColor =
-            colors.levelColors[(level.level - 1) % colors.levelColors.length];
-          const levelLine = seriesRef.current.createPriceLine({
-            price: level.openPrice,
-            color: levelColor,
-            lineWidth: 1,
-            lineStyle: 3,
-            axisLabelVisible: false,
-            title: `L${level.level}`,
-          });
-          newLines.push(levelLine);
-        }
-      }
-    }
-
-    priceLinesRef.current = newLines;
-  }, [trade, config, colors, isChartReady]);
 
   // ==================== REPLAY ANIMATION ====================
 
   useEffect(() => {
-    if (!isPlaying || allTicks.length === 0) return;
+    if (!isPlaying || allTicks.length === 0) {
+      if (replayIntervalRef.current) {
+        clearInterval(replayIntervalRef.current);
+        replayIntervalRef.current = null;
+      }
+      return;
+    }
 
-    const intervalMs = Math.max(5, 100 / speed);
+    const intervalMs = SPEED_INTERVALS[speed] || 500;
     let idx = currentTickIndex;
     let currentCandles = [...historyCandles];
-    let cancelled = false;
 
-    const interval = setInterval(() => {
-      if (cancelled || idx >= allTicks.length) {
+    replayIntervalRef.current = setInterval(() => {
+      if (idx >= allTicks.length) {
         setIsPlaying(false);
-        clearInterval(interval);
+        if (replayIntervalRef.current) {
+          clearInterval(replayIntervalRef.current);
+          replayIntervalRef.current = null;
+        }
         return;
       }
 
@@ -603,10 +496,377 @@ export default function SimpleCandleChart({
     }, intervalMs);
 
     return () => {
-      cancelled = true;
-      clearInterval(interval);
+      if (replayIntervalRef.current) {
+        clearInterval(replayIntervalRef.current);
+        replayIntervalRef.current = null;
+      }
     };
   }, [isPlaying, speed, allTicks, currentTickIndex, timeframe, historyCandles]);
+
+  // ==================== CANVAS RENDERING ====================
+
+  const drawChart = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const { width, height } = dimensions;
+
+    // Set canvas size with DPR
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Chart area
+    const padding = { top: 20, right: 70, bottom: 30, left: 10 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+
+    // Clear
+    ctx.fillStyle = colors.background;
+    ctx.fillRect(0, 0, width, height);
+
+    // Get visible candles
+    const visible = displayedCandles.slice(visibleStart, visibleStart + visibleCount);
+    if (visible.length === 0) {
+      ctx.fillStyle = colors.text;
+      ctx.font = "14px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("No hay datos", width / 2, height / 2);
+      return;
+    }
+
+    const { min: minPrice, max: maxPrice } = priceRange;
+    const priceRangeValue = maxPrice - minPrice || 1;
+
+    // Helper functions
+    const priceToY = (price: number) =>
+      padding.top + chartHeight - ((price - minPrice) / priceRangeValue) * chartHeight;
+
+    const indexToX = (index: number) => {
+      const candleWidth = chartWidth / visibleCount;
+      return padding.left + index * candleWidth + candleWidth / 2;
+    };
+
+    // Draw grid lines
+    ctx.strokeStyle = colors.grid;
+    ctx.lineWidth = 1;
+
+    // Horizontal grid (price)
+    const priceSteps = 5;
+    for (let i = 0; i <= priceSteps; i++) {
+      const price = minPrice + (priceRangeValue * i) / priceSteps;
+      const y = priceToY(price);
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(width - padding.right, y);
+      ctx.stroke();
+
+      // Price labels
+      ctx.fillStyle = colors.text;
+      ctx.font = `${isMobile ? 10 : 11}px monospace`;
+      ctx.textAlign = "left";
+      ctx.fillText(price.toFixed(2), width - padding.right + 5, y + 4);
+    }
+
+    // Vertical grid (time)
+    const timeSteps = Math.min(6, visible.length);
+    for (let i = 0; i < timeSteps; i++) {
+      const idx = Math.floor((i / (timeSteps - 1)) * (visible.length - 1));
+      const x = indexToX(idx);
+      ctx.beginPath();
+      ctx.moveTo(x, padding.top);
+      ctx.lineTo(x, height - padding.bottom);
+      ctx.stroke();
+
+      // Time labels
+      if (visible[idx]) {
+        const date = new Date(visible[idx].time * 1000);
+        const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        ctx.fillStyle = colors.text;
+        ctx.font = `${isMobile ? 9 : 10}px monospace`;
+        ctx.textAlign = "center";
+        ctx.fillText(timeStr, x, height - padding.bottom + 15);
+      }
+    }
+
+    // Calculate candle dimensions
+    const candleSlotWidth = chartWidth / visibleCount;
+    const candleBodyWidth = candleSlotWidth * CANDLE_BODY_RATIO;
+    const candleWickWidth = 1;
+
+    // Draw candles
+    for (let i = 0; i < visible.length; i++) {
+      const candle = visible[i];
+      const x = indexToX(i);
+      const isBullish = candle.close >= candle.open;
+
+      const color = isBullish ? colors.candleUp : colors.candleDown;
+      const wickColor = isBullish ? colors.wickUp : colors.wickDown;
+
+      const openY = priceToY(candle.open);
+      const closeY = priceToY(candle.close);
+      const highY = priceToY(candle.high);
+      const lowY = priceToY(candle.low);
+
+      // Wick
+      ctx.strokeStyle = wickColor;
+      ctx.lineWidth = candleWickWidth;
+      ctx.beginPath();
+      ctx.moveTo(x, highY);
+      ctx.lineTo(x, lowY);
+      ctx.stroke();
+
+      // Body
+      const bodyTop = Math.min(openY, closeY);
+      const bodyHeight = Math.abs(closeY - openY) || 1;
+
+      ctx.fillStyle = color;
+      ctx.fillRect(x - candleBodyWidth / 2, bodyTop, candleBodyWidth, bodyHeight);
+    }
+
+    // Draw trade markers
+    if (trade) {
+      const isBuy = trade.signalSide === "BUY";
+      const tpPrice = isBuy
+        ? trade.entryPrice + config.takeProfitPips * PIP_VALUE
+        : trade.entryPrice - config.takeProfitPips * PIP_VALUE;
+      const slPrice = isBuy
+        ? trade.entryPrice - 50 * PIP_VALUE
+        : trade.entryPrice + 50 * PIP_VALUE;
+
+      // Entry line
+      const entryY = priceToY(trade.entryPrice);
+      ctx.strokeStyle = colors.entryLine;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(padding.left, entryY);
+      ctx.lineTo(width - padding.right, entryY);
+      ctx.stroke();
+
+      ctx.fillStyle = colors.entryLine;
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("Entry", width - padding.right + 5, entryY + 4);
+
+      // TP line
+      const tpY = priceToY(tpPrice);
+      ctx.strokeStyle = colors.tpLine;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(padding.left, tpY);
+      ctx.lineTo(width - padding.right, tpY);
+      ctx.stroke();
+
+      ctx.fillStyle = colors.tpLine;
+      ctx.fillText("TP", width - padding.right + 5, tpY + 4);
+
+      // SL line
+      const slY = priceToY(slPrice);
+      ctx.strokeStyle = colors.slLine;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(padding.left, slY);
+      ctx.lineTo(width - padding.right, slY);
+      ctx.stroke();
+
+      ctx.fillStyle = colors.slLine;
+      ctx.fillText("SL", width - padding.right + 5, slY + 4);
+
+      ctx.setLineDash([]);
+
+      // Level lines
+      if (trade.levels) {
+        for (const level of trade.levels) {
+          if (level.level > 0) {
+            const levelColor = colors.levelColors[(level.level - 1) % colors.levelColors.length];
+            const levelY = priceToY(level.openPrice);
+
+            ctx.strokeStyle = levelColor;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 4]);
+            ctx.beginPath();
+            ctx.moveTo(padding.left, levelY);
+            ctx.lineTo(width - padding.right, levelY);
+            ctx.stroke();
+
+            ctx.fillStyle = levelColor;
+            ctx.font = "10px sans-serif";
+            ctx.fillText(`L${level.level}`, width - padding.right + 5, levelY + 3);
+          }
+        }
+        ctx.setLineDash([]);
+      }
+
+      // Exit marker
+      if (trade.exitPrice && displayedCandles.length > 0) {
+        // Find the last candle (exit)
+        const lastCandle = displayedCandles[displayedCandles.length - 1];
+        if (lastCandle) {
+          const exitIdx = displayedCandles.length - 1 - visibleStart;
+          if (exitIdx >= 0 && exitIdx < visibleCount) {
+            const exitX = indexToX(exitIdx);
+            const exitY = priceToY(trade.exitPrice);
+
+            // Triangle marker
+            ctx.fillStyle = trade.totalProfit >= 0 ? colors.tpLine : colors.slLine;
+            ctx.beginPath();
+            if (isBuy) {
+              ctx.moveTo(exitX, exitY - 10);
+              ctx.lineTo(exitX - 6, exitY - 2);
+              ctx.lineTo(exitX + 6, exitY - 2);
+            } else {
+              ctx.moveTo(exitX, exitY + 10);
+              ctx.lineTo(exitX - 6, exitY + 2);
+              ctx.lineTo(exitX + 6, exitY + 2);
+            }
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+      }
+    }
+
+    // Draw crosshair
+    if (mousePos && mousePos.x > padding.left && mousePos.x < width - padding.right) {
+      ctx.strokeStyle = colors.text + "40";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+
+      // Vertical line
+      ctx.beginPath();
+      ctx.moveTo(mousePos.x, padding.top);
+      ctx.lineTo(mousePos.x, height - padding.bottom);
+      ctx.stroke();
+
+      // Horizontal line
+      if (mousePos.y > padding.top && mousePos.y < height - padding.bottom) {
+        ctx.beginPath();
+        ctx.moveTo(padding.left, mousePos.y);
+        ctx.lineTo(width - padding.right, mousePos.y);
+        ctx.stroke();
+
+        // Price label at crosshair
+        const price = minPrice + ((height - padding.bottom - mousePos.y) / chartHeight) * priceRangeValue;
+        ctx.fillStyle = colors.text;
+        ctx.font = "11px monospace";
+        ctx.textAlign = "left";
+        ctx.fillText(price.toFixed(2), width - padding.right + 5, mousePos.y + 4);
+      }
+
+      ctx.setLineDash([]);
+    }
+  }, [dimensions, displayedCandles, visibleStart, visibleCount, priceRange, colors, trade, config, mousePos, isMobile]);
+
+  // Render on state changes
+  useEffect(() => {
+    drawChart();
+  }, [drawChart]);
+
+  // ==================== MOUSE/TOUCH HANDLERS ====================
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    setMousePos({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setMousePos(null);
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    setIsDragging(true);
+    setDragStartX(e.clientX);
+    setDragStartVisibleStart(visibleStart);
+  }, [visibleStart]);
+
+  const handleMouseMoveDrag = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDragging) return;
+
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const deltaX = e.clientX - dragStartX;
+    const candleWidth = (rect.width - 80) / visibleCount;
+    const candleDelta = Math.round(deltaX / candleWidth);
+
+    const newStart = Math.max(0, Math.min(displayedCandles.length - visibleCount, dragStartVisibleStart - candleDelta));
+    setVisibleStart(newStart);
+  }, [isDragging, dragStartX, dragStartVisibleStart, visibleCount, displayedCandles.length]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+
+    const delta = e.deltaY > 0 ? 5 : -5;
+    const newCount = Math.max(MIN_CANDLES_VISIBLE, Math.min(MAX_CANDLES_VISIBLE, visibleCount + delta));
+
+    // Adjust visibleStart to keep center candle in center
+    const centerOffset = visibleCount / 2;
+    const newCenterOffset = newCount / 2;
+    const newStart = Math.max(0, Math.min(displayedCandles.length - newCount, Math.round(visibleStart + centerOffset - newCenterOffset)));
+
+    setVisibleCount(newCount);
+    setVisibleStart(newStart);
+  }, [visibleCount, visibleStart, displayedCandles.length]);
+
+  // Touch handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      setDragStartX(e.touches[0].clientX);
+      setDragStartVisibleStart(visibleStart);
+    } else if (e.touches.length === 2) {
+      // Pinch start
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      setLastPinchDistance(Math.sqrt(dx * dx + dy * dy));
+    }
+  }, [visibleStart]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length === 1 && isDragging) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const deltaX = e.touches[0].clientX - dragStartX;
+      const candleWidth = (rect.width - 80) / visibleCount;
+      const candleDelta = Math.round(deltaX / candleWidth);
+
+      const newStart = Math.max(0, Math.min(displayedCandles.length - visibleCount, dragStartVisibleStart - candleDelta));
+      setVisibleStart(newStart);
+    } else if (e.touches.length === 2 && lastPinchDistance !== null) {
+      // Pinch zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      const delta = (lastPinchDistance - distance) / 10;
+      const newCount = Math.max(MIN_CANDLES_VISIBLE, Math.min(MAX_CANDLES_VISIBLE, visibleCount + Math.round(delta)));
+
+      setVisibleCount(newCount);
+      setLastPinchDistance(distance);
+    }
+  }, [isDragging, dragStartX, dragStartVisibleStart, visibleCount, displayedCandles.length, lastPinchDistance]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false);
+    setLastPinchDistance(null);
+  }, []);
 
   // ==================== HANDLERS ====================
 
@@ -616,12 +876,14 @@ export default function SimpleCandleChart({
     setProgress(0);
     setCurrentTick(null);
     setDisplayedCandles(historyCandles);
+    setVisibleStart(0);
+    setVisibleCount(60);
   }, [historyCandles]);
 
   const handleTimeframeChange = useCallback(
     (tf: Timeframe) => {
       setTimeframe(tf);
-      if (trade && allTicks.length > 0) {
+      if (trade) {
         const history = generateHistoryCandles(
           trade.entryPrice,
           new Date(trade.entryTime),
@@ -629,15 +891,36 @@ export default function SimpleCandleChart({
           tf
         );
         setHistoryCandles(history);
+
+        const tradeCndl = aggregateTicksToCandles(allTicks, tf);
+        setTradeCandles(tradeCndl);
+
         setDisplayedCandles(history);
         setCurrentTickIndex(0);
         setProgress(0);
         setIsPlaying(false);
         setCurrentTick(null);
+        setVisibleStart(0);
+        setVisibleCount(60);
       }
     },
     [trade, allTicks]
   );
+
+  const handlePlayPause = useCallback(() => {
+    if (isPlaying) {
+      setIsPlaying(false);
+    } else {
+      // If at end, reset first
+      if (currentTickIndex >= allTicks.length - 1) {
+        setDisplayedCandles(historyCandles);
+        setCurrentTickIndex(0);
+        setProgress(0);
+        setCurrentTick(null);
+      }
+      setIsPlaying(true);
+    }
+  }, [isPlaying, currentTickIndex, allTicks.length, historyCandles]);
 
   // ==================== VALIDATION ====================
 
@@ -673,7 +956,7 @@ export default function SimpleCandleChart({
   // ==================== RENDER ====================
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Trade header */}
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 p-3 bg-slate-800 rounded-lg">
         <div className="flex flex-wrap items-center gap-2 sm:gap-4">
@@ -726,15 +1009,14 @@ export default function SimpleCandleChart({
       </div>
 
       {/* Controls */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-3 bg-slate-800 rounded-lg">
+      <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-800 rounded-lg">
         {/* Timeframe buttons */}
-        <div className="flex items-center gap-1 sm:gap-2">
-          <span className="text-xs text-gray-400 hidden sm:inline">TF:</span>
+        <div className="flex items-center gap-1">
           {(["1", "5", "15"] as Timeframe[]).map((tf) => (
             <button
               key={tf}
               onClick={() => handleTimeframeChange(tf)}
-              className={`px-3 py-2.5 sm:py-1.5 rounded text-[13px] sm:text-sm font-medium transition-colors min-h-[44px] sm:min-h-0 ${
+              className={`px-3 py-2 sm:py-1.5 rounded text-[13px] sm:text-sm font-medium transition-colors min-h-[44px] sm:min-h-0 min-w-[44px] sm:min-w-0 ${
                 timeframe === tf
                   ? "bg-blue-600 text-white"
                   : "bg-slate-700 text-gray-300 hover:bg-slate-600"
@@ -746,25 +1028,26 @@ export default function SimpleCandleChart({
         </div>
 
         {/* Speed selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 hidden sm:inline">Speed:</span>
-          <select
-            value={speed}
-            onChange={(e) => setSpeed(Number(e.target.value))}
-            className="px-3 py-2.5 sm:py-1.5 bg-slate-700 rounded text-[13px] sm:text-sm border-0 text-white min-h-[44px] sm:min-h-0"
-          >
-            {SPEED_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}x
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center gap-1">
+          {([1, 2, 5, 10] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setSpeed(s)}
+              className={`px-3 py-2 sm:py-1.5 rounded text-[13px] sm:text-sm font-medium transition-colors min-h-[44px] sm:min-h-0 min-w-[44px] sm:min-w-0 ${
+                speed === s
+                  ? "bg-purple-600 text-white"
+                  : "bg-slate-700 text-gray-300 hover:bg-slate-600"
+              }`}
+            >
+              {s}x
+            </button>
+          ))}
         </div>
 
         {/* Play/Pause */}
         <button
-          onClick={() => setIsPlaying(!isPlaying)}
-          className={`px-4 py-2.5 sm:py-1.5 rounded font-medium text-white flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0 ${
+          onClick={handlePlayPause}
+          className={`px-4 py-2 sm:py-1.5 rounded font-medium text-white flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0 ${
             isPlaying
               ? "bg-amber-600 hover:bg-amber-700"
               : "bg-green-600 hover:bg-green-700"
@@ -772,11 +1055,7 @@ export default function SimpleCandleChart({
         >
           {isPlaying ? (
             <>
-              <svg
-                className="w-4 h-4"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"
                   d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z"
@@ -788,11 +1067,7 @@ export default function SimpleCandleChart({
             </>
           ) : (
             <>
-              <svg
-                className="w-4 h-4"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
@@ -807,7 +1082,7 @@ export default function SimpleCandleChart({
         {/* Reset */}
         <button
           onClick={handleReset}
-          className="px-4 py-2.5 sm:py-1.5 bg-slate-600 hover:bg-slate-500 rounded font-medium text-white flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0"
+          className="px-4 py-2 sm:py-1.5 bg-slate-600 hover:bg-slate-500 rounded font-medium text-white flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0"
         >
           <svg
             className="w-4 h-4"
@@ -853,9 +1128,26 @@ export default function SimpleCandleChart({
       {/* Chart container */}
       <div
         ref={containerRef}
-        className="w-full rounded-lg overflow-hidden min-h-[300px] sm:min-h-[450px]"
-        style={{ backgroundColor: colors.background }}
-      />
+        className="w-full rounded-lg overflow-hidden"
+        style={{ backgroundColor: colors.background, height: dimensions.height }}
+      >
+        <canvas
+          ref={canvasRef}
+          style={{ width: dimensions.width, height: dimensions.height }}
+          onMouseMove={(e) => {
+            handleMouseMove(e);
+            handleMouseMoveDrag(e);
+          }}
+          onMouseLeave={handleMouseLeave}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onWheel={handleWheel}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className="cursor-crosshair touch-none"
+        />
+      </div>
 
       {/* Price levels legend */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 p-3 bg-slate-800 rounded-lg text-[13px] sm:text-sm">
