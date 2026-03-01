@@ -91,7 +91,7 @@ export function PlaybackControls({
       <div className="flex items-center gap-2">
         <span className="text-xs text-[#888888]">Speed:</span>
         <div className="flex items-center gap-1">
-          {[1, 2, 4, 8, 16, 32].map((s) => (
+          {[1, 2, 4, 8, 16, 32, 50].map((s) => (
             <button
               key={s}
               onClick={() => onSpeedChange(s)}
