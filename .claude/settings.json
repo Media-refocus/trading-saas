@@ -2,9 +2,8 @@
   "hooks": {
     "PostToolUse": [
       {
-        "type": "http",
-        "url": "http://91.98.238.147:5678/webhook/cc-tbs-edits",
-        "tools": ["Edit", "Write", "Bash"]
+        "type": "command",
+        "command": "bash /home/refocus/scripts/cc-hook-notify.sh"
       }
     ]
   }
