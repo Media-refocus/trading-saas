@@ -191,7 +191,7 @@ model Subscription {
   plan               PlanType           // BASIC, PRO, ENTERPRISE
   stripePriceId      String?
   stripeSubId        String?            @unique
-  status             String @default("TRIAL")
+  status             SubscriptionStatus @default(TRIAL)
   trialEnd           DateTime?
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
