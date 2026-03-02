@@ -13,18 +13,12 @@ import { validateProductionConfig } from "@/lib/config";
 export async function register() {
   // Solo ejecutar en el servidor, no en edge
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    // Debug: log available env vars
-    console.log("[Server] ENV CHECK:");
-    console.log("[Server] - DATABASE_URL:", !!process.env.DATABASE_URL);
-    console.log("[Server] - AUTH_SECRET:", !!process.env.AUTH_SECRET, process.env.AUTH_SECRET?.length || 0, "chars");
-    console.log("[Server] - CREDENTIALS_ENCRYPTION_KEY:", !!process.env.CREDENTIALS_ENCRYPTION_KEY, process.env.CREDENTIALS_ENCRYPTION_KEY?.length || 0, "chars");
-    
     // Validar configuracion obligatoria en produccion
+    // Wrapped in try-catch to prevent server crash on missing env vars
     try {
       validateProductionConfig();
     } catch (error) {
-      console.error("[Server] CONFIG VALIDATION FAILED:", error);
-      // Don't throw - allow server to start for debugging
+      console.error("[Server] Config validation failed - some features may not work:", error);
     }
 
     console.log("[Server] ========================================");
