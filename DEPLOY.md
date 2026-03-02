@@ -49,7 +49,9 @@ En Vercel Dashboard → Settings → Environment Variables:
 | `AUTH_SECRET` | `openssl rand -base64 32` |
 | `NEXTAUTH_URL` | `https://tu-dominio.vercel.app` |
 | `NEXT_PUBLIC_APP_URL` | `https://tu-dominio.vercel.app` |
-| `CREDENTIALS_ENCRYPTION_KEY` | `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `CREDENTIALS_ENCRYPTION_KEY` | `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` ⚠️ |
+
+> ⚠️ **IMPORTANTE:** `CREDENTIALS_ENCRYPTION_KEY` debe ser **exactamente 64 caracteres** (32 bytes en hex). Si no, `instrumentation.ts` crasheará el servidor al arrancar y TODAS las APIs retornarán 500. Ver [post-mortem](../../.openclaw/workspace/memory/post-mortems/2026-03-02-vercel-500-error.md).
 
 ### Stripe (cuando tengas cuenta)
 
