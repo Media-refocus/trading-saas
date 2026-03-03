@@ -190,6 +190,18 @@ export default function BacktesterPage() {
   const [selectedTradeIndex, setSelectedTradeIndex] = useState<number | null>(null);
   const [showEnhancedChart, setShowEnhancedChart] = useState(true);
 
+  // Secciones colapsables en mobile
+  const [expandedSections, setExpandedSections] = useState({
+    estrategia: true,
+    gridRisk: true,
+    ejecucion: false,
+    datos: false,
+  });
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
   // Cargar datos de localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -458,32 +470,44 @@ export default function BacktesterPage() {
               Configuración
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 pt-3">
-            {/* Fila 1: Fuente + Estrategia */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Señales</Label>
-                <select
-                  className="w-full px-2.5 py-2 text-xs border rounded-lg bg-background/50 hover:bg-background transition-colors focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  value={config.signalsSource}
-                  onChange={(e) => updateConfig("signalsSource", e.target.value)}
-                >
-                  {signalSources.data?.map((s) => (
-                    <option key={s.file} value={s.file}>{s.file.replace('.csv', '')} ({s.total})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Estrategia</Label>
-                <select
-                  className="w-full px-2.5 py-2 text-xs border rounded-lg bg-background/50 hover:bg-background transition-colors focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  value={config.strategyName}
-                  onChange={(e) => updateConfig("strategyName", e.target.value)}
-                >
-                  <option>Toni (G4)</option>
-                  <option>Xisco (G2)</option>
-                  <option>Personalizada</option>
-                </select>
+          <CardContent className="space-y-3 pt-3">
+            {/* Sección: Estrategia - siempre visible en desktop, colapsable en mobile */}
+            <div className="sm:block">
+              <button
+                type="button"
+                onClick={() => toggleSection("estrategia")}
+                className="w-full flex items-center justify-between py-2 sm:hidden"
+              >
+                <span className="text-xs font-semibold text-muted-foreground">Estrategia</span>
+                {expandedSections.estrategia ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              <div className={`space-y-2 ${expandedSections.estrategia ? 'block' : 'hidden sm:block'}`}>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground font-medium">Señales</Label>
+                    <select
+                      className="w-full px-2.5 py-2.5 text-xs border rounded-lg bg-background/50 hover:bg-background transition-colors focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 min-h-[44px]"
+                      value={config.signalsSource}
+                      onChange={(e) => updateConfig("signalsSource", e.target.value)}
+                    >
+                      {signalSources.data?.map((s) => (
+                        <option key={s.file} value={s.file}>{s.file.replace('.csv', '')} ({s.total})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground font-medium">Estrategia</Label>
+                    <select
+                      className="w-full px-2.5 py-2.5 text-xs border rounded-lg bg-background/50 hover:bg-background transition-colors focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 min-h-[44px]"
+                      value={config.strategyName}
+                      onChange={(e) => updateConfig("strategyName", e.target.value)}
+                    >
+                      <option>Toni (G4)</option>
+                      <option>Xisco (G2)</option>
+                      <option>Personalizada</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
 
