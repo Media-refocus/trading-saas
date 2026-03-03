@@ -46,27 +46,68 @@ interface CandleChartCanvasProps {
   onExportPng?: () => void;
 }
 
-// Mouse state for crosshair
-interface MouseState {
-  x: number;
-  y: number;
-  isInside: boolean;
-  candleIndex: number;
+interface TouchState {
+  // Panning
+  isPanning: boolean;
+  panStartX: number;
+  panStartOffsetX: number;
+  lastPanX: number;
+  lastPanTime: number;
+  velocityX: number;
+
+  // Pinch zoom (horizontal)
+  isPinching: boolean;
+  pinchStartDist: number;
+  pinchStartScaleX: number;
+  pinchCenterX: number;
+
+  // Price axis drag (vertical Y zoom)
+  isDraggingPriceAxis: boolean;
+  priceAxisStartY: number;
+  priceAxisStartScaleY: number;
+
+  // Long press crosshair
+  longPressTimer: ReturnType<typeof setTimeout> | null;
+  isCrosshairActive: boolean;
+  crosshairX: number;
+  crosshairY: number;
+
+  // Double tap
+  lastTapTime: number;
 }
 
 // ==================== CONSTANTS ====================
 
-const PIP_VALUE = 0.1;
-const CANDLE_BODY_RATIO = 0.65;
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 3;
-const ZOOM_SENSITIVITY = 0.001;
+const PRICE_AXIS_WIDTH = 65;
+const TIME_AXIS_HEIGHT = 30;
+const TOP_PADDING = 12;
+const LEFT_PADDING = 6;
+const MIN_CANDLES_VISIBLE = 15;
+const MAX_CANDLES_VISIBLE = 600;
+const LONG_PRESS_MS = 300;
+const DOUBLE_TAP_MS = 300;
+const MOMENTUM_FRICTION = 0.95;
+const MOMENTUM_MIN_VELOCITY = 0.5;
+
+// MT5 colors
+const MT5 = {
+  bg: "#000000",
+  candleUp: "#26a69a",
+  candleDown: "#ef5350",
+  grid: "rgba(255,255,255,0.06)",
+  text: "rgba(255,255,255,0.6)",
+  textBright: "rgba(255,255,255,0.85)",
+  currentPrice: "#00bcd4",
+  crosshair: "rgba(255,255,255,0.3)",
+  tooltipBg: "rgba(20,20,20,0.95)",
+  tooltipBorder: "rgba(255,255,255,0.15)",
+};
 
 // ==================== COMPONENT ====================
 
 export function CandleChartCanvas({
   candles,
-  visibleStart: externalVisibleStart,
+  visibleStart: _externalVisibleStart,
   visibleCount: externalVisibleCount = 60,
   currentCandleIndex = 0,
   tradeMarkers = [],
@@ -81,258 +122,258 @@ export function CandleChartCanvas({
   showVolume = false,
   onExportPng,
 }: CandleChartCanvasProps) {
-  const colors = getThemeColors(themeId);
-
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const equityCanvasRef = useRef<HTMLCanvasElement>(null);
   const volumeCanvasRef = useRef<HTMLCanvasElement>(null);
+  const animFrameRef = useRef<number>(0);
+  const momentumRef = useRef<number>(0);
+  const touchRef = useRef<TouchState>({
+    isPanning: false,
+    panStartX: 0,
+    panStartOffsetX: 0,
+    lastPanX: 0,
+    lastPanTime: 0,
+    velocityX: 0,
+    isPinching: false,
+    pinchStartDist: 0,
+    pinchStartScaleX: 0,
+    pinchCenterX: 0,
+    isDraggingPriceAxis: false,
+    priceAxisStartY: 0,
+    priceAxisStartScaleY: 0,
+    longPressTimer: null,
+    isCrosshairActive: false,
+    crosshairX: 0,
+    crosshairY: 0,
+    lastTapTime: 0,
+  });
 
   // Dimensions
   const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
-  const [isMobile, setIsMobile] = useState(false);
 
-  // Mouse state for crosshair
-  const [mouse, setMouse] = useState<MouseState>({
+  // Chart state — internal scroll/zoom
+  const [offsetX, setOffsetX] = useState(0); // scroll position (candle units from end)
+  const [scaleX, setScaleX] = useState(externalVisibleCount); // candles visible
+  const [scaleY, setScaleY] = useState(1.0); // Y zoom multiplier
+  const [isAutoFitY, setIsAutoFitY] = useState(true);
+  const [crosshair, setCrosshair] = useState<{ active: boolean; x: number; y: number }>({
+    active: false,
     x: 0,
     y: 0,
-    isInside: false,
-    candleIndex: -1,
   });
 
-  // Zoom state
-  const [zoom, setZoom] = useState(1);
+  // Mouse state for desktop
+  const [mouseInside, setMouseInside] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Chart geometry helpers
+  const chartWidth = dimensions.width - LEFT_PADDING - PRICE_AXIS_WIDTH;
+  const chartHeight = dimensions.height - TOP_PADDING - TIME_AXIS_HEIGHT;
 
   // Calculate visible range
-  const visibleCount = externalVisibleCount;
-  const visibleStart = externalVisibleStart ?? Math.max(0, candles.length - visibleCount);
-  const visibleEnd = Math.min(candles.length, visibleStart + visibleCount);
+  const visibleCandlesCount = Math.max(MIN_CANDLES_VISIBLE, Math.min(MAX_CANDLES_VISIBLE, Math.round(scaleX)));
+  const visibleEnd = Math.max(0, candles.length - Math.round(offsetX));
+  const visibleStart = Math.max(0, visibleEnd - visibleCandlesCount);
   const visibleCandles = candles.slice(visibleStart, visibleEnd);
 
-  // Calculate price range with padding
-  const priceRange = useCallback(() => {
-    if (visibleCandles.length === 0) {
-      return { min: 0, max: 1 };
-    }
+  // Price range calculation
+  const priceRange = useMemo(() => {
+    if (visibleCandles.length === 0) return { min: 0, max: 1, center: 0.5 };
 
     let min = Infinity;
     let max = -Infinity;
-
     for (const c of visibleCandles) {
       min = Math.min(min, c.low);
       max = Math.max(max, c.high);
     }
 
-    // Add trade markers to range
-    for (const trade of tradeMarkers) {
-      min = Math.min(min, trade.entryPrice, trade.exitPrice);
-      max = Math.max(max, trade.entryPrice, trade.exitPrice);
+    const padding = (max - min) * 0.08 || 1;
+    min -= padding;
+    max += padding;
+    const center = (min + max) / 2;
 
-      // Add TP/SL
-      const isBuy = trade.side === "BUY";
-      const tpPrice = isBuy
-        ? trade.entryPrice + (config.takeProfitPips ?? 50) * PIP_VALUE
-        : trade.entryPrice - (config.takeProfitPips ?? 50) * PIP_VALUE;
-      const slPrice = isBuy
-        ? trade.entryPrice - 50 * PIP_VALUE
-        : trade.entryPrice + 50 * PIP_VALUE;
-
-      min = Math.min(min, tpPrice, slPrice);
-      max = Math.max(max, tpPrice, slPrice);
+    if (!isAutoFitY) {
+      // Apply manual Y scale
+      const halfRange = ((max - min) / 2) * scaleY;
+      return { min: center - halfRange, max: center + halfRange, center };
     }
 
-    // Add padding
-    const padding = (max - min) * 0.1 || 1;
-    return { min: min - padding, max: max + padding };
-  }, [visibleCandles, tradeMarkers, config]);
+    return { min, max, center };
+  }, [visibleCandles, isAutoFitY, scaleY]);
+
+  // Coordinate transforms
+  const priceToY = useCallback(
+    (price: number) => {
+      const range = priceRange.max - priceRange.min || 1;
+      return TOP_PADDING + chartHeight - ((price - priceRange.min) / range) * chartHeight;
+    },
+    [priceRange, chartHeight]
+  );
+
+  const yToPrice = useCallback(
+    (y: number) => {
+      const range = priceRange.max - priceRange.min || 1;
+      return priceRange.min + ((TOP_PADDING + chartHeight - y) / chartHeight) * range;
+    },
+    [priceRange, chartHeight]
+  );
+
+  const indexToX = useCallback(
+    (i: number) => {
+      if (visibleCandles.length === 0) return 0;
+      const candleW = chartWidth / visibleCandles.length;
+      return LEFT_PADDING + i * candleW + candleW / 2;
+    },
+    [visibleCandles.length, chartWidth]
+  );
+
+  const xToIndex = useCallback(
+    (x: number) => {
+      if (visibleCandles.length === 0) return -1;
+      const candleW = chartWidth / visibleCandles.length;
+      return Math.floor((x - LEFT_PADDING) / candleW);
+    },
+    [visibleCandles.length, chartWidth]
+  );
 
   // Handle resize
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const updateDimensions = () => {
+    const update = () => {
       const rect = container.getBoundingClientRect();
-      setDimensions({
-        width: rect.width || 800,
-        height: rect.height || 400,
-      });
-      setIsMobile(window.innerWidth < 768);
+      setDimensions({ width: rect.width || 800, height: rect.height || 400 });
     };
+    update();
 
-    updateDimensions();
-
-    const observer = new ResizeObserver(updateDimensions);
+    const observer = new ResizeObserver(update);
     observer.observe(container);
-
-    window.addEventListener("resize", updateDimensions);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", updateDimensions);
-    };
+    return () => observer.disconnect();
   }, []);
 
-  // Draw chart
-  const drawChart = useCallback(() => {
+  // ==================== DRAWING ====================
+
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
     const { width, height } = dimensions;
-
-    // Set canvas size with DPR
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
 
-    // Chart area with room for labels
-    const padding = { top: 20, right: 75, bottom: 35, left: 10 };
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
-
-    // Clear with theme background
-    ctx.fillStyle = colors.background;
+    // Background — pure black
+    ctx.fillStyle = MT5.bg;
     ctx.fillRect(0, 0, width, height);
 
-    // Get visible candles
     if (visibleCandles.length === 0) {
-      ctx.fillStyle = colors.text;
-      ctx.font = "14px sans-serif";
+      ctx.fillStyle = MT5.text;
+      ctx.font = "13px -apple-system, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("No hay datos", width / 2, height / 2);
+      ctx.fillText("No hay datos de velas", width / 2, height / 2);
       return;
     }
 
-    const { min: minPrice, max: maxPrice } = priceRange();
-    const priceRangeValue = maxPrice - minPrice || 1;
+    const candleW = chartWidth / visibleCandles.length;
+    const bodyW = Math.max(1, candleW * 0.7 - 1);
 
-    // Helper functions
-    const priceToY = (price: number) =>
-      padding.top + chartHeight - ((price - minPrice) / priceRangeValue) * chartHeight;
-
-    const yToPrice = (y: number) =>
-      minPrice + ((padding.top + chartHeight - y) / chartHeight) * priceRangeValue;
-
-    const indexToX = (index: number) => {
-      const candleWidth = (chartWidth * zoom) / visibleCount;
-      return padding.left + index * candleWidth + candleWidth / 2;
-    };
-
-    const xToIndex = (x: number) => {
-      const candleWidth = (chartWidth * zoom) / visibleCount;
-      return Math.floor((x - padding.left) / candleWidth);
-    };
-
-    // Draw grid lines
-    ctx.strokeStyle = colors.grid;
+    // ---- Grid lines ----
+    ctx.strokeStyle = MT5.grid;
     ctx.lineWidth = 1;
 
-    // Horizontal grid (price) - with labels
-    const priceSteps = 5;
-    for (let i = 0; i <= priceSteps; i++) {
-      const price = minPrice + (priceRangeValue * i) / priceSteps;
-      const y = priceToY(price);
+    // Horizontal grid + price labels
+    const priceRangeVal = priceRange.max - priceRange.min || 1;
+    const rawStep = priceRangeVal / 6;
+    const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    const nice = [1, 2, 5, 10].find((n) => n * mag >= rawStep) || 10;
+    const step = nice * mag;
+    const firstPrice = Math.ceil(priceRange.min / step) * step;
+
+    ctx.font = "11px monospace";
+    for (let p = firstPrice; p <= priceRange.max; p += step) {
+      const y = priceToY(p);
+      if (y < TOP_PADDING || y > TOP_PADDING + chartHeight) continue;
       ctx.beginPath();
-      ctx.moveTo(padding.left, y);
-      ctx.lineTo(width - padding.right, y);
+      ctx.moveTo(LEFT_PADDING, y);
+      ctx.lineTo(LEFT_PADDING + chartWidth, y);
       ctx.stroke();
 
-      // Price labels on Y-axis (right side)
-      ctx.fillStyle = colors.text;
-      ctx.font = `${isMobile ? 10 : 11}px monospace`;
+      // Price label
+      ctx.fillStyle = MT5.text;
       ctx.textAlign = "left";
-      ctx.fillText(price.toFixed(2), width - padding.right + 5, y + 4);
+      ctx.fillText(p.toFixed(2), LEFT_PADDING + chartWidth + 6, y + 4);
     }
 
-    // Vertical grid (time) - with labels
-    const timeSteps = Math.min(6, visibleCandles.length);
-    for (let i = 0; i < timeSteps; i++) {
-      const idx = Math.floor((i / Math.max(1, timeSteps - 1)) * (visibleCandles.length - 1));
-      const x = indexToX(idx);
+    // Vertical grid + time labels
+    const maxTimeLabels = Math.max(3, Math.floor(chartWidth / 100));
+    const timeStep = Math.max(1, Math.floor(visibleCandles.length / maxTimeLabels));
+    ctx.font = "10px monospace";
+    for (let i = 0; i < visibleCandles.length; i += timeStep) {
+      const x = indexToX(i);
+      ctx.strokeStyle = MT5.grid;
       ctx.beginPath();
-      ctx.moveTo(x, padding.top);
-      ctx.lineTo(x, height - padding.bottom);
+      ctx.moveTo(x, TOP_PADDING);
+      ctx.lineTo(x, TOP_PADDING + chartHeight);
       ctx.stroke();
 
-      // Time labels on X-axis (bottom)
-      if (visibleCandles[idx]) {
-        const date = new Date(visibleCandles[idx].time * 1000);
-        const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        ctx.fillStyle = colors.text;
-        ctx.font = `${isMobile ? 9 : 10}px monospace`;
-        ctx.textAlign = "center";
-        ctx.fillText(timeStr, x, height - padding.bottom + 15);
-      }
+      const date = new Date(visibleCandles[i].time * 1000);
+      const label =
+        visibleCandles.length > 200
+          ? date.toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
+          : date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+      ctx.fillStyle = MT5.text;
+      ctx.textAlign = "center";
+      ctx.fillText(label, x, height - TIME_AXIS_HEIGHT + 18);
     }
 
-    // Calculate candle dimensions
-    const candleSlotWidth = (chartWidth * zoom) / visibleCount;
-    const candleBodyWidth = candleSlotWidth * CANDLE_BODY_RATIO;
-    const candleWickWidth = 1;
-
-    // Draw candles
+    // ---- Candles ----
     for (let i = 0; i < visibleCandles.length; i++) {
-      const candle = visibleCandles[i];
+      const c = visibleCandles[i];
       const x = indexToX(i);
-      const isBullish = candle.close >= candle.open;
+      const bull = c.close >= c.open;
+      const color = bull ? MT5.candleUp : MT5.candleDown;
 
-      const color = isBullish ? colors.candleUp : colors.candleDown;
-      const wickColor = isBullish ? colors.wickUp : colors.wickDown;
+      const oY = priceToY(c.open);
+      const cY = priceToY(c.close);
+      const hY = priceToY(c.high);
+      const lY = priceToY(c.low);
 
-      const openY = priceToY(candle.open);
-      const closeY = priceToY(candle.close);
-      const highY = priceToY(candle.high);
-      const lowY = priceToY(candle.low);
-
-      // Wick
-      ctx.strokeStyle = wickColor;
-      ctx.lineWidth = candleWickWidth;
+      // Wick — 1px
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(x, highY);
-      ctx.lineTo(x, lowY);
+      ctx.moveTo(x, hY);
+      ctx.lineTo(x, lY);
       ctx.stroke();
 
       // Body
-      const bodyTop = Math.min(openY, closeY);
-      const bodyHeight = Math.abs(closeY - openY) || 1;
-
+      const top = Math.min(oY, cY);
+      const h = Math.max(1, Math.abs(cY - oY));
       ctx.fillStyle = color;
-      ctx.fillRect(x - candleBodyWidth / 2, bodyTop, candleBodyWidth, bodyHeight);
-
-      // Highlight current candle in playback
-      if (i === currentCandleIndex - visibleStart && currentCandleIndex >= visibleStart && currentCandleIndex < visibleEnd) {
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x - candleBodyWidth / 2 - 2, bodyTop - 2, candleBodyWidth + 4, bodyHeight + 4);
-      }
+      ctx.fillRect(Math.round(x - bodyW / 2), Math.round(top), Math.round(bodyW), Math.round(h));
     }
 
-    // Draw MA lines
+    // ---- MA Lines ----
     for (const ma of maLines) {
       if (!ma.values || ma.values.length === 0) continue;
-
       ctx.strokeStyle = ma.color;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-
-      let isFirstPoint = true;
+      let first = true;
       for (let i = 0; i < visibleCandles.length; i++) {
-        const candle = visibleCandles[i];
-        // Find matching MA value by time
-        const maValue = ma.values.find(v => v.time === candle.time);
-        if (!maValue || maValue.value === null) continue;
-
+        const mv = ma.values.find((v) => v.time === visibleCandles[i].time);
+        if (!mv || mv.value === null) continue;
         const x = indexToX(i);
-        const y = priceToY(maValue.value);
-
-        if (isFirstPoint) {
+        const y = priceToY(mv.value);
+        if (first) {
           ctx.moveTo(x, y);
-          isFirstPoint = false;
+          first = false;
         } else {
           ctx.lineTo(x, y);
         }
@@ -340,362 +381,480 @@ export function CandleChartCanvas({
       ctx.stroke();
     }
 
-    // Draw trade arrows instead of horizontal lines
+    // ---- Trade arrows ----
     for (const trade of tradeMarkers) {
-      // Find entry candle index
-      const entryTime = Math.floor(new Date(trade.entryTime).getTime() / 1000);
-      const entryCandleIdx = visibleCandles.findIndex(c => c.time === entryTime);
+      const entryTs = Math.floor(new Date(trade.entryTime).getTime() / 1000);
+      const idx = visibleCandles.findIndex((c) => c.time === entryTs);
+      if (idx < 0) continue;
 
-      if (entryCandleIdx >= 0) {
-        const candle = visibleCandles[entryCandleIdx];
-        const x = indexToX(entryCandleIdx);
-        const isBuy = trade.side === "BUY";
+      const x = indexToX(idx);
+      const c = visibleCandles[idx];
+      const isBuy = trade.side === "BUY";
+      const arrowY = isBuy ? priceToY(c.low) + 14 : priceToY(c.high) - 14;
+      const sz = 8;
 
-        // Arrow position: below low for BUY, above high for SELL
-        const arrowY = isBuy ? priceToY(candle.low) + 15 : priceToY(candle.high) - 15;
-        const arrowColor = isBuy ? "#22c55e" : "#ef4444";
-
-        // Draw arrow
-        ctx.fillStyle = arrowColor;
-        ctx.strokeStyle = arrowColor;
-        ctx.lineWidth = 2;
-
-        const arrowSize = 10;
-        ctx.beginPath();
-        if (isBuy) {
-          // Up arrow for BUY
-          ctx.moveTo(x, arrowY);
-          ctx.lineTo(x - arrowSize / 2, arrowY + arrowSize);
-          ctx.lineTo(x + arrowSize / 2, arrowY + arrowSize);
-        } else {
-          // Down arrow for SELL
-          ctx.moveTo(x, arrowY);
-          ctx.lineTo(x - arrowSize / 2, arrowY - arrowSize);
-          ctx.lineTo(x + arrowSize / 2, arrowY - arrowSize);
-        }
-        ctx.closePath();
-        ctx.fill();
-
-        // Draw entry price label
-        const entryY = priceToY(trade.entryPrice);
-        ctx.fillStyle = "#2196f3";
-        ctx.font = "bold 10px monospace";
-        ctx.textAlign = "left";
-        ctx.fillText(`E: ${trade.entryPrice.toFixed(2)}`, width - padding.right + 5, entryY + 4);
+      ctx.fillStyle = isBuy ? "#22c55e" : "#ef4444";
+      ctx.beginPath();
+      if (isBuy) {
+        ctx.moveTo(x, arrowY);
+        ctx.lineTo(x - sz / 2, arrowY + sz);
+        ctx.lineTo(x + sz / 2, arrowY + sz);
+      } else {
+        ctx.moveTo(x, arrowY);
+        ctx.lineTo(x - sz / 2, arrowY - sz);
+        ctx.lineTo(x + sz / 2, arrowY - sz);
       }
+      ctx.closePath();
+      ctx.fill();
     }
 
-    // Draw playback position indicator
-    if (currentCandleIndex >= 0 && currentCandleIndex < candles.length) {
-      const relativeIndex = currentCandleIndex - visibleStart;
-      if (relativeIndex >= 0 && relativeIndex < visibleCandles.length) {
-        const x = indexToX(relativeIndex);
+    // ---- Current price badge ----
+    if (visibleCandles.length > 0) {
+      const lastCandle = visibleCandles[visibleCandles.length - 1];
+      const currentPrice = lastCandle.close;
+      const cpY = priceToY(currentPrice);
 
-        // Vertical line at current position
-        ctx.strokeStyle = "#0078D4";
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath();
-        ctx.moveTo(x, padding.top);
-        ctx.lineTo(x, height - padding.bottom);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
+      // Dashed line across chart
+      ctx.strokeStyle = MT5.currentPrice;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(LEFT_PADDING, cpY);
+      ctx.lineTo(LEFT_PADDING + chartWidth, cpY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Badge on price axis
+      const badgeW = PRICE_AXIS_WIDTH - 4;
+      const badgeH = 18;
+      const badgeX = LEFT_PADDING + chartWidth + 2;
+      const badgeY = cpY - badgeH / 2;
+      ctx.fillStyle = MT5.currentPrice;
+      ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+      ctx.fillStyle = "#000000";
+      ctx.font = "bold 11px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(currentPrice.toFixed(2), badgeX + badgeW / 2, badgeY + 13);
     }
 
-    // Draw crosshair if mouse is inside
-    if (mouse.isInside && mouse.candleIndex >= 0 && mouse.candleIndex < visibleCandles.length) {
-      const candle = visibleCandles[mouse.candleIndex];
-      const x = indexToX(mouse.candleIndex);
+    // ---- Crosshair (touch or desktop) ----
+    const showCrosshair = crosshair.active || (mouseInside && !crosshair.active);
+    const cx = crosshair.active ? crosshair.x : mousePos.x;
+    const cy = crosshair.active ? crosshair.y : mousePos.y;
 
-      // Crosshair lines
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    if (showCrosshair && cx > LEFT_PADDING && cx < LEFT_PADDING + chartWidth && cy > TOP_PADDING && cy < TOP_PADDING + chartHeight) {
+      const hoverIdx = xToIndex(cx);
+
+      // Dashed lines
+      ctx.strokeStyle = MT5.crosshair;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 4]);
 
-      // Vertical line
       ctx.beginPath();
-      ctx.moveTo(mouse.x, padding.top);
-      ctx.lineTo(mouse.x, height - padding.bottom);
+      ctx.moveTo(cx, TOP_PADDING);
+      ctx.lineTo(cx, TOP_PADDING + chartHeight);
       ctx.stroke();
 
-      // Horizontal line
       ctx.beginPath();
-      ctx.moveTo(padding.left, mouse.y);
-      ctx.lineTo(width - padding.right, mouse.y);
+      ctx.moveTo(LEFT_PADDING, cy);
+      ctx.lineTo(LEFT_PADDING + chartWidth, cy);
       ctx.stroke();
-
       ctx.setLineDash([]);
 
-      // Price marker on Y-axis
-      const price = yToPrice(mouse.y);
+      // Price label at crosshair Y
+      const chPrice = yToPrice(cy);
       ctx.fillStyle = "#0078D4";
-      ctx.fillRect(width - padding.right, mouse.y - 10, 70, 20);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 11px monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(price.toFixed(2), width - padding.right + 5, mouse.y + 4);
+      ctx.fillRect(LEFT_PADDING + chartWidth + 1, cy - 9, PRICE_AXIS_WIDTH - 2, 18);
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 10px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(chPrice.toFixed(2), LEFT_PADDING + chartWidth + PRICE_AXIS_WIDTH / 2, cy + 4);
 
-      // OHLC Tooltip
-      const tooltipX = Math.min(mouse.x + 15, width - 150);
-      const tooltipY = Math.max(padding.top + 10, mouse.y - 80);
-      const tooltipWidth = 130;
-      const tooltipHeight = 95;
+      // OHLC tooltip
+      if (hoverIdx >= 0 && hoverIdx < visibleCandles.length) {
+        const candle = visibleCandles[hoverIdx];
+        const date = new Date(candle.time * 1000);
+        const dateStr = date.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" });
+        const timeStr = date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 
-      // Tooltip background
-      ctx.fillStyle = "rgba(30, 30, 30, 0.95)";
-      ctx.strokeStyle = "#3C3C3C";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 6);
-      ctx.fill();
-      ctx.stroke();
+        const tw = 135;
+        const th = 90;
+        const tx = cx + 20 + tw > width ? cx - tw - 10 : cx + 20;
+        const ty = Math.max(TOP_PADDING + 4, Math.min(cy - 45, TOP_PADDING + chartHeight - th));
 
-      // Tooltip content
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 11px monospace";
-      ctx.textAlign = "left";
+        ctx.fillStyle = MT5.tooltipBg;
+        ctx.strokeStyle = MT5.tooltipBorder;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(tx, ty, tw, th, 4);
+        ctx.fill();
+        ctx.stroke();
 
-      const date = new Date(candle.time * 1000);
-      const dateStr = date.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" });
-      const timeStr = date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+        ctx.font = "bold 10px monospace";
+        ctx.fillStyle = MT5.textBright;
+        ctx.textAlign = "left";
+        ctx.fillText(`${dateStr} ${timeStr}`, tx + 8, ty + 16);
 
-      ctx.fillText(`${dateStr} ${timeStr}`, tooltipX + 10, tooltipY + 18);
+        const labels = ["O", "H", "L", "C"];
+        const vals = [candle.open, candle.high, candle.low, candle.close];
+        const colors = [MT5.text, MT5.candleUp, MT5.candleDown, candle.close >= candle.open ? MT5.candleUp : MT5.candleDown];
 
-      ctx.font = "11px monospace";
-      ctx.fillStyle = "#888888";
-      ctx.fillText("O:", tooltipX + 10, tooltipY + 36);
-      ctx.fillText("H:", tooltipX + 10, tooltipY + 51);
-      ctx.fillText("L:", tooltipX + 10, tooltipY + 66);
-      ctx.fillText("C:", tooltipX + 10, tooltipY + 81);
-
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(candle.open.toFixed(2), tooltipX + 30, tooltipY + 36);
-      ctx.fillStyle = "#22c55e";
-      ctx.fillText(candle.high.toFixed(2), tooltipX + 30, tooltipY + 51);
-      ctx.fillStyle = "#ef4444";
-      ctx.fillText(candle.low.toFixed(2), tooltipX + 30, tooltipY + 66);
-      ctx.fillStyle = candle.close >= candle.open ? "#22c55e" : "#ef4444";
-      ctx.fillText(candle.close.toFixed(2), tooltipX + 30, tooltipY + 81);
+        ctx.font = "10px monospace";
+        labels.forEach((l, j) => {
+          const ly = ty + 32 + j * 14;
+          ctx.fillStyle = "rgba(255,255,255,0.4)";
+          ctx.fillText(`${l}:`, tx + 8, ly);
+          ctx.fillStyle = colors[j];
+          ctx.fillText(vals[j].toFixed(2), tx + 28, ly);
+        });
+      }
     }
-  }, [dimensions, visibleCandles, visibleStart, visibleCount, priceRange, colors, tradeMarkers, config, isMobile, currentCandleIndex, candles.length, mouse, zoom, maLines]);
+  }, [
+    dimensions,
+    visibleCandles,
+    priceRange,
+    chartWidth,
+    chartHeight,
+    priceToY,
+    yToPrice,
+    indexToX,
+    xToIndex,
+    tradeMarkers,
+    maLines,
+    crosshair,
+    mouseInside,
+    mousePos,
+  ]);
 
-  // Mouse event handlers
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  // ==================== TOUCH HANDLERS ====================
+
+  const getTouchDist = (t1: Touch, t2: Touch) =>
+    Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+
+  const isInPriceAxis = (clientX: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    return x > dimensions.width - PRICE_AXIS_WIDTH;
+  };
+
+  const clearLongPress = () => {
+    const ts = touchRef.current;
+    if (ts.longPressTimer) {
+      clearTimeout(ts.longPressTimer);
+      ts.longPressTimer = null;
+    }
+  };
+
+  const handleTouchStart = useCallback(
+    (e: TouchEvent) => {
+      e.preventDefault();
+      const ts = touchRef.current;
+      clearLongPress();
+
+      // Stop momentum
+      if (momentumRef.current) {
+        cancelAnimationFrame(momentumRef.current);
+        momentumRef.current = 0;
+      }
+
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const x = touch.clientX - rect.left;
+
+        // Double tap detection
+        const now = Date.now();
+        if (now - ts.lastTapTime < DOUBLE_TAP_MS) {
+          // Double tap — reset Y to auto-fit
+          setIsAutoFitY(true);
+          setScaleY(1.0);
+          ts.lastTapTime = 0;
+          return;
+        }
+        ts.lastTapTime = now;
+
+        if (isInPriceAxis(touch.clientX)) {
+          // Price axis drag — Y zoom
+          ts.isDraggingPriceAxis = true;
+          ts.priceAxisStartY = touch.clientY;
+          ts.priceAxisStartScaleY = scaleY;
+        } else {
+          // Pan
+          ts.isPanning = true;
+          ts.panStartX = touch.clientX;
+          ts.panStartOffsetX = offsetX;
+          ts.lastPanX = touch.clientX;
+          ts.lastPanTime = Date.now();
+          ts.velocityX = 0;
+
+          // Long press for crosshair
+          ts.longPressTimer = setTimeout(() => {
+            ts.isCrosshairActive = true;
+            const y = touch.clientY - (rect?.top || 0);
+            setCrosshair({ active: true, x, y });
+          }, LONG_PRESS_MS);
+        }
+      } else if (e.touches.length === 2) {
+        // Pinch zoom
+        clearLongPress();
+        ts.isPanning = false;
+        ts.isCrosshairActive = false;
+        setCrosshair({ active: false, x: 0, y: 0 });
+
+        ts.isPinching = true;
+        ts.pinchStartDist = getTouchDist(e.touches[0], e.touches[1]);
+        ts.pinchStartScaleX = scaleX;
+        ts.pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      }
+    },
+    [offsetX, scaleX, scaleY]
+  );
+
+  const handleTouchMove = useCallback(
+    (e: TouchEvent) => {
+      e.preventDefault();
+      const ts = touchRef.current;
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      if (ts.isPinching && e.touches.length === 2) {
+        const dist = getTouchDist(e.touches[0], e.touches[1]);
+        const ratio = ts.pinchStartDist / dist; // inverse: pinch out = more candles
+        const newScale = Math.max(
+          MIN_CANDLES_VISIBLE,
+          Math.min(MAX_CANDLES_VISIBLE, ts.pinchStartScaleX * ratio)
+        );
+        setScaleX(newScale);
+        onZoomChange?.(newScale);
+      } else if (ts.isDraggingPriceAxis && e.touches.length === 1) {
+        const dy = e.touches[0].clientY - ts.priceAxisStartY;
+        // Drag down = expand range (scaleY increases)
+        const sensitivity = 0.005;
+        const newScaleY = Math.max(0.2, Math.min(5, ts.priceAxisStartScaleY + dy * sensitivity));
+        setScaleY(newScaleY);
+        setIsAutoFitY(false);
+      } else if (ts.isPanning && e.touches.length === 1) {
+        const touch = e.touches[0];
+
+        // If moved enough, cancel long press
+        if (Math.abs(touch.clientX - ts.panStartX) > 8) {
+          clearLongPress();
+          ts.isCrosshairActive = false;
+          setCrosshair({ active: false, x: 0, y: 0 });
+        }
+
+        if (ts.isCrosshairActive) {
+          // Move crosshair
+          const x = touch.clientX - rect.left;
+          const y = touch.clientY - rect.top;
+          setCrosshair({ active: true, x, y });
+        } else {
+          // Pan
+          const dx = touch.clientX - ts.lastPanX;
+          const now = Date.now();
+          const dt = now - ts.lastPanTime || 1;
+          ts.velocityX = dx / dt;
+          ts.lastPanX = touch.clientX;
+          ts.lastPanTime = now;
+
+          const totalDx = touch.clientX - ts.panStartX;
+          const candleW = chartWidth / visibleCandlesCount;
+          const candlesDelta = totalDx / candleW;
+
+          setOffsetX(Math.max(0, Math.min(candles.length - visibleCandlesCount, ts.panStartOffsetX + candlesDelta)));
+        }
+      }
+    },
+    [chartWidth, visibleCandlesCount, candles.length, onZoomChange]
+  );
+
+  const startMomentum = useCallback(
+    (velocity: number) => {
+      let v = velocity * 15; // scale up
+      const tick = () => {
+        v *= MOMENTUM_FRICTION;
+        if (Math.abs(v) < MOMENTUM_MIN_VELOCITY) return;
+        setOffsetX((prev) => {
+          const candleW = chartWidth / visibleCandlesCount;
+          const delta = v / (candleW || 1);
+          return Math.max(0, Math.min(candles.length - visibleCandlesCount, prev + delta));
+        });
+        momentumRef.current = requestAnimationFrame(tick);
+      };
+      momentumRef.current = requestAnimationFrame(tick);
+    },
+    [chartWidth, visibleCandlesCount, candles.length]
+  );
+
+  const handleTouchEnd = useCallback(
+    (e: TouchEvent) => {
+      const ts = touchRef.current;
+      clearLongPress();
+
+      if (ts.isPanning && !ts.isCrosshairActive && Math.abs(ts.velocityX) > 0.1) {
+        startMomentum(ts.velocityX);
+      }
+
+      ts.isPanning = false;
+      ts.isPinching = false;
+      ts.isDraggingPriceAxis = false;
+
+      if (ts.isCrosshairActive && e.touches.length === 0) {
+        ts.isCrosshairActive = false;
+        setCrosshair({ active: false, x: 0, y: 0 });
+      }
+    },
+    [startMomentum]
+  );
+
+  // ==================== MOUSE HANDLERS (desktop) ====================
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      setMouseInside(true);
+    },
+    []
+  );
+
+  const handleMouseLeave = useCallback(() => setMouseInside(false), []);
+
+  const handleWheel = useCallback(
+    (e: React.WheelEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        // Vertical zoom
+        const dy = e.deltaY * 0.003;
+        setScaleY((prev) => Math.max(0.2, Math.min(5, prev + dy)));
+        setIsAutoFitY(false);
+      } else {
+        // Horizontal zoom
+        const delta = e.deltaY * 0.5;
+        setScaleX((prev) => Math.max(MIN_CANDLES_VISIBLE, Math.min(MAX_CANDLES_VISIBLE, prev + delta)));
+      }
+    },
+    []
+  );
+
+  // ==================== ATTACH TOUCH EVENTS ====================
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
+    canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
+    canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
+    canvas.addEventListener("touchcancel", handleTouchEnd, { passive: false });
 
-    const padding = { top: 20, right: 75, bottom: 35, left: 10 };
-    const chartWidth = dimensions.width - padding.left - padding.right;
+    return () => {
+      canvas.removeEventListener("touchstart", handleTouchStart);
+      canvas.removeEventListener("touchmove", handleTouchMove);
+      canvas.removeEventListener("touchend", handleTouchEnd);
+      canvas.removeEventListener("touchcancel", handleTouchEnd);
+    };
+  }, [handleTouchStart, handleTouchMove, handleTouchEnd]);
 
-    const candleWidth = (chartWidth * zoom) / visibleCount;
-    const candleIndex = Math.floor((x - padding.left) / candleWidth);
+  // ==================== RENDER LOOP ====================
 
-    setMouse({
-      x,
-      y,
-      isInside: x >= padding.left && x <= dimensions.width - padding.right &&
-                y >= padding.top && y <= dimensions.height - padding.bottom,
-      candleIndex,
-    });
-  }, [dimensions, zoom, visibleCount]);
-
-  const handleMouseLeave = useCallback(() => {
-    setMouse(prev => ({ ...prev, isInside: false }));
-  }, []);
-
-  // Wheel zoom handler
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-
-    const delta = -e.deltaY * ZOOM_SENSITIVITY;
-    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom + delta));
-
-    if (newZoom !== zoom) {
-      setZoom(newZoom);
-      onZoomChange?.(newZoom);
-    }
-  }, [zoom, onZoomChange]);
-
-  // Render on state changes
   useEffect(() => {
-    drawChart();
-  }, [drawChart]);
+    draw();
+  }, [draw]);
 
-  // Draw equity curve in separate canvas
+  // ==================== EQUITY CURVE ====================
+
   useEffect(() => {
     if (!showEquityCurve || !equityCanvasRef.current || equityCurve.length === 0) return;
-
     const canvas = equityCanvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const width = dimensions.width;
-    const height = 100;
-
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
+    const w = dimensions.width;
+    const h = 100;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
     ctx.scale(dpr, dpr);
 
-    const padding = { top: 10, right: 75, bottom: 20, left: 10 };
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
+    ctx.fillStyle = MT5.bg;
+    ctx.fillRect(0, 0, w, h);
 
-    // Clear
-    ctx.fillStyle = colors.background;
-    ctx.fillRect(0, 0, width, height);
+    const pad = { t: 10, r: PRICE_AXIS_WIDTH, b: 20, l: LEFT_PADDING };
+    const cw = w - pad.l - pad.r;
+    const ch = h - pad.t - pad.b;
 
-    // Find min/max equity
-    const minEquity = Math.min(...equityCurve.map(p => p.equity));
-    const maxEquity = Math.max(...equityCurve.map(p => p.equity));
-    const range = maxEquity - minEquity || 1;
+    const minE = Math.min(...equityCurve.map((p) => p.equity));
+    const maxE = Math.max(...equityCurve.map((p) => p.equity));
+    const range = maxE - minE || 1;
 
-    // Draw equity line
     ctx.strokeStyle = "#0078D4";
     ctx.lineWidth = 2;
     ctx.beginPath();
-
-    equityCurve.forEach((point, i) => {
-      const x = padding.left + (i / (equityCurve.length - 1)) * chartWidth;
-      const y = padding.top + chartHeight - ((point.equity - minEquity) / range) * chartHeight;
-
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+    equityCurve.forEach((p, i) => {
+      const x = pad.l + (i / (equityCurve.length - 1)) * cw;
+      const y = pad.t + ch - ((p.equity - minE) / range) * ch;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     });
     ctx.stroke();
 
-    // Draw zero line if equity goes negative
-    if (minEquity < 10000) {
-      const zeroY = padding.top + chartHeight - ((10000 - minEquity) / range) * chartHeight;
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(padding.left, zeroY);
-      ctx.lineTo(width - padding.right, zeroY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    // Labels
-    ctx.fillStyle = colors.text;
+    ctx.fillStyle = MT5.text;
     ctx.font = "10px monospace";
     ctx.textAlign = "left";
-    ctx.fillText(`$${maxEquity.toFixed(0)}`, width - padding.right + 5, padding.top + 10);
-    ctx.fillText(`$${minEquity.toFixed(0)}`, width - padding.right + 5, height - padding.bottom);
-  }, [showEquityCurve, equityCurve, dimensions, colors]);
+    ctx.fillText(`$${maxE.toFixed(0)}`, w - pad.r + 5, pad.t + 10);
+    ctx.fillText(`$${minE.toFixed(0)}`, w - pad.r + 5, h - pad.b);
+  }, [showEquityCurve, equityCurve, dimensions]);
 
-  // Draw volume bars in separate canvas
+  // ==================== VOLUME BARS ====================
+
   useEffect(() => {
     if (!showVolume || !volumeCanvasRef.current || volumeBars.length === 0) return;
-
     const canvas = volumeCanvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const width = dimensions.width;
-    const height = 60;
-
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
+    const w = dimensions.width;
+    const h = 60;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
     ctx.scale(dpr, dpr);
 
-    const padding = { top: 5, right: 75, bottom: 15, left: 10 };
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
+    ctx.fillStyle = MT5.bg;
+    ctx.fillRect(0, 0, w, h);
 
-    // Clear
-    ctx.fillStyle = colors.background;
-    ctx.fillRect(0, 0, width, height);
+    const pad = { t: 5, r: PRICE_AXIS_WIDTH, b: 15, l: LEFT_PADDING };
+    const cw = w - pad.l - pad.r;
+    const ch = h - pad.t - pad.b;
 
-    // Find max volume
-    const visibleVolumes = volumeBars.slice(visibleStart, visibleEnd);
-    const maxVolume = Math.max(...visibleVolumes.map(v => v.volume), 1);
+    const visBars = volumeBars.slice(visibleStart, visibleEnd);
+    const maxVol = Math.max(...visBars.map((v) => v.volume), 1);
+    const barW = cw / visBars.length;
 
-    // Draw volume bars
-    const barWidth = (chartWidth * zoom) / visibleCount;
-    
-    visibleVolumes.forEach((vol, i) => {
-      const x = padding.left + i * barWidth + barWidth * 0.3;
-      const barHeight = (vol.volume / maxVolume) * chartHeight;
-      const y = padding.top + chartHeight - barHeight;
-
-      // Color based on price direction (match candle)
+    visBars.forEach((vol, i) => {
+      const x = pad.l + i * barW + barW * 0.2;
+      const bh = (vol.volume / maxVol) * ch;
+      const y = pad.t + ch - bh;
       const candle = visibleCandles[i];
-      const isBullish = candle && candle.close >= candle.open;
-      ctx.fillStyle = isBullish ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)";
-      ctx.fillRect(x, y, barWidth * 0.6, barHeight);
+      const bull = candle && candle.close >= candle.open;
+      ctx.fillStyle = bull ? "rgba(38,166,154,0.5)" : "rgba(239,83,80,0.5)";
+      ctx.fillRect(x, y, barW * 0.6, bh);
     });
-
-    // Volume label
-    ctx.fillStyle = colors.text;
-    ctx.font = "9px monospace";
-    ctx.textAlign = "left";
-    ctx.fillText(`Vol: ${(maxVolume / 1000).toFixed(1)}K`, width - padding.right + 5, padding.top + 10);
-  }, [showVolume, volumeBars, dimensions, colors, visibleStart, visibleEnd, visibleCount, zoom, visibleCandles]);
-
-  // Export PNG function
-  const exportPng = useCallback(() => {
-    const mainCanvas = canvasRef.current;
-    const equityCanvas = equityCanvasRef.current;
-    const volumeCanvas = volumeCanvasRef.current;
-    
-    if (!mainCanvas) return;
-
-    // Create composite canvas
-    const totalHeight = dimensions.height + 
-      (showEquityCurve && equityCanvas ? 100 : 0) + 
-      (showVolume && volumeCanvas? 60 : 0);
-    
-    const exportCanvas = document.createElement("canvas");
-    exportCanvas.width = dimensions.width * (window.devicePixelRatio || 1);
-    exportCanvas.height = totalHeight * (window.devicePixelRatio || 1);
-    const ctx = exportCanvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-
-    // Draw main chart
-    ctx.drawImage(mainCanvas, 0, 0);
-    
-    let offsetY = dimensions.height;
-
-    // Draw volume
-    if (showVolume && volumeCanvas) {
-      ctx.drawImage(volumeCanvas, 0, offsetY);
-      offsetY += 60;
-    }
-
-    // Draw equity
-    if (showEquityCurve && equityCanvas) {
-      ctx.drawImage(equityCanvas, 0, offsetY);
-    }
-
-    // Download
-    const link = document.createElement("a");
-    link.download = "backtester-chart.png";
-    link.href = exportCanvas.toDataURL("image/png");
-    link.click();
-  }, [dimensions, showEquityCurve, showVolume]);
-
-  // Expose export function via ref
-  useEffect(() => {
-    if (onExportPng) {
-      // Parent can call this via callback
-    }
-  }, [onExportPng]);
+  }, [showVolume, volumeBars, dimensions, visibleStart, visibleEnd, visibleCandles]);
 
   return (
-    <div ref={containerRef} className={className} style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
+    <div
+      ref={containerRef}
+      className={className}
+      style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", touchAction: "none" }}
+    >
       <canvas
         ref={canvasRef}
-        style={{ width: "100%", flex: showEquityCurve || showVolume ? "1" : "1", display: "block" }}
+        style={{ width: "100%", flex: 1, display: "block", touchAction: "none" }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
@@ -703,13 +862,13 @@ export function CandleChartCanvas({
       {showVolume && volumeBars.length > 0 && (
         <canvas
           ref={volumeCanvasRef}
-          style={{ width: "100%", height: 60, display: "block", borderTop: "1px solid #3C3C3C" }}
+          style={{ width: "100%", height: 60, display: "block", borderTop: "1px solid #1a1a1a" }}
         />
       )}
       {showEquityCurve && equityCurve.length > 0 && (
         <canvas
           ref={equityCanvasRef}
-          style={{ width: "100%", height: 100, display: "block", borderTop: "1px solid #3C3C3C" }}
+          style={{ width: "100%", height: 100, display: "block", borderTop: "1px solid #1a1a1a" }}
         />
       )}
     </div>
