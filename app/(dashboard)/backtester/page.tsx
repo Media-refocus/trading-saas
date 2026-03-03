@@ -407,7 +407,7 @@ export default function BacktesterPage() {
 
   return (
     <>
-    <div className="space-y-4 max-w-[1600px] mx-auto font-sans pb-8 overflow-x-hidden">
+    <div className="space-y-4 max-w-[1600px] mx-auto font-sans pb-8 sm:pb-8 pb-20 overflow-x-hidden">
       {/* Header mejorado - mobile responsive */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-border/50 gap-3">
         <div className="flex items-center gap-3 sm:gap-4">
@@ -1684,6 +1684,29 @@ export default function BacktesterPage() {
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Botón sticky "Ejecutar" en mobile */}
+    <div className="fixed bottom-0 left-0 right-0 z-50 p-3 bg-background/80 backdrop-blur-lg border-t border-border/50 sm:hidden">
+      <Button
+        className={`w-full h-12 text-sm font-semibold ${
+          isBacktestPending ? "animate-pulse" : ""
+        }`}
+        onClick={handleExecute}
+        disabled={isBacktestPending}
+      >
+        {isBacktestPending ? (
+          <span className="flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            Procesando...
+          </span>
+        ) : (
+          <span className="flex items-center gap-2">
+            <Play className="w-4 h-4" />
+            Ejecutar Backtest
+          </span>
+        )}
+      </Button>
+    </div>
     </>
   );
 }
