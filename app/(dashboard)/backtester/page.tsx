@@ -18,6 +18,13 @@ import {
 import { trpc } from "@/lib/trpc";
 import SimpleCandleChart from "@/components/simple-candle-chart";
 import { CHART_THEMES, getPreferredTheme, savePreferredTheme } from "@/lib/chart-themes";
+import { EnhancedCandleViewer } from "@/components/backtester/enhanced-candle-viewer";
+import {
+  generateSyntheticCandles,
+  mapTradesToMarkers,
+  extendCandleRange,
+} from "@/lib/candle-generator";
+import type { OHLC } from "@/lib/candle-compression";
 import {
   Play,
   Trash2,
@@ -181,6 +188,7 @@ export default function BacktesterPage() {
 
   // Gráfico
   const [selectedTradeIndex, setSelectedTradeIndex] = useState<number | null>(null);
+  const [showEnhancedChart, setShowEnhancedChart] = useState(true);
 
   // Cargar datos de localStorage
   useEffect(() => {
@@ -992,6 +1000,46 @@ export default function BacktesterPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Enhanced Candle Chart con todos los trades */}
+                {results.tradeDetails && results.tradeDetails.length > 0 && (
+                  <div className="border rounded-lg overflow-hidden bg-slate-900 border-slate-700">
+                    <button
+                      onClick={() => setShowEnhancedChart(!showEnhancedChart)}
+                      className="w-full flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700 hover:bg-slate-700 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-blue-400" />
+                        <span className="text-sm font-semibold text-white">
+                          Chart de Velas con Trades
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          ({results.tradeDetails.length} trades)
+                        </span>
+                      </div>
+                      {showEnhancedChart ? (
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      ) : (
+                        <ChevronUp className="w-4 h-4 text-gray-400" />
+                      )}
+                    </button>
+                    {showEnhancedChart && (
+                      <EnhancedCandleViewer
+                        candles={(() => {
+                          const baseCandles = generateSyntheticCandles(results.tradeDetails);
+                          return extendCandleRange(baseCandles, results.tradeDetails, 30);
+                        })()}
+                        trades={mapTradesToMarkers(results.tradeDetails)}
+                        config={{
+                          takeProfitPips: config.takeProfitPips,
+                          pipsDistance: config.pipsDistance,
+                          maxLevels: config.maxLevels,
+                        }}
+                        className="h-[400px] sm:h-[500px]"
+                      />
+                    )}
                   </div>
                 )}
 
