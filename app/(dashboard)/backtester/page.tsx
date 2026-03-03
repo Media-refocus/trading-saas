@@ -94,8 +94,8 @@ const defaultConfig: BacktestConfig = {
   signalsSource: "signals_simple.csv",
   initialCapital: 10000,
   useRealPrices: false,
-  dataSource: "csv",
-  dateFrom: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), // 30 días atrás
+  dataSource: "supabase",
+  dateFrom: "2024-01-01", // Desde inicio de señales históricas
   dateTo: new Date().toISOString().slice(0, 10), // Hoy
 };
 
