@@ -75,6 +75,10 @@ interface BacktestConfig {
   initialCapital?: number;
   useRealPrices?: boolean;
   filters?: BacktestFilters;
+  // Nueva opción: fuente de datos
+  dataSource?: "csv" | "supabase";
+  dateFrom?: string;  // Para Supabase
+  dateTo?: string;    // Para Supabase
 }
 
 const defaultConfig: BacktestConfig = {
@@ -90,6 +94,9 @@ const defaultConfig: BacktestConfig = {
   signalsSource: "signals_simple.csv",
   initialCapital: 10000,
   useRealPrices: false,
+  dataSource: "csv",
+  dateFrom: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), // 30 días atrás
+  dateTo: new Date().toISOString().slice(0, 10), // Hoy
 };
 
 // Dark mode toggle helper
@@ -207,6 +214,70 @@ export default function BacktesterPage() {
 
   const handleExecute = async () => {
     try {
+      // Si la fuente es Supabase, usar la nueva API REST
+      if (config.dataSource === "supabase") {
+        if (!config.dateFrom || !config.dateTo) {
+          alert("Debes especificar fecha desde y hasta para usar Supabase");
+          return;
+        }
+
+        // Llamar a la nueva API REST
+        const response = await fetch("/api/backtest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            strategyName: config.strategyName,
+            lotajeBase: config.lotajeBase,
+            numOrders: config.numOrders,
+            pipsDistance: config.pipsDistance,
+            maxLevels: config.maxLevels,
+            takeProfitPips: config.takeProfitPips,
+            stopLossPips: config.stopLossPips,
+            useStopLoss: config.useStopLoss,
+            useTrailingSL: config.useTrailingSL,
+            trailingSLPercent: config.trailingSLPercent,
+            restrictionType: config.restrictionType,
+            initialCapital: config.initialCapital,
+            dateFrom: config.dateFrom,
+            dateTo: config.dateTo,
+            filters: config.filters,
+            useRealPrices: config.useRealPrices,
+            signalLimit,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Error ejecutando backtest");
+        }
+
+        const data = await response.json();
+
+        // Actualizar el estado manualmente para mostrar resultados
+        // Como no usamos tRPC aquí, necesitamos simular la respuesta
+        executeBacktest.setData({
+          jobId: data.jobId || `supabase_${Date.now()}`,
+          status: data.status,
+          results: data.results,
+          fromCache: false,
+          elapsedMs: data.elapsedMs,
+          config: {
+            ...config,
+            filters: config.filters ? {
+              ...config.filters,
+              dateFrom: config.filters.dateFrom ? new Date(config.filters.dateFrom) : undefined,
+              dateTo: config.filters.dateTo ? new Date(config.filters.dateTo) : undefined,
+            } : undefined,
+          },
+          debug: data.meta,
+        });
+
+        setSelectedTradeIndex(null);
+        setSaveSuccess(false);
+        return;
+      }
+
+      // Comportamiento original: usar tRPC con CSV
       const processedConfig = {
         ...config,
         filters: config.filters ? {
@@ -220,6 +291,7 @@ export default function BacktesterPage() {
       setSaveSuccess(false);
     } catch (error) {
       console.error("Error ejecutando backtest:", error);
+      alert(error instanceof Error ? error.message : "Error desconocido");
     }
   };
 
@@ -646,6 +718,73 @@ export default function BacktesterPage() {
                 Usar ticks reales <span className="text-muted-foreground">(lento)</span>
               </Label>
             </div>
+
+            {/* Selector de fuente de datos: CSV vs Supabase */}
+            <div className="space-y-2 p-3 rounded-lg border border-border/50 bg-muted/20">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Fuente de datos</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => updateConfig("dataSource", "csv")}
+                  className={`p-2.5 rounded-lg text-xs font-medium transition-all ${
+                    config.dataSource !== "supabase"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted/50 hover:bg-muted"
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-1.5">
+                    <Database className="w-3.5 h-3.5" />
+                    CSV Local
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateConfig("dataSource", "supabase")}
+                  className={`p-2.5 rounded-lg text-xs font-medium transition-all ${
+                    config.dataSource === "supabase"
+                      ? "bg-green-600 text-white shadow-sm"
+                      : "bg-muted/50 hover:bg-muted"
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-1.5">
+                    <Signal className="w-3.5 h-3.5" />
+                    Supabase
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Campos de fecha para Supabase */}
+            {config.dataSource === "supabase" && (
+              <div className="space-y-2 p-3 rounded-lg border border-green-500/20 bg-green-500/5 animate-fade-in">
+                <Label className="text-xs text-green-600 dark:text-green-400 uppercase tracking-wide">
+                  Rango de fechas (Supabase)
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Desde</Label>
+                    <Input
+                      type="date"
+                      className="h-9 text-xs min-h-[36px]"
+                      value={config.dateFrom || ""}
+                      onChange={(e) => updateConfig("dateFrom", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Hasta</Label>
+                    <Input
+                      type="date"
+                      className="h-9 text-xs min-h-[36px]"
+                      value={config.dateTo || ""}
+                      onChange={(e) => updateConfig("dateTo", e.target.value)}
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Las señales se leerán de la tabla Signal en Supabase/PostgreSQL
+                </p>
+              </div>
+            )}
 
             {/* Botón Ejecutar Backtest - GRANDE */}
             <Button

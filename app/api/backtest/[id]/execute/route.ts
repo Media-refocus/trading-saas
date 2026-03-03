@@ -12,19 +12,17 @@ import {
   Side,
 } from "@/lib/backtest-engine";
 import {
-  loadSignalsFromFile,
   TradingSignal,
+  generateSyntheticTicks,
 } from "@/lib/parsers/signals-csv";
-import { isTicksDBReady, getTicksStats } from "@/lib/ticks-db";
+import { isTicksDBReady } from "@/lib/ticks-db";
 import {
   getDaysNeededForSignals,
   loadTicksByDayGrouped,
   getMarketPriceFromCache,
   getTicksForSignal as getTicksForSignalFromBatch,
 } from "@/lib/ticks-batch-loader";
-import { filterSignals, getSegmentationStats } from "@/lib/backtest-filters";
-import { generateSyntheticTicks } from "@/lib/parsers/signals-csv";
-import path from "path";
+import { getSegmentationStats } from "@/lib/backtest-filters";
 
 // Precios de referencia XAUUSD por mes
 const XAUUSD_REFERENCE_PRICES: Record<string, number> = {
@@ -113,10 +111,21 @@ export async function POST(
       filters: params.filters,
     };
 
-    // Cargar señales
-    const signalsSource = params.signalsSource || "signals_simple.csv";
-    const signalsPath = path.join(process.cwd(), signalsSource);
-    let signals = await loadSignalsFromFile(signalsPath);
+    // Cargar señales de Supabase (NO CSV en serverless)
+    const dbSignals = await prisma.signal.findMany({
+      where: { tenantId: user.tenantId },
+      orderBy: { receivedAt: 'asc' },
+      take: 2000, // Limitar para rendimiento
+    });
+
+    // Convertir a formato TradingSignal
+    let signals: TradingSignal[] = dbSignals.map(s => ({
+      timestamp: s.receivedAt,
+      closeTimestamp: s.processedAt || new Date(s.receivedAt.getTime() + 30 * 60 * 1000),
+      side: (s.side === 'BUY' || s.side === 'SELL') ? s.side as 'BUY' | 'SELL' : 'BUY',
+      entryPrice: s.price || 0,
+      range_id: s.messageId || '',
+    }));
 
     // Aplicar filtros
     if (params.filters) {
