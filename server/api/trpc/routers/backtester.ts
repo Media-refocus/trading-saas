@@ -561,18 +561,31 @@ export const backtesterRouter = router({
    */
   getSignalsInfo: procedure
     .input(z.object({
-      source: z.string().optional().default("signals_simple.csv"),
+      source: z.string().optional().default("supabase"),
     }))
-    .query(async ({ input }) => {
-      const signalsPath = path.join(process.cwd(), input.source);
-      const signals = await loadSignalsFromFile(signalsPath);
+    .query(async ({ ctx }) => {
+      // Obtener tenant del usuario
+      const user = await prisma.user.findUnique({
+        where: { id: ctx.session.user.id },
+        select: { tenantId: true },
+      });
+
+      if (!user?.tenantId) {
+        throw new Error("Usuario sin tenant");
+      }
+
+      // Leer señales de Supabase
+      const signals = await prisma.signal.findMany({
+        where: { tenantId: user.tenantId },
+        orderBy: { receivedAt: 'asc' },
+      });
 
       return {
         total: signals.length,
-        source: input.source,
+        source: "supabase",
         dateRange: {
-          start: signals[0]?.timestamp,
-          end: signals[signals.length - 1]?.timestamp,
+          start: signals[0]?.receivedAt,
+          end: signals[signals.length - 1]?.receivedAt,
         },
         bySide: {
           buy: signals.filter((s) => s.side === "BUY").length,
