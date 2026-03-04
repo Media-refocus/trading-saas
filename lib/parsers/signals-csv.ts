@@ -112,14 +112,51 @@ export function groupSignalsByRange(rawSignals: RawSignal[]): TradingSignal[] {
 
 /**
  * Carga señales desde un archivo CSV en el servidor
+ * En Vercel (producción) usa fetch desde /public/
+ * En desarrollo usa fs.readFileSync
  */
 export async function loadSignalsFromFile(
   filePath: string
 ): Promise<TradingSignal[]> {
-  const fs = await import("fs");
-  const content = fs.readFileSync(filePath, "utf-8");
-  const rawSignals = parseSignalsCsv(content);
-  return groupSignalsByRange(rawSignals);
+  // Detectar si estamos en Vercel/producción (no hay filesystem accesible)
+  const isVercel = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+
+  if (isVercel) {
+    // En Vercel, cargar desde URL pública
+    const fileName = filePath.split("/").pop() || "signals_simple.csv";
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+    try {
+      const response = await fetch(`${baseUrl}/${fileName}`);
+      if (!response.ok) {
+        console.warn(`[SignalsCSV] No se pudo cargar ${fileName} desde ${baseUrl}`);
+        return [];
+      }
+      const content = await response.text();
+      const rawSignals = parseSignalsCsv(content);
+      return groupSignalsByRange(rawSignals);
+    } catch (error) {
+      console.warn(`[SignalsCSV] Error cargando señales en producción:`, error);
+      return [];
+    }
+  }
+
+  // En desarrollo, usar filesystem
+  try {
+    const fs = await import("fs");
+    if (!fs.existsSync(filePath)) {
+      console.warn(`[SignalsCSV] Archivo no encontrado: ${filePath}`);
+      return [];
+    }
+    const content = fs.readFileSync(filePath, "utf-8");
+    const rawSignals = parseSignalsCsv(content);
+    return groupSignalsByRange(rawSignals);
+  } catch (error) {
+    console.warn(`[SignalsCSV] Error leyendo archivo:`, error);
+    return [];
+  }
 }
 
 /**
