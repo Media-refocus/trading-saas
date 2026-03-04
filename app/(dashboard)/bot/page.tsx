@@ -140,10 +140,25 @@ function ApiKeySection({ onRegenerate }: { onRegenerate: () => Promise<{ apiKey?
               <code className="flex-1 p-2 md:p-3 bg-muted rounded font-mono text-xs md:text-sm break-all">
                 {newKey}
               </code>
-              <Button variant="outline" size="icon" onClick={handleCopy} className="shrink-0">
-                {copied ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleCopy}
+                className="shrink-0 relative"
+                title={copied ? "¡Copiado!" : "Copiar al portapapeles"}
+              >
+                {copied ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
               </Button>
             </div>
+            {copied && (
+              <div className="text-xs text-green-600 dark:text-green-400 animate-fade-in sm:hidden">
+                ✓ Copiado al portapapeles
+              </div>
+            )}
             <Button variant="outline" size="sm" onClick={() => setShowKey(false)} className="text-sm">
               Ya la guardé
             </Button>
