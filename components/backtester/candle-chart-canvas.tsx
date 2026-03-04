@@ -178,23 +178,27 @@ export function CandleChartCanvas({
   const visibleStart = Math.max(0, visibleEnd - visibleCandlesCount);
   const visibleCandles = candles.slice(visibleStart, visibleEnd);
 
-  // Price range calculation — fit to visible candles only, with minimum spread
+  // Price range calculation — fit ONLY to valid visible candles (skip price=0)
   const priceRange = useMemo(() => {
     if (visibleCandles.length === 0) return { min: 0, max: 1, center: 0.5 };
 
     let min = Infinity;
     let max = -Infinity;
+    let validCount = 0;
     for (const c of visibleCandles) {
+      // Skip candles with zero or invalid prices
+      if (c.low <= 0 || c.high <= 0 || !isFinite(c.low) || !isFinite(c.high)) continue;
       min = Math.min(min, c.low);
       max = Math.max(max, c.high);
+      validCount++;
     }
 
-    // If no valid prices, return default
-    if (!isFinite(min) || !isFinite(max)) return { min: 0, max: 1, center: 0.5 };
+    // If no valid prices found, return default
+    if (validCount === 0 || !isFinite(min) || !isFinite(max)) return { min: 0, max: 1, center: 0.5 };
 
-    // Ensure minimum visible spread (at least 0.3% of price)
+    // Ensure minimum visible spread (at least 0.5% of price)
     const center = (max + min) / 2;
-    const minSpread = Math.max(center * 0.003, 5);
+    const minSpread = Math.max(center * 0.005, 10);
     const rawSpread = max - min;
     if (rawSpread < minSpread) {
       min = center - minSpread / 2;
