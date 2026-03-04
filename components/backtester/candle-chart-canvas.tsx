@@ -178,34 +178,44 @@ export function CandleChartCanvas({
   const visibleStart = Math.max(0, visibleEnd - visibleCandlesCount);
   const visibleCandles = candles.slice(visibleStart, visibleEnd);
 
-  // Price range calculation — fit ONLY to valid visible candles (skip price=0)
+  // Price range — use median-based approach to exclude outlier candles
   const priceRange = useMemo(() => {
     if (visibleCandles.length === 0) return { min: 0, max: 1, center: 0.5 };
 
+    // Collect all close prices to find median
+    const closes = visibleCandles.map(c => c.close).filter(p => isFinite(p) && p > 0).sort((a, b) => a - b);
+    if (closes.length === 0) return { min: 0, max: 1, center: 0.5 };
+
+    const median = closes[Math.floor(closes.length / 2)];
+    // Allow 5% deviation from median for valid candles
+    const tolerance = median * 0.05;
+    const validLow = median - tolerance;
+    const validHigh = median + tolerance;
+
     let min = Infinity;
     let max = -Infinity;
-    let validCount = 0;
     for (const c of visibleCandles) {
-      // Skip candles with zero or invalid prices
-      if (c.low <= 0 || c.high <= 0 || !isFinite(c.low) || !isFinite(c.high)) continue;
-      min = Math.min(min, c.low);
-      max = Math.max(max, c.high);
-      validCount++;
+      // Only include candles within reasonable range of median
+      if (c.close < validLow || c.close > validHigh) continue;
+      if (c.low > 0 && isFinite(c.low)) min = Math.min(min, c.low);
+      if (c.high > 0 && isFinite(c.high)) max = Math.max(max, c.high);
     }
 
-    // If no valid prices found, return default
-    if (validCount === 0 || !isFinite(min) || !isFinite(max)) return { min: 0, max: 1, center: 0.5 };
+    // Fallback: if filtering excluded everything, use median +/- 1%
+    if (!isFinite(min) || !isFinite(max)) {
+      min = median * 0.99;
+      max = median * 1.01;
+    }
 
-    // Ensure minimum visible spread (at least 0.5% of price)
+    // Ensure minimum visible spread
     const center = (max + min) / 2;
     const minSpread = Math.max(center * 0.005, 10);
-    const rawSpread = max - min;
-    if (rawSpread < minSpread) {
+    if (max - min < minSpread) {
       min = center - minSpread / 2;
       max = center + minSpread / 2;
     }
 
-    // Add 10% padding on each side
+    // Add 10% padding
     const spread = max - min;
     const padding = spread * 0.1;
     min -= padding;
@@ -215,11 +225,6 @@ export function CandleChartCanvas({
     if (!isAutoFitY) {
       const halfRange = (spread / 2) * scaleY;
       return { min: center - halfRange, max: center + halfRange, center };
-    }
-
-    // Debug: log price range (remove after fixing)
-    if (typeof window !== 'undefined') {
-      console.log(`PRICERANGE: min=${min.toFixed(2)} max=${max.toFixed(2)} validCount=${validCount} totalCandles=${visibleCandles.length}`);
     }
 
     return { min, max, center };
