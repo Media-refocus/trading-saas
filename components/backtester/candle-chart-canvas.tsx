@@ -217,6 +217,11 @@ export function CandleChartCanvas({
       return { min: center - halfRange, max: center + halfRange, center };
     }
 
+    // Debug: log price range (remove after fixing)
+    if (typeof window !== 'undefined') {
+      console.log(`PRICERANGE: min=${min.toFixed(2)} max=${max.toFixed(2)} validCount=${validCount} totalCandles=${visibleCandles.length}`);
+    }
+
     return { min, max, center };
   }, [visibleCandles, isAutoFitY, scaleY]);
 
