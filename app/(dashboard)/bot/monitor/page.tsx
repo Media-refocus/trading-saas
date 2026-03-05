@@ -23,6 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import {
   Activity,
   TrendingUp,
@@ -231,18 +232,24 @@ export default function BotMonitorPage() {
     undefined,
     {
       refetchInterval: refreshInterval,
+      onError: (err) => toast.error('Error cargando estado: ' + err.message),
     }
   );
 
-  const { data: signalsData, isLoading: signalsLoading } = trpc.bot.getSignalHistory.useQuery({
-    limit: 10,
-  });
+  const { data: signalsData, isLoading: signalsLoading } = trpc.bot.getSignalHistory.useQuery(
+    { limit: 10 },
+    { onError: (err) => toast.error('Error cargando señales: ' + err.message) }
+  );
 
-  const { data: tradesData, isLoading: tradesLoading } = trpc.bot.getTradeHistory.useQuery({
-    limit: 10,
-  });
+  const { data: tradesData, isLoading: tradesLoading } = trpc.bot.getTradeHistory.useQuery(
+    { limit: 10 },
+    { onError: (err) => toast.error('Error cargando trades: ' + err.message) }
+  );
 
-  const { data: stats, isLoading: statsLoading } = trpc.bot.getStats.useQuery();
+  const { data: stats, isLoading: statsLoading } = trpc.bot.getStats.useQuery(
+    undefined,
+    { onError: (err) => toast.error('Error cargando estadísticas: ' + err.message) }
+  );
 
   const exportCsv = trpc.bot.exportTradesCsv.useQuery(undefined, { enabled: false });
 
