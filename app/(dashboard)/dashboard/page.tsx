@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
 import Link from "next/link";
 import {
@@ -17,25 +18,54 @@ import {
   Activity,
   Signal,
   Settings,
+  CheckCircle2,
+  Key,
+  Play,
 } from "lucide-react";
+
+// Skeleton para las stat cards
+function StatCardSkeleton() {
+  return (
+    <Card className="min-h-[80px]">
+      <CardContent className="p-4 md:pt-6 md:pb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-4 w-16 mb-2" />
+            <Skeleton className="h-7 w-12" />
+          </div>
+          <Skeleton className="w-10 h-10 rounded-lg" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function DashboardPage() {
   // Obtener datos del marketplace
-  const { data: topStrategies } = trpc.marketplace.getTop.useQuery(
+  const { data: topStrategies, isLoading: loadingStrategies } = trpc.marketplace.getTop.useQuery(
     { period: "month", limit: 3 },
     { refetchInterval: 60000 }
   );
 
   // Obtener estado del bot
-  const { data: botStatus } = trpc.bot.getStatus.useQuery(undefined, {
+  const { data: botStatus, isLoading: loadingBotStatus } = trpc.bot.getStatus.useQuery(undefined, {
     refetchInterval: 30000,
   });
 
   // Obtener info de señales
-  const { data: signalsInfo } = trpc.backtester.getSignalsInfo.useQuery(
+  const { data: signalsInfo, isLoading: loadingSignals } = trpc.backtester.getSignalsInfo.useQuery(
     { source: "signals_simple.csv" },
     { staleTime: 300000 }
   );
+
+  // Obtener suscripción real
+  const { data: subscription } = trpc.tenant.getSubscription.useQuery();
+
+  // Estado de carga global para las stats
+  const isLoading = loadingStrategies || loadingBotStatus || loadingSignals;
+
+  // Verificar si el usuario necesita onboarding (bot no configurado)
+  const needsOnboarding = !isLoading && (!botStatus?.isOnline || botStatus?.status === "OFFLINE");
 
   const formatProfit = (value: number) => {
     const prefix = value >= 0 ? "+" : "";
@@ -53,66 +83,123 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${
-            botStatus?.isOnline
-              ? "bg-green-500/10 text-green-600"
-              : "bg-muted text-muted-foreground"
-          }`}>
-            <Bot className="w-4 h-4" />
-            <span>{botStatus?.isOnline ? "Bot Online" : "Bot Offline"}</span>
-          </div>
+          {isLoading ? (
+            <Skeleton className="h-9 w-28" />
+          ) : (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${
+              botStatus?.isOnline
+                ? "bg-green-500/10 text-green-600"
+                : "bg-muted text-muted-foreground"
+            }`}>
+              <Bot className="w-4 h-4" />
+              <span>{botStatus?.isOnline ? "Bot Online" : "Bot Offline"}</span>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Onboarding Banner - Solo si el bot no está configurado */}
+      {needsOnboarding && (
+        <Card className="border-blue-500/50 bg-blue-500/5">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center gap-4">
+              <div className="flex-1">
+                <h3 className="font-semibold text-base md:text-lg mb-2">Primeros pasos</h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Completa estos pasos para empezar a operar automáticamente.
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${botStatus?.hasConfig ? "bg-green-500 text-white" : "border-2 border-muted-foreground"}`}>
+                      {botStatus?.hasConfig && <CheckCircle2 className="w-3 h-3" />}
+                    </div>
+                    <span className={botStatus?.hasConfig ? "text-muted-foreground" : ""}>1. Configura tu bot</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${botStatus?.hasApiKey ? "bg-green-500 text-white" : "border-2 border-muted-foreground"}`}>
+                      {botStatus?.hasApiKey && <CheckCircle2 className="w-3 h-3" />}
+                    </div>
+                    <span className={botStatus?.hasApiKey ? "text-muted-foreground" : ""}>2. Conecta tu API key</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${botStatus?.isOnline ? "bg-green-500 text-white" : "border-2 border-muted-foreground"}`}>
+                      {botStatus?.isOnline && <CheckCircle2 className="w-3 h-3" />}
+                    </div>
+                    <span className={botStatus?.isOnline ? "text-muted-foreground" : ""}>3. Lanza tu primera operativa</span>
+                  </div>
+                </div>
+              </div>
+              <Link href="/bot" className="shrink-0">
+                <Button className="min-h-[44px]">
+                  <Play className="w-4 h-4 mr-2" />
+                  Configurar Bot
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Quick Stats - 2x2 grid on mobile */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20 min-h-[80px]">
-          <CardContent className="p-4 md:pt-6 md:pb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Señales</p>
-                <p className="text-xl md:text-2xl font-bold">{signalsInfo?.total || 0}</p>
-              </div>
-              <Signal className="w-8 h-8 md:w-10 md:h-10 text-blue-500/50" />
-            </div>
-          </CardContent>
-        </Card>
+        {isLoading ? (
+          <>
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </>
+        ) : (
+          <>
+            <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20 min-h-[80px]">
+              <CardContent className="p-4 md:pt-6 md:pb-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs md:text-sm text-muted-foreground">Señales</p>
+                    <p className="text-xl md:text-2xl font-bold">{signalsInfo?.total || 0}</p>
+                  </div>
+                  <Signal className="w-8 h-8 md:w-10 md:h-10 text-blue-500/50" />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20 min-h-[80px]">
-          <CardContent className="p-4 md:pt-6 md:pb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Operativas</p>
-                <p className="text-xl md:text-2xl font-bold">{topStrategies?.length || 0}</p>
-              </div>
-              <Store className="w-8 h-8 md:w-10 md:h-10 text-green-500/50" />
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20 min-h-[80px]">
+              <CardContent className="p-4 md:pt-6 md:pb-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs md:text-sm text-muted-foreground">Operativas</p>
+                    <p className="text-xl md:text-2xl font-bold">{topStrategies?.length || 0}</p>
+                  </div>
+                  <Store className="w-8 h-8 md:w-10 md:h-10 text-green-500/50" />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20 min-h-[80px]">
-          <CardContent className="p-4 md:pt-6 md:pb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Bot Status</p>
-                <p className="text-xl md:text-2xl font-bold">{botStatus?.isOnline ? "Activo" : "Inactivo"}</p>
-              </div>
-              <Activity className="w-8 h-8 md:w-10 md:h-10 text-purple-500/50" />
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20 min-h-[80px]">
+              <CardContent className="p-4 md:pt-6 md:pb-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs md:text-sm text-muted-foreground">Bot Status</p>
+                    <p className="text-xl md:text-2xl font-bold">{botStatus?.isOnline ? "Activo" : "Inactivo"}</p>
+                  </div>
+                  <Activity className="w-8 h-8 md:w-10 md:h-10 text-purple-500/50" />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20 min-h-[80px]">
-          <CardContent className="p-4 md:pt-6 md:pb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Win Rate</p>
-                <p className="text-xl md:text-2xl font-bold">--</p>
-              </div>
-              <TrendingUp className="w-8 h-8 md:w-10 md:h-10 text-amber-500/50" />
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20 min-h-[80px]">
+              <CardContent className="p-4 md:pt-6 md:pb-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs md:text-sm text-muted-foreground">Plan</p>
+                    <p className="text-xl md:text-2xl font-bold">{subscription?.planName || "Trial"}</p>
+                  </div>
+                  <TrendingUp className="w-8 h-8 md:w-10 md:h-10 text-amber-500/50" />
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Main Grid */}

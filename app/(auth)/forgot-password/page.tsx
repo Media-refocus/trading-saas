@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Mail, CheckCircle2, AlertTriangle } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -28,9 +27,9 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
 
     try {
-      // TODO: Implementar endpoint de recuperación
-      // Por ahora simulamos el envío
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // TODO: Implementar endpoint de recuperación con email real
+      // Por ahora mostramos mensaje genérico de éxito
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       setSent(true);
     } catch {
       setError("Error al enviar el email. Intenta nuevamente.");
@@ -47,7 +46,7 @@ export default function ForgotPasswordPage() {
             <CheckCircle2 className="h-6 w-6 text-green-500" />
           </div>
           <CardTitle className="text-2xl font-bold text-white">
-            Email Enviado
+            Solicitud Enviada
           </CardTitle>
           <CardDescription className="text-slate-400">
             Si existe una cuenta con {email}, recibirás un enlace para restablecer tu contraseña.
@@ -99,6 +98,13 @@ export default function ForgotPasswordPage() {
               disabled={isLoading}
               className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500 h-11"
             />
+          </div>
+          {/* Disclaimer de funcionalidad en desarrollo */}
+          <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-200">
+              Funcionalidad en desarrollo. Si necesitas restablecer tu contraseña, contacta a soporte.
+            </p>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">

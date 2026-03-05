@@ -20,6 +20,7 @@ import {
   MessageCircle,
   Send,
 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function OperativaDetailPage() {
   const params = useParams();
@@ -59,9 +60,10 @@ export default function OperativaDetailPage() {
         publishedId: strategy.id,
         name: `${strategy.name} (fork)`,
       });
+      toast.success("Estrategia copiada a tu cuenta");
       router.push("/backtester");
     } catch (error) {
-      console.error("Error al hacer fork:", error);
+      toast.error("Error al copiar la estrategia");
     } finally {
       setForking(false);
     }

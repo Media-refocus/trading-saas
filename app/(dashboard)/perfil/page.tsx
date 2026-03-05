@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   Key,
 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function PerfilPage() {
   const [name, setName] = useState("");
@@ -32,6 +33,9 @@ export default function PerfilPage() {
 
   // Obtener datos del usuario
   const { data: user, isLoading } = trpc.auth.me.useQuery();
+
+  // Obtener suscripción real
+  const { data: subscription } = trpc.tenant.getSubscription.useQuery();
 
   // Mutations
   const updateProfile = trpc.auth.updateProfile.useMutation();
@@ -51,8 +55,9 @@ export default function PerfilPage() {
       utils.auth.me.invalidate();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      toast.success("Perfil actualizado correctamente");
     } catch (error) {
-      console.error("Error guardando perfil:", error);
+      toast.error("Error guardando perfil. Intenta nuevamente.");
     }
   };
 
@@ -67,8 +72,10 @@ export default function PerfilPage() {
       setNewPassword("");
       setPasswordChanged(true);
       setTimeout(() => setPasswordChanged(false), 3000);
+      toast.success("Contraseña actualizada correctamente");
     } catch (error) {
       setPasswordError("La contraseña actual es incorrecta");
+      toast.error("Error al cambiar la contraseña");
     }
   };
 
@@ -163,8 +170,8 @@ export default function PerfilPage() {
             <div className="flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-xl font-semibold">{user?.name || "Sin nombre"}</h2>
-                <Badge variant={getPlanBadgeVariant("")}>
-                  {getPlanName("")}
+                <Badge variant={getPlanBadgeVariant(subscription?.planName || "")}>
+                  {getPlanName(subscription?.planName || "")}
                 </Badge>
                 <Badge variant="outline" className="flex items-center gap-1">
                   Usuario
@@ -204,8 +211,8 @@ export default function PerfilPage() {
             <Separator />
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground text-[13px] md:text-sm">Plan</span>
-              <Badge variant={getPlanBadgeVariant("")}>
-                {getPlanName("")}
+              <Badge variant={getPlanBadgeVariant(subscription?.planName || "")}>
+                {getPlanName(subscription?.planName || "")}
               </Badge>
             </div>
             <Separator />

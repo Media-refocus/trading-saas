@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { CheckCircle2, Loader2, MessageCircle, Copy, Check, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 export default function SettingsPage() {
   const [name, setName] = useState("");
@@ -17,6 +18,9 @@ export default function SettingsPage() {
 
   // Obtener datos del usuario
   const { data: user, isLoading } = trpc.auth.me.useQuery();
+
+  // Obtener suscripción real
+  const { data: subscription } = trpc.tenant.getSubscription.useQuery();
 
   // Mutations
   const updateProfile = trpc.auth.updateProfile.useMutation();
@@ -35,8 +39,9 @@ export default function SettingsPage() {
       utils.auth.me.invalidate();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      toast.success("Perfil actualizado correctamente");
     } catch (error) {
-      console.error("Error guardando perfil:", error);
+      toast.error("Error guardando perfil. Intenta nuevamente.");
     }
   };
 
@@ -48,9 +53,8 @@ export default function SettingsPage() {
     }
   };
 
-  // Verificar si tiene plan compatible con Telegram
-  // TODO: Obtener plan del tenant desde una query separada
-  const canUseTelegram = false;
+  // Verificar si tiene plan compatible con Telegram (PRO o ENTERPRISE)
+  const canUseTelegram = subscription?.planName === "PRO" || subscription?.planName === "ENTERPRISE" || subscription?.planName === "VIP";
 
   if (isLoading) {
     return (
@@ -85,13 +89,15 @@ export default function SettingsPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-3">
               <div>
                 <h3 className="font-semibold text-[13px] md:text-base">
-                  {false ? "Plan Pro" :
-                   false ? "Plan Básico" :
-    // @ts-ignore
-                   "" || "Plan Gratuito"}
+                  {subscription?.planName === "PRO" ? "Plan Pro" :
+                   subscription?.planName === "ENTERPRISE" || subscription?.planName === "VIP" ? "Plan VIP" :
+                   subscription?.planName === "BASIC" ? "Plan Básico" :
+                   "Plan Gratuito"}
                 </h3>
                 <p className="text-[13px] md:text-sm text-muted-foreground">
-                  {user?.id || "" || "Tu organización"}
+                  {subscription?.isTrial && subscription.trialDaysRemaining
+                    ? `Periodo de prueba: ${subscription.trialDaysRemaining} días restantes`
+                    : "Tu organización"}
                 </p>
               </div>
               <Link href="/pricing" className="w-full sm:w-auto">

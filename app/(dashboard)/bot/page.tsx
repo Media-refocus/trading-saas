@@ -60,6 +60,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 // ==================== TYPES ====================
 
@@ -293,8 +294,9 @@ function TradingConfigForm({ config, onSave }: { config: BotConfig | null; onSav
 
       utils.bot.getConfig.invalidate();
       onSave();
+      toast.success("Configuración guardada correctamente");
     } catch (error) {
-      console.error("Error saving config:", error);
+      toast.error("Error al guardar la configuración");
     } finally {
       setIsSaving(false);
     }
@@ -681,8 +683,9 @@ function AccountsSection({ accounts }: { accounts: BotConfig["accounts"] }) {
         symbol: "XAUUSD",
         magic: 20250101,
       });
+      toast.success("Cuenta MT5 añadida correctamente");
     } catch (error) {
-      console.error("Error adding account:", error);
+      toast.error("Error al añadir la cuenta");
     }
   };
 
@@ -690,8 +693,9 @@ function AccountsSection({ accounts }: { accounts: BotConfig["accounts"] }) {
     try {
       await removeAccount.mutateAsync({ id });
       utils.bot.getConfig.invalidate();
+      toast.success("Cuenta eliminada correctamente");
     } catch (error) {
-      console.error("Error removing account:", error);
+      toast.error("Error al eliminar la cuenta");
     }
   };
 

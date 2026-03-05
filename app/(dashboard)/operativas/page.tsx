@@ -22,6 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { trpc } from "@/lib/trpc";
 import {
   Search,
@@ -515,15 +521,23 @@ export default function OperativasPage() {
                       )}
                       {forking ? "Copiando..." : "Copiar a mis Estrategias"}
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        // TODO: Ir al backtester con estos parametros
-                      }}
-                    >
-                      <Target className="h-4 w-4 mr-2" />
-                      Probar en Backtester
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            disabled
+                            className="opacity-50 cursor-not-allowed"
+                          >
+                            <Target className="h-4 w-4 mr-2" />
+                            Probar en Backtester
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Próximamente</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
 
                   {/* Comments Section */}
