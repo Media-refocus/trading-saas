@@ -211,12 +211,13 @@
 **Prioridad**: ALTA
 **Dependencias**: 2.1
 **Tiempo estimado**: 1 día
+**Estado**: COMPLETADO
 
 **Tareas**:
-- [ ] Migrar Prisma a PostgreSQL (Supabase/Railway)
-- [ ] Configurar connection pooling
+- [x] Migrar Prisma a PostgreSQL (Supabase)
+- [x] Configurar connection pooling (PgBouncer via Supabase pooler)
+- [x] Variables de entorno por ambiente (DATABASE_URL + DIRECT_DATABASE_URL)
 - [ ] Backups automáticos
-- [ ] Variables de entorno por ambiente
 
 ### 2.3 Pagos con Stripe
 **Prioridad**: ALTA
@@ -588,3 +589,64 @@ El cliente puede:
 
 *Documento creado: 2026-02-19*
 *Ultima actualizacion: 2026-02-28*
+
+---
+
+## Fase 9: Soporte MT4 + Arquitectura Unificada (Q1 2026)
+
+### 9.1 EA Cliente Ligero MQL4
+**Prioridad**: ALTA
+**Dependencias**: Fase 2.3 (Stripe) completada
+**Tiempo estimado**: 2-3 días
+
+**Objetivo**: EA MQL4 que actúa como cliente ligero, mismo patrón que MT5.
+
+**Tareas**:
+- [ ] Portar EA de MQL5 a MQL4 (polling señales, ejecución órdenes)
+- [ ] WebRequest al servidor cada 5-10s para señales activas
+- [ ] Validación de licencia en OnInit() + cada 24h
+- [ ] Kill-switch: si licencia inválida → ExpertRemove()
+- [ ] Licencia atada a AccountNumber() del broker
+- [ ] Compilar a .ex4 (protección nativa, no decompilable)
+- [ ] Tests en cuenta demo con broker MT4
+
+### 9.2 API de Licencias + Señales
+**Prioridad**: ALTA
+**Dependencias**: 9.1
+**Tiempo estimado**: 1-2 días
+
+**Tareas**:
+- [ ] Endpoint `POST /api/validate-license` (account + key → valid/invalid/expired)
+- [ ] Endpoint `GET /api/signals/active` (devuelve señal actual si licencia válida)
+- [ ] Webhook Stripe: activar/desactivar licencia automáticamente al pagar/cancelar
+- [ ] Rate limiting por cuenta
+- [ ] Cache de validación (no golpear DB en cada polling)
+- [ ] Logs de acceso por cuenta (auditoría)
+
+### 9.3 Instalador Unificado MT4/MT5
+**Prioridad**: ALTA
+**Dependencias**: 9.1, 9.2
+**Tiempo estimado**: 1 día
+
+**Tareas**:
+- [ ] Actualizar `install.ps1`: detectar si hay MT4, MT5 o ambos
+- [ ] Descargar EA correcto (.ex4 o .ex5) según terminal detectado
+- [ ] Copiar EA a carpeta `MQL4/Experts/` o `MQL5/Experts/`
+- [ ] Configurar URLs permitidas en WebRequest automáticamente
+- [ ] Solicitar license key al cliente durante instalación
+- [ ] Verificar conexión al servidor antes de finalizar
+- [ ] Script de desinstalación limpia
+
+### 9.4 Protección IP
+**Prioridad**: CRÍTICA
+**Dependencias**: 9.1
+
+**Arquitectura de seguridad**:
+- [ ] Toda lógica de trading en servidor (EA solo ejecuta órdenes)
+- [ ] EA compilado .ex4/.ex5 (no decompilable desde Build 600+)
+- [ ] Licencia vinculada a AccountNumber + suscripción Stripe
+- [ ] Sin suscripción activa → servidor no responde → EA muere
+- [ ] HMAC en requests para evitar suplantación
+- [ ] No redistribuible: EA inútil sin license key válida
+
+---

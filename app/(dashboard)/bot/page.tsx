@@ -659,8 +659,6 @@ function AccountsSection({ accounts }: { accounts: BotConfig["accounts"] }) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newAccount, setNewAccount] = useState({
     login: "",
-    password: "",
-    server: "",
     path: "",
     symbol: "XAUUSD",
     magic: 20260101,
@@ -676,7 +674,7 @@ function AccountsSection({ accounts }: { accounts: BotConfig["accounts"] }) {
       await addAccount.mutateAsync(newAccount);
       utils.bot.getConfig.invalidate();
       setIsAddDialogOpen(false);
-      setNewAccount({ login: "", password: "", server: "", path: "", symbol: "XAUUSD", magic: 20260101, platform: "MT5" });
+      setNewAccount({ login: "", path: "", symbol: "XAUUSD", magic: 20260101, platform: "MT5" });
       toast.success(`Cuenta ${newAccount.platform} añadida correctamente`);
     } catch (error) {
       toast.error("Error al añadir la cuenta");
@@ -758,32 +756,6 @@ function AccountsSection({ accounts }: { accounts: BotConfig["accounts"] }) {
                   />
                 </div>
 
-                {/* Campos solo para MT5 */}
-                {!isMT4 && (
-                  <>
-                    <div className="grid grid-cols-4 items-center gap-2 md:gap-4">
-                      <Label htmlFor="password" className="text-right text-xs md:text-sm">Password</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        value={newAccount.password}
-                        onChange={(e) => setNewAccount({ ...newAccount, password: e.target.value })}
-                        className="col-span-3 h-9 md:h-10"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-2 md:gap-4">
-                      <Label htmlFor="server" className="text-right text-xs md:text-sm">Servidor</Label>
-                      <Input
-                        id="server"
-                        value={newAccount.server}
-                        onChange={(e) => setNewAccount({ ...newAccount, server: e.target.value })}
-                        className="col-span-3 h-9 md:h-10"
-                        placeholder="Broker-Demo"
-                      />
-                    </div>
-                  </>
-                )}
-
                 {/* Magic number */}
                 <div className="grid grid-cols-4 items-center gap-2 md:gap-4">
                   <Label htmlFor="magic" className="text-right text-xs md:text-sm">Magic</Label>
@@ -811,6 +783,27 @@ function AccountsSection({ accounts }: { accounts: BotConfig["accounts"] }) {
                     </ol>
                     <p className="text-blue-600 dark:text-blue-400 pt-1">
                       ⚠️ El número de cuenta que introduces aquí debe coincidir exactamente con el de tu MT4.
+                    </p>
+                  </div>
+                )}
+
+                {/* Instrucciones MT5 */}
+                {!isMT4 && (
+                  <div className="col-span-4 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 p-3 text-xs space-y-1.5">
+                    <p className="font-semibold text-green-800 dark:text-green-200">📥 Cómo activar el EA en MT5:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-green-700 dark:text-green-300">
+                      <li>Descarga <span className="font-mono">TBSSignalEA.ex5</span> desde el botón de abajo</li>
+                      <li>Cópialo a <span className="font-mono">MT5 / MQL5 / Experts /</span></li>
+                      <li>Arrastra el EA al gráfico XAUUSD</li>
+                      <li>En MT5: <span className="font-medium">Herramientas → Opciones → Asesores Expertos</span></li>
+                      <li>Activa <span className="font-medium">&quot;Permitir solicitudes Web para URL listadas&quot;</span> y añade la URL del servidor</li>
+                      <li>Introduce tu API Key del dashboard en los inputs del EA</li>
+                    </ol>
+                    <p className="text-green-600 dark:text-green-400 pt-1">
+                      ⚠️ El número de cuenta que introduces aquí debe coincidir exactamente con el de tu MT5.
+                    </p>
+                    <p className="text-green-600 dark:text-green-400 text-[10px] mt-1">
+                      💡 El EA enviará heartbeat cada 30 segundos para mantener actualizado el estado de tu cuenta.
                     </p>
                   </div>
                 )}

@@ -102,8 +102,8 @@ model BotAccount {
   botConfigId String
   loginEnc    String
   platform    String        @default("MT5")
-  passwordEnc String
-  serverEnc   String
+  passwordEnc String?
+  serverEnc   String?
   pathEnc     String?
   symbol      String        @default("XAUUSD")
   magic       Int

@@ -52,8 +52,8 @@ const BotConfigInputSchema = z.object({
 
 const BotAccountInputSchema = z.object({
   login: z.string().min(1),
-  password: z.string().optional().default(""),
-  server: z.string().optional().default(""),
+  password: z.string().optional(),
+  server: z.string().optional(),
   path: z.string().optional(),
   symbol: z.string().default("XAUUSD"),
   magic: z.number(),
@@ -115,7 +115,7 @@ export const botRouter = router({
       dailyLossResetAt: botConfig.dailyLossResetAt,
       hasTelegramConfig: !!(botConfig.telegramApiIdEnc && botConfig.telegramApiHashEnc),
       telegramChannels: botConfig.telegramChannels,
-      accounts: botConfig.BotAccount.map((acc: { id: string; loginEnc: string; serverEnc: string; symbol: string; magic: number; isActive: boolean; lastSyncAt: Date | null; lastBalance: number | null; lastEquity: number | null; platform: string }) => {
+      accounts: botConfig.BotAccount.map((acc: { id: string; loginEnc: string; symbol: string; magic: number; isActive: boolean; lastSyncAt: Date | null; lastBalance: number | null; lastEquity: number | null; platform: string }) => {
         // Mostrar últimos 4 dígitos del login (número de cuenta)
         let loginMasked = "****";
         try {
@@ -298,8 +298,8 @@ export const botRouter = router({
         data: {
           botConfigId: botConfig.id,
           loginEnc: encryptCredential(input.login),
-          passwordEnc: encryptCredential(input.password || ""),
-          serverEnc: encryptCredential(input.server || ""),
+          passwordEnc: input.password ? encryptCredential(input.password) : null,
+          serverEnc: input.server ? encryptCredential(input.server) : null,
           pathEnc: input.path ? encryptCredential(input.path) : undefined,
           symbol: input.symbol,
           magic: input.magic,
