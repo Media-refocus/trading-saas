@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
-import { CheckCircle2, Loader2, MessageCircle, Copy, Check, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, MessageCircle, Copy, Check, XCircle, AlertTriangle, Clock, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { signOut } from "next-auth/react";
 
@@ -55,7 +55,30 @@ export default function SettingsPage() {
   };
 
   // Verificar si tiene plan compatible con Telegram (PRO o ENTERPRISE)
-  const canUseTelegram = subscription?.planName === "PRO" || subscription?.planName === "ENTERPRISE" || subscription?.planName === "VIP";
+  const canUseTelegram = (subscription?.planName === "PRO" || subscription?.planName === "ENTERPRISE" || subscription?.planName === "VIP") && subscription?.isActive;
+
+  // Get status display info
+  const getStatusDisplay = () => {
+    if (subscription?.isPastDue) {
+      return { icon: AlertTriangle, text: "Pago Pendiente", color: "text-yellow-500", bgColor: "bg-yellow-500/10" };
+    }
+    if (subscription?.isCanceled) {
+      return { icon: Ban, text: "Cancelado", color: "text-red-500", bgColor: "bg-red-500/10" };
+    }
+    if (subscription?.isPaused) {
+      return { icon: Clock, text: "Pausado", color: "text-orange-500", bgColor: "bg-orange-500/10" };
+    }
+    if (subscription?.isTrial) {
+      return { icon: Clock, text: "Periodo de Prueba", color: "text-blue-500", bgColor: "bg-blue-500/10" };
+    }
+    if (subscription?.isActive) {
+      return { icon: CheckCircle2, text: "Activo", color: "text-green-500", bgColor: "bg-green-500/10" };
+    }
+    return { icon: XCircle, text: "Inactivo", color: "text-muted-foreground", bgColor: "bg-muted" };
+  };
+
+  const statusDisplay = getStatusDisplay();
+  const StatusIcon = statusDisplay.icon;
 
   if (isLoading) {
     return (
@@ -88,22 +111,52 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-3">
-              <div>
-                <h3 className="font-semibold text-[13px] md:text-base">
-                  {subscription?.planName === "PRO" ? "Plan Pro" :
-                   subscription?.planName === "ENTERPRISE" || subscription?.planName === "VIP" ? "Plan VIP" :
-                   subscription?.planName === "BASIC" ? "Plan Básico" :
-                   "Plan Gratuito"}
-                </h3>
-                <p className="text-[13px] md:text-sm text-muted-foreground">
-                  {subscription?.isTrial && subscription.trialDaysRemaining
-                    ? `Periodo de prueba: ${subscription.trialDaysRemaining} días restantes`
-                    : "Tu organización"}
-                </p>
+              <div className="flex items-start gap-3">
+                <div className={`p-2 rounded-full ${statusDisplay.bgColor}`}>
+                  <StatusIcon className={`h-5 w-5 ${statusDisplay.color}`} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-[13px] md:text-base flex items-center gap-2">
+                    {subscription?.planName === "PRO" ? "Plan Pro" :
+                     subscription?.planName === "ENTERPRISE" || subscription?.planName === "VIP" ? "Plan VIP" :
+                     subscription?.planName === "BASIC" ? "Plan Básico" :
+                     "Plan Gratuito"}
+                    <span className={`text-xs font-medium ${statusDisplay.color}`}>
+                      ({statusDisplay.text})
+                    </span>
+                  </h3>
+                  <p className="text-[13px] md:text-sm text-muted-foreground">
+                    {subscription?.isTrial && subscription.trialDaysRemaining
+                      ? `Periodo de prueba: ${subscription.trialDaysRemaining} días restantes`
+                      : subscription?.isPastDue
+                      ? "Tu última factura no pudo ser cobrada. Actualiza tu método de pago."
+                      : subscription?.isCanceled
+                      ? "Tu suscripción ha sido cancelada. Reactívala para continuar."
+                      : subscription?.daysUntilBilling
+                      ? `Próxima facturación en ${subscription.daysUntilBilling} días`
+                      : "Tu organización"}
+                  </p>
+                </div>
               </div>
-              <Link href="/pricing" className="w-full sm:w-auto">
-                <Button className="w-full sm:w-auto min-h-[44px]">Mejorar Plan</Button>
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                {subscription?.hasStripeCustomer && (
+                  <Link href="/api/stripe/portal" className="w-full sm:w-auto">
+                    <Button variant="outline" className="w-full sm:w-auto min-h-[44px]">
+                      Gestionar Facturación
+                    </Button>
+                  </Link>
+                )}
+                {!subscription?.isCanceled && !subscription?.isPastDue && (
+                  <Link href="/pricing" className="w-full sm:w-auto">
+                    <Button className="w-full sm:w-auto min-h-[44px]">Mejorar Plan</Button>
+                  </Link>
+                )}
+                {(subscription?.isCanceled || subscription?.isPastDue) && (
+                  <Link href="/pricing" className="w-full sm:w-auto">
+                    <Button className="w-full sm:w-auto min-h-[44px]">Reactivar Plan</Button>
+                  </Link>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
