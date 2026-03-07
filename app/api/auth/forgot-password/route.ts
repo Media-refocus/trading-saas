@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { randomBytes } from "crypto";
+import { sendPasswordResetEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,6 +29,11 @@ export async function POST(request: NextRequest) {
     const token = randomBytes(32).toString("hex");
     const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hora
 
+    // Eliminar tokens anteriores para este email
+    await prisma.passwordResetToken.deleteMany({
+      where: { email: email.toLowerCase() },
+    });
+
     // Guardar token en la base de datos
     await prisma.passwordResetToken.create({
       data: {
@@ -38,9 +44,10 @@ export async function POST(request: NextRequest) {
     });
 
     // Construir URL de reset
-    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
+    const baseUrl = process.env.NEXTAUTH_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      "http://localhost:3000";
     const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
     // En desarrollo, loguear el enlace
@@ -51,41 +58,11 @@ export async function POST(request: NextRequest) {
       console.log("=".repeat(60));
     }
 
-    // En producción, enviar email si hay SMTP configurado
-    if (process.env.SMTP_HOST && process.env.NODE_ENV === "production") {
-      try {
-        const nodemailer = await import("nodemailer");
-        const transporter = nodemailer.default.createTransport({
-          host: process.env.SMTP_HOST,
-          port: parseInt(process.env.SMTP_PORT || "587"),
-          secure: process.env.SMTP_SECURE === "true",
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-        });
+    // Intentar enviar email (Resend o SMTP)
+    const emailSent = await sendPasswordResetEmail(email, resetUrl);
 
-        await transporter.sendMail({
-          from: process.env.SMTP_FROM || "noreply@tradingbot.com",
-          to: email,
-          subject: "Restablecer contraseña - Trading Bot",
-          html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2>Restablecer tu contraseña</h2>
-              <p>Has solicitado restablecer tu contraseña. Haz clic en el siguiente enlace:</p>
-              <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background: #0078D4; color: white; text-decoration: none; border-radius: 6px;">
-                Restablecer Contraseña
-              </a>
-              <p style="margin-top: 20px; color: #666;">
-                Este enlace expirará en 1 hora. Si no solicitaste este email, puedes ignorarlo.
-              </p>
-            </div>
-          `,
-        });
-      } catch (emailError) {
-        console.error("Error enviando email:", emailError);
-        // No revelamos el error al usuario por seguridad
-      }
+    if (!emailSent && process.env.NODE_ENV === "production") {
+      console.warn("[Forgot Password] Email could not be sent. Configure RESEND_API_KEY or SMTP_* vars.");
     }
 
     return NextResponse.json({ success: true });

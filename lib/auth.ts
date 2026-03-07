@@ -92,23 +92,42 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return true;
         }
 
-        // Crear nuevo usuario con tenant
-        const newTenant = await prisma.tenant.create({
-          data: {
-            name: user.name || "Mi Cuenta",
-            email: user.email,
-            plan: "TRIAL",
-          },
-        });
+        // Crear nuevo usuario con tenant y suscripcion trial
+        // Fecha de fin de trial: 14 días desde ahora
+        const trialEnd = new Date();
+        trialEnd.setDate(trialEnd.getDate() + 14);
 
-        const newUser = await prisma.user.create({
-          data: {
-            email: user.email,
-            name: user.name,
-            image: user.image,
-            tenantId: newTenant.id,
-            role: "USER",
-          },
+        const newUser = await prisma.$transaction(async (tx) => {
+          // Crear tenant
+          const tenant = await tx.tenant.create({
+            data: {
+              name: user.name || "Mi Cuenta",
+              email: user.email,
+            },
+          });
+
+          // Crear usuario
+          const u = await tx.user.create({
+            data: {
+              email: user.email!,
+              name: user.name,
+              image: user.image,
+              tenantId: tenant.id,
+              role: "USER",
+            },
+          });
+
+          // Crear suscripcion trial (14 dias con features PRO)
+          await tx.subscription.create({
+            data: {
+              tenantId: tenant.id,
+              plan: "PRO",
+              status: "TRIAL",
+              trialEnd,
+            },
+          });
+
+          return u;
         });
 
         user.tenantId = newUser.tenantId;
