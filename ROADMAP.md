@@ -484,7 +484,7 @@ npm run build
   - Vinculacion via codigo en dashboard
   - Seccion Telegram en settings
 
-**Disponible en planes**: Pro (97 EUR) y VIP (197 EUR)
+**Disponible en planes**: Todos los planes
 
 ---
 
@@ -535,23 +535,31 @@ El cliente puede:
 - [x] Acciones validadas antes de ejecutar
 - [x] Logs de conversaciones en Telegram
 
-**Disponible en plan**: VIP (197 EUR) - Diferencial competitivo
+**Disponible en plan**: VIP (347 EUR) - Diferencial competitivo
 
 ---
 
-## Features por Plan (Actualizado 2026-02-28)
+## Features por Plan (Actualizado 2026-03-08)
 
-| Feature | Trader (57 EUR) | Pro (97 EUR) | VIP (197 EUR) |
-|---------|-----------------|--------------|---------------|
+| Feature | Trader (57 EUR) | Pro (147 EUR) | VIP (347 EUR) |
+|---------|-----------------|---------------|---------------|
 | Dashboard completo | ✅ | ✅ | ✅ |
-| Bot MT5 | 1 cuenta | 3 cuentas | Ilimitadas |
+| Bot señales XAUUSD | ✅ | ✅ | ✅ |
 | Backtester avanzado | ✅ | ✅ | ✅ |
+| Heartbeat monitoring | ✅ | ✅ | ✅ |
+| Telegram notificaciones | ✅ | ✅ | ✅ |
 | Daily Loss Limit | ✅ | ✅ | ✅ |
-| Kill Switch | ✅ | ✅ | ✅ |
-| Instalacion VPS guiada | ✅ | ✅ | ✅ |
+| Kill Switch emergencia | ✅ | ✅ | ✅ |
 | Soporte email | ✅ | ✅ | ✅ |
-| Telegram notificaciones | ❌ | ✅ | ✅ |
+| Cuentas MT5 | 1 | 3 | Ilimitadas |
+| Circuit Breaker | ❌ | ✅ | ✅ |
+| Account Guardian | ❌ | ✅ | ✅ |
+| News Filter | ❌ | ✅ | ✅ |
+| TradingView Bridge | ❌ | ✅ | ✅ |
 | Analytics Pro | ❌ | ✅ | ✅ |
+| Equity Curve | ❌ | ✅ | ✅ |
+| Heatmap horario | ❌ | ✅ | ✅ |
+| Smart Entry Filter | ❌ | ✅ | ✅ |
 | **Agente IA de Operativa** | ❌ | ❌ | **✅** |
 | Soporte prioritario | ❌ | ❌ | ✅ |
 | Canal VIP con Xisco | ❌ | ❌ | ✅ |
@@ -588,7 +596,7 @@ El cliente puede:
 ---
 
 *Documento creado: 2026-02-19*
-*Ultima actualizacion: 2026-02-28*
+*Ultima actualizacion: 2026-03-08*
 
 ---
 
