@@ -47,3 +47,24 @@ Started: Sun Mar  8 00:11:43 CET 2026
 - **Files changed:** scripts/ralph/prd.json (marked as passes: true)
 - **Commit:** (this commit)
 ---
+
+## [Sat Mar 8 11:15 CET 2026] - STORY-012
+- Created comprehensive manual test plan for Stripe payments:
+  - Test Case 1: Successful subscription flow
+  - Test Case 2: Payment declined handling
+  - Test Case 3: Subscription cancellation via portal
+  - Test Case 4: Payment failure (renewal) handling
+  - Test Case 5: Plan limits enforcement verification
+  - Test Case 6: Stripe billing portal access
+  - Test Case 7: Webhook signature verification
+  - Test Case 8: Edge cases (multiple subs, session expiry, concurrent webhooks)
+- Documented Stripe test cards for different scenarios
+- Added pre-launch verification checklist
+- Added rollback procedure for production issues
+- Added test execution log template
+- **Files changed:** tests/manual/TEST_PLAN_PAYMENTS.md (created)
+- **Learnings:**
+  - Payment flow: checkout → webhook → DB update → UI reflect
+  - Webhook events: checkout.session.completed, subscription.updated/deleted, invoice.payment_failed
+  - Portal access requires stripeCustomerId on tenant
+---

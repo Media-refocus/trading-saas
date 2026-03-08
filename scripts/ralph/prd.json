@@ -106,7 +106,7 @@
       "id": "STORY-012",
       "title": "Test flujo pagos end-to-end",
       "priority": "CRITICAL",
-      "passes": false,
+      "passes": true,
       "description": "Crear tests/manual/TEST_PLAN_PAYMENTS.md con pasos de test manual. Test con Stripe test cards: 4242424242424242 (success), 4000000000000002 (decline). Verificar webhook, email, plan en dashboard, límites aplicados.",
       "testCriteria": "Documento completo + test manual ejecutado con éxito",
       "files": ["tests/manual/TEST_PLAN_PAYMENTS.md"]
