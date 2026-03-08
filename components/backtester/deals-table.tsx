@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Download } from "lucide-react";
+import { exportTradesToCSV } from "@/lib/export-csv";
 
 interface Deal {
   index: number;
@@ -50,6 +51,7 @@ interface DealsTableProps {
   trades: Trade[];
   onSelectTrade: (index: number) => void;
   selectedTradeIndex: number | null;
+  strategyName?: string;
 }
 
 export function DealsTable({
@@ -57,6 +59,7 @@ export function DealsTable({
   trades,
   onSelectTrade,
   selectedTradeIndex,
+  strategyName = "backtest",
 }: DealsTableProps) {
   const [viewMode, setViewMode] = useState<"deals" | "trades" | "report">("trades");
 
@@ -99,6 +102,31 @@ export function DealsTable({
         </button>
 
         <div className="flex-1" />
+
+        {/* Export CSV Button */}
+        {trades.length > 0 && (
+          <button
+            onClick={() => exportTradesToCSV(
+              trades.map(t => ({
+                timestamp: new Date(t.signalTimestamp),
+                side: t.signalSide,
+                entryPrice: t.entryPrice,
+                exitPrice: t.exitPrice,
+                profitPips: t.totalProfitPips,
+                profitEur: t.totalProfit,
+                exitReason: t.exitReason,
+                levels: t.maxLevels,
+                durationMinutes: t.durationMinutes,
+              })),
+              strategyName
+            )}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs bg-[#333333] text-[#888888] hover:text-white rounded transition-colors"
+            title="Export trades to CSV"
+          >
+            <Download className="w-3 h-3" />
+            Export CSV
+          </button>
+        )}
 
         <div className="text-xs text-[#888888]">
           {trades.length} trades • {deals.length} deals
