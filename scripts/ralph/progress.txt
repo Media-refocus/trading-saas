@@ -48,6 +48,20 @@ Started: Sun Mar  8 00:11:43 CET 2026
 - **Commit:** (this commit)
 ---
 
+## [Sat Mar 8 12:00 CET 2026] - STORY-003
+- Verified rate limiting already implemented in codebase:
+  - lib/rate-limit.ts exists with checkRateLimit(), RATE_LIMITS presets
+  - bot: 100 req/min per IP configured
+  - X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset headers
+  - 429 response with retryAfter when exceeded
+- All /api/bot/* endpoints use authenticateBot() which includes checkBotRateLimit()
+- No code changes needed - feature already complete
+- **Files verified:** lib/rate-limit.ts, app/api/bot/auth.ts, all bot endpoints
+- **Learnings:**
+  - Rate limiting is per-IP, not per-tenant (by design for DDoS protection)
+  - authenticateBot() is the single point of enforcement for all bot endpoints
+---
+
 ## [Sat Mar 8 11:15 CET 2026] - STORY-012
 - Created comprehensive manual test plan for Stripe payments:
   - Test Case 1: Successful subscription flow

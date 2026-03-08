@@ -25,7 +25,7 @@
       "id": "STORY-003",
       "title": "Implementar rate limiting en API endpoints",
       "priority": "HIGH",
-      "passes": false,
+      "passes": true,
       "description": "Añadir rate limiting para prevenir abuso de API: 100 req/min por tenant. Crear lib/rate-limit.ts con middleware. Añadir a /api/bot/* endpoints. Response headers con X-RateLimit-Limit y X-RateLimit-Remaining.",
       "testCriteria": "curl >100 veces a /api/bot/status retorna 429 Too Many Requests con headers de rate limit",
       "files": ["lib/rate-limit.ts", "app/api/bot/*/route.ts"]
