@@ -217,3 +217,17 @@ Started: Sun Mar  8 00:11:43 CET 2026
   - Use document.createElement("a") + blob URL for client-side file download
   - Clean up URL with URL.revokeObjectURL after download
 ---
+
+## [Sat Mar 8 17:38 CET 2026] - STORY-013
+- Implemented cache hit/miss counter in lib/backtest-cache.ts:
+  - Added cacheHits and cacheMisses module-level counters
+  - Updated getCachedResult() to track hits and misses
+  - Updated getCacheStats() to return { size, maxSize, hitRate, hits, misses }
+  - hitRate calculated as hits / (hits + misses)
+- Exposed via tRPC router backtester.getBacktestCacheStats
+- **Files changed:** lib/backtest-cache.ts
+- **Commit:** dd04bf2
+- **Learnings:**
+  - Module-level variables persist across requests in Node.js
+  - Track both hits (found) and misses (not found or expired) for accurate hit rate
+---
