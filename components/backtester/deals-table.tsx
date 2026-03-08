@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface Deal {
   index: number;
@@ -19,9 +20,34 @@ interface Deal {
   exitReason?: string;
 }
 
+interface TradeLevel {
+  level: number;
+  openPrice: number;
+  closePrice: number;
+  lotSize: number;
+  profit: number;
+  profitPips: number;
+  openTime: Date;
+  closeTime: Date;
+}
+
+interface Trade {
+  signalTimestamp: Date;
+  signalSide: "BUY" | "SELL";
+  entryPrice: number;
+  exitPrice: number;
+  maxLevels: number;
+  totalProfitPips: number;
+  totalProfit: number;
+  exitReason: string;
+  levels?: TradeLevel[];
+  avgPrice?: number;
+  durationMinutes?: number;
+}
+
 interface DealsTableProps {
   deals: Deal[];
-  trades: any[];
+  trades: Trade[];
   onSelectTrade: (index: number) => void;
   selectedTradeIndex: number | null;
 }
@@ -171,82 +197,172 @@ function TradesView({
   onSelectTrade,
   selectedTradeIndex,
 }: {
-  trades: any[];
+  trades: Trade[];
   onSelectTrade: (index: number) => void;
   selectedTradeIndex: number | null;
 }) {
+  const [expandedTrade, setExpandedTrade] = useState<number | null>(null);
+
+  const toggleExpand = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedTrade(expandedTrade === index ? null : index);
+  };
+
   return (
-    <table className="w-full text-xs" aria-label="Tabla de trades agrupados">
-      <thead className="bg-[#2D2D2D] sticky top-0">
-        <tr>
-          <th scope="col" className="text-left py-2 px-3 text-[#888888]">#</th>
-          <th scope="col" className="text-left py-2 px-3 text-[#888888]">Date</th>
-          <th scope="col" className="text-left py-2 px-3 text-[#888888]">Side</th>
-          <th scope="col" className="text-right py-2 px-3 text-[#888888]">Entry</th>
-          <th scope="col" className="text-right py-2 px-3 text-[#888888]">Exit</th>
-          <th scope="col" className="text-right py-2 px-3 text-[#888888]">Levels</th>
-          <th scope="col" className="text-right py-2 px-3 text-[#888888]">Pips</th>
-          <th scope="col" className="text-right py-2 px-3 text-[#888888]">Profit</th>
-          <th scope="col" className="text-left py-2 px-3 text-[#888888]">Close</th>
-        </tr>
-      </thead>
-      <tbody>
-        {trades.map((trade, i) => (
-          <tr
-            key={i}
-            onClick={() => onSelectTrade(i)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelectTrade(i); }}
-            role="button"
-            tabIndex={0}
-            className={cn(
-              "border-b border-[#333333] cursor-pointer transition-colors",
-              selectedTradeIndex === i
-                ? "bg-[#0078D4]/20 border-l-2 border-l-[#0078D4]"
-                : "hover:bg-[#2A2A2A]",
-              trade.totalProfit >= 0 ? "bg-[#1A2E1A]/20" : "bg-[#2E1A1A]/20"
-            )}
-          >
-            <td className="py-2 px-3 font-mono text-[#666666]">{i + 1}</td>
-            <td className="py-2 px-3 font-mono">
-              {new Date(trade.signalTimestamp).toLocaleDateString()}
-            </td>
-            <td className={cn(
-              "py-2 px-3 font-semibold",
-              trade.signalSide === "BUY" ? "text-[#00C853]" : "text-[#FF5252]"
-            )}>
-              {trade.signalSide}
-            </td>
-            <td className="py-2 px-3 text-right font-mono">{trade.entryPrice?.toFixed(2)}</td>
-            <td className="py-2 px-3 text-right font-mono">{trade.exitPrice?.toFixed(2)}</td>
-            <td className="py-2 px-3 text-right">{trade.maxLevels}</td>
-            <td className={cn(
-              "py-2 px-3 text-right font-mono",
-              trade.totalProfitPips >= 0 ? "text-[#00C853]" : "text-[#FF5252]"
-            )}>
-              {trade.totalProfitPips >= 0 ? "+" : ""}{trade.totalProfitPips?.toFixed(1)}
-            </td>
-            <td className={cn(
-              "py-2 px-3 text-right font-mono font-semibold",
-              trade.totalProfit >= 0 ? "text-[#00C853]" : "text-[#FF5252]"
-            )}>
-              {trade.totalProfit >= 0 ? "+" : ""}{trade.totalProfit?.toFixed(2)}€
-            </td>
-            <td className="py-2 px-3">
-              <span className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-medium",
-                trade.exitReason === "TAKE_PROFIT"
-                  ? "bg-[#00C853]/20 text-[#00C853]"
-                  : trade.exitReason === "TRAILING_SL"
-                  ? "bg-[#FFA500]/20 text-[#FFA500]"
-                  : "bg-[#FF5252]/20 text-[#FF5252]"
-              )}>
-                {trade.exitReason === "TAKE_PROFIT" ? "TP" : trade.exitReason === "TRAILING_SL" ? "Trail" : "SL"}
-              </span>
-            </td>
+    <div className="w-full">
+      <table className="w-full text-xs" aria-label="Tabla de trades agrupados">
+        <thead className="bg-[#2D2D2D] sticky top-0">
+          <tr>
+            <th scope="col" className="w-6 py-2 px-2 text-[#888888]"></th>
+            <th scope="col" className="text-left py-2 px-3 text-[#888888]">#</th>
+            <th scope="col" className="text-left py-2 px-3 text-[#888888]">Date</th>
+            <th scope="col" className="text-left py-2 px-3 text-[#888888]">Side</th>
+            <th scope="col" className="text-right py-2 px-3 text-[#888888]">Entry</th>
+            <th scope="col" className="text-right py-2 px-3 text-[#888888]">Exit</th>
+            <th scope="col" className="text-right py-2 px-3 text-[#888888]">Levels</th>
+            <th scope="col" className="text-right py-2 px-3 text-[#888888]">Pips</th>
+            <th scope="col" className="text-right py-2 px-3 text-[#888888]">Profit</th>
+            <th scope="col" className="text-left py-2 px-3 text-[#888888]">Close</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {trades.map((trade, i) => (
+            <>
+              <tr
+                key={`row-${i}`}
+                onClick={() => onSelectTrade(i)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelectTrade(i); }}
+                role="button"
+                tabIndex={0}
+                className={cn(
+                  "border-b border-[#333333] cursor-pointer transition-colors",
+                  selectedTradeIndex === i
+                    ? "bg-[#0078D4]/20 border-l-2 border-l-[#0078D4]"
+                    : "hover:bg-[#2A2A2A]",
+                  trade.totalProfit >= 0 ? "bg-[#1A2E1A]/20" : "bg-[#2E1A1A]/20"
+                )}
+              >
+                <td className="py-2 px-2">
+                  <button
+                    onClick={(e) => toggleExpand(i, e)}
+                    className="p-0.5 hover:bg-[#444] rounded transition-colors"
+                    aria-label={expandedTrade === i ? "Collapse" : "Expand"}
+                  >
+                    {expandedTrade === i ? (
+                      <ChevronDown className="w-3 h-3 text-[#888]" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3 text-[#888]" />
+                    )}
+                  </button>
+                </td>
+                <td className="py-2 px-3 font-mono text-[#666666]">{i + 1}</td>
+                <td className="py-2 px-3 font-mono">
+                  {new Date(trade.signalTimestamp).toLocaleDateString()}
+                </td>
+                <td className={cn(
+                  "py-2 px-3 font-semibold",
+                  trade.signalSide === "BUY" ? "text-[#00C853]" : "text-[#FF5252]"
+                )}>
+                  {trade.signalSide}
+                </td>
+                <td className="py-2 px-3 text-right font-mono">{trade.entryPrice?.toFixed(2)}</td>
+                <td className="py-2 px-3 text-right font-mono">{trade.exitPrice?.toFixed(2)}</td>
+                <td className="py-2 px-3 text-right">{trade.maxLevels}</td>
+                <td className={cn(
+                  "py-2 px-3 text-right font-mono",
+                  trade.totalProfitPips >= 0 ? "text-[#00C853]" : "text-[#FF5252]"
+                )}>
+                  {trade.totalProfitPips >= 0 ? "+" : ""}{trade.totalProfitPips?.toFixed(1)}
+                </td>
+                <td className={cn(
+                  "py-2 px-3 text-right font-mono font-semibold",
+                  trade.totalProfit >= 0 ? "text-[#00C853]" : "text-[#FF5252]"
+                )}>
+                  {trade.totalProfit >= 0 ? "+" : ""}{trade.totalProfit?.toFixed(2)}€
+                </td>
+                <td className="py-2 px-3">
+                  <span className={cn(
+                    "px-2 py-0.5 rounded text-[10px] font-medium",
+                    trade.exitReason === "TAKE_PROFIT"
+                      ? "bg-[#00C853]/20 text-[#00C853]"
+                      : trade.exitReason === "TRAILING_SL"
+                      ? "bg-[#FFA500]/20 text-[#FFA500]"
+                      : "bg-[#FF5252]/20 text-[#FF5252]"
+                  )}>
+                    {trade.exitReason === "TAKE_PROFIT" ? "TP" : trade.exitReason === "TRAILING_SL" ? "Trail" : "SL"}
+                  </span>
+                </td>
+              </tr>
+              {/* Expanded row with grid details */}
+              {expandedTrade === i && trade.levels && trade.levels.length > 0 && (
+                <tr key={`expanded-${i}`} className="bg-[#1A1A1A] border-b border-[#333333]">
+                  <td colSpan={10} className="p-0">
+                    <div className="overflow-hidden transition-all duration-200 ease-in-out">
+                      <div className="p-3 space-y-2">
+                        {/* Summary row */}
+                        <div className="flex items-center gap-4 text-[11px] text-[#888] pb-2 border-b border-[#333]">
+                          <span>Avg Price: <span className="font-mono text-white">{trade.avgPrice?.toFixed(2)}</span></span>
+                          <span>Duration: <span className="font-mono text-white">{trade.durationMinutes ? `${Math.round(trade.durationMinutes)}m` : '-'}</span></span>
+                          <span>Total Lots: <span className="font-mono text-white">{trade.levels.reduce((s, l) => s + l.lotSize, 0).toFixed(2)}</span></span>
+                        </div>
+                        {/* Grid levels */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-[11px]">
+                            <thead>
+                              <tr className="text-[#666]">
+                                <th className="text-left py-1 px-2">Level</th>
+                                <th className="text-left py-1 px-2">Open Time</th>
+                                <th className="text-right py-1 px-2">Open Price</th>
+                                <th className="text-right py-1 px-2">Close Price</th>
+                                <th className="text-right py-1 px-2">Lots</th>
+                                <th className="text-right py-1 px-2">Pips</th>
+                                <th className="text-right py-1 px-2">Profit</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {trade.levels.map((level, li) => (
+                                <tr key={li} className="border-t border-[#2A2A2A]">
+                                  <td className="py-1.5 px-2">
+                                    <span className={cn(
+                                      "px-1.5 py-0.5 rounded text-[10px] font-medium",
+                                      level.level === 0 ? "bg-[#0078D4]/20 text-[#0078D4]" : "bg-[#8B5CF6]/20 text-[#8B5CF6]"
+                                    )}>
+                                      L{level.level}
+                                    </span>
+                                  </td>
+                                  <td className="py-1.5 px-2 font-mono text-[#888]">
+                                    {new Date(level.openTime).toLocaleTimeString()}
+                                  </td>
+                                  <td className="py-1.5 px-2 text-right font-mono">{level.openPrice.toFixed(2)}</td>
+                                  <td className="py-1.5 px-2 text-right font-mono">{level.closePrice.toFixed(2)}</td>
+                                  <td className="py-1.5 px-2 text-right font-mono">{level.lotSize.toFixed(2)}</td>
+                                  <td className={cn(
+                                    "py-1.5 px-2 text-right font-mono",
+                                    level.profitPips >= 0 ? "text-[#00C853]" : "text-[#FF5252]"
+                                  )}>
+                                    {level.profitPips >= 0 ? "+" : ""}{level.profitPips.toFixed(1)}
+                                  </td>
+                                  <td className={cn(
+                                    "py-1.5 px-2 text-right font-mono font-medium",
+                                    level.profit >= 0 ? "text-[#00C853]" : "text-[#FF5252]"
+                                  )}>
+                                    {level.profit >= 0 ? "+" : ""}{level.profit.toFixed(2)}€
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
