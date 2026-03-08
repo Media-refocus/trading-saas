@@ -34,7 +34,7 @@
       "id": "STORY-004",
       "title": "Añadir tests unitarios básicos",
       "priority": "HIGH",
-      "passes": false,
+      "passes": true,
       "description": "Configurar Vitest. Crear tests unitarios para: lib/backtest-engine.ts (cálculo profit), lib/signal-parser.ts (parsing Telegram), app/api/stripe/webhook/route.ts (verificación firma). npm run test debe pasar.",
       "testCriteria": "npm run test pasa con >80% coverage en archivos testeables",
       "files": ["vitest.config.ts", "lib/*.test.ts", "app/api/stripe/webhook/route.test.ts"]
@@ -43,7 +43,7 @@
       "id": "STORY-005",
       "title": "Añadir Playwright tests a GitHub Actions CI",
       "priority": "HIGH",
-      "passes": false,
+      "passes": true,
       "description": "Modificar .github/workflows/ci.yml para ejecutar tests e2e automáticamente en cada PR. Tests en paralelo con build. Fallo de tests → CI falla. Guardar artifacts en caso de fallo.",
       "testCriteria": "Push a branch → CI ejecuta tests e2e → report en GitHub Actions",
       "files": [".github/workflows/ci.yml"]

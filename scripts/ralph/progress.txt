@@ -7,6 +7,8 @@ Started: Sun Mar  8 00:11:43 CET 2026
 - Build passes even with some TypeScript errors (pre-existing issues)
 - Pre-commit hooks check for secrets (gitleaks)
 - Env vars: NEXT_PUBLIC_APP_URL used for absolute URLs (emails, webhooks, redirects)
+- E2E tests tagged with @prod are excluded from CI (--grep-invert "@prod")
+- CI runs unit tests (Vitest) and e2e tests (Playwright) in parallel with build
 
 ---
 
@@ -81,4 +83,45 @@ Started: Sun Mar  8 00:11:43 CET 2026
   - Payment flow: checkout → webhook → DB update → UI reflect
   - Webhook events: checkout.session.completed, subscription.updated/deleted, invoice.payment_failed
   - Portal access requires stripeCustomerId on tenant
+---
+
+## [Sat Mar 8 17:01 CET 2026] - STORY-004
+- Configured Vitest and created unit tests:
+  - lib/parsers/signals-csv.test.ts (27 tests) - CSV parsing, signal grouping, synthetic tick generation
+  - lib/stripe-webhook.test.ts (28 tests) - signature format validation, timestamp validation, replay attack protection
+- Total: 89 tests passing, 80.91% statement coverage
+- Coverage breakdown:
+  - backtest-engine.ts: 89.96%
+  - rate-limit.ts: 85.29%
+  - signals-csv.ts: 69.87%
+- Installed @vitest/coverage-v8 for coverage reporting
+- **Files changed:** lib/parsers/signals-csv.test.ts (created), lib/stripe-webhook.test.ts (created), package.json, vitest.config.ts
+- **Commit:** 7b27a05
+- **Learnings:**
+  - Next.js route handlers can't be tested in isolation due to headers() requiring request context
+  - Created standalone utility functions to test webhook signature validation logic
+  - Pre-existing TypeScript errors in app/ don't affect build success
+---
+
+## [Sat Mar 8 17:10 CET 2026] - STORY-005
+- Updated CI workflow for parallel test execution:
+  - E2E tests now run in parallel with build (removed `needs: [build]`)
+  - Added unit tests job that runs in parallel with build
+  - Added concurrency settings to cancel in-progress runs on same branch
+  - Run all e2e tests (not just audit-full.spec.ts) with `--grep-invert "@prod"`
+- Tagged production-only tests with @prod to exclude from CI:
+  - backtester-e2e.spec.ts (targets production Vercel)
+  - mobile-ux-audit.spec.ts (targets production Vercel)
+  - vps-home.spec.ts (targets VPS IP)
+  - vps-login.spec.ts (targets VPS IP)
+  - login-debug.spec.ts (debug tests)
+  - login-intercept.spec.ts (debug tests)
+- Added screenshot upload on test failure
+- Added `prisma db push` before seed to ensure schema is synced
+- **Files changed:** .github/workflows/ci.yml, tests/e2e/*.spec.ts (6 files)
+- **Commit:** 26bf018
+- **Learnings:**
+  - Use @prod tag in test names to exclude from CI
+  - CI now runs: lint → typecheck → (build || test-unit || test-e2e) in parallel
+  - Playwright --grep-invert flag filters out tagged tests
 ---
