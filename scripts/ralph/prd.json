@@ -97,7 +97,7 @@
       "id": "STORY-011",
       "title": "Documentar backups automáticos Supabase",
       "priority": "CRITICAL",
-      "passes": false,
+      "passes": true,
       "description": "Añadir sección 'Database Backups' en README.md. Documentar: Supabase automatic daily backups, 30-day retention. Instrucciones de cómo restaurar desde backup. Contacto de soporte Supabase.",
       "testCriteria": "README.md tiene sección completa de backups con instrucciones claras",
       "files": ["README.md"]

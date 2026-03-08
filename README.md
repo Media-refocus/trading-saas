@@ -198,6 +198,91 @@ Si prefieres no usar Ralph, también puedo lanzar **agentes especializados** par
 
 ---
 
+## 💾 Database Backups (Supabase)
+
+> **Critical Production Documentation**
+
+### Automatic Backups
+
+Supabase proporciona backups automáticos diarios para todas las bases de datos:
+
+| Feature | Detalle |
+|---------|---------|
+| **Frecuencia** | Daily (cada 24h) |
+| **Retención** | 30 días |
+| **Tipo** | Full database snapshot |
+| **Incluye** | Schema + Data + Extensions |
+
+### Cómo Restaurar desde Backup
+
+1. **Acceder al Dashboard de Supabase**
+   - URL: https://supabase.com/dashboard
+   - Seleccionar el proyecto: Trading Bot SaaS
+
+2. **Navegar a Backups**
+   - Settings → Database → Backups
+   - Ver lista de backups disponibles con fecha y hora
+
+3. **Restaurar**
+   - Click en "Restore" junto al backup deseado
+   - Confirmar la acción (irreversible)
+   - **⚠️ ADVERTENCIA:** La restauración sobrescribe toda la BD actual
+
+### Procedimiento de Emergencia
+
+```bash
+# 1. Notificar al equipo
+# Email/SMS a stakeholders sobre incidente
+
+# 2. Acceder a Supabase Dashboard
+# https://supabase.com/dashboard/project/[PROJECT_ID]/database/backups
+
+# 3. Seleccionar el backup más reciente antes del incidente
+
+# 4. Click "Restore" y confirmar
+
+# 5. Verificar integridad post-restauración
+# - Check tenant data isolation
+# - Verify user authentication
+# - Test critical API endpoints
+
+# 6. Documentar incidente
+# - Causa raíz
+# - Tiempo de recuperación
+# - Lecciones aprendidas
+```
+
+### Contacto de Soporte Supabase
+
+| Canal | Detalle |
+|-------|---------|
+| **Dashboard Support** | https://supabase.com/dashboard/support |
+| **Email** | support@supabase.com |
+| **Docs** | https://supabase.com/docs/guides/platform/backups |
+| **Status Page** | https://status.supabase.com |
+
+### Best Practices
+
+- ✅ Verificar backups semanales en el dashboard
+- ✅ Documentar cualquier restauración en `tasks/incidents.md`
+- ✅ Mantener secrets de Supabase seguros (no en código)
+- ❌ No confiar únicamente en backups automáticos para datos críticos
+- ❌ No hacer cambios de schema sin verificar backup reciente
+
+### Backup Manual (Opcional)
+
+Para backups adicionales antes de operaciones críticas:
+
+```bash
+# Usando pg_dump con Supabase connection string
+pg_dump "$DATABASE_URL" > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Restaurar backup manual
+psql "$DATABASE_URL" < backup_20260308_120000.sql
+```
+
+---
+
 ## 📊 Estado Actual
 
 - ✅ Estructura creada
