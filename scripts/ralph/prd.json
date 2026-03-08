@@ -115,7 +115,7 @@
       "id": "STORY-013",
       "title": "Contador hits/misses backtest cache",
       "priority": "LOW",
-      "passes": false,
+      "passes": true,
       "description": "Implementar contador de cache hits/misses en lib/backtest-cache.ts. Actualizar hitRate en cada get/set. Exponer via tRPC. Log cada 100 operaciones. Test unitario.",
       "testCriteria": "hitRate se actualiza y se muestra en dashboard",
       "files": ["lib/backtest-cache.ts", "server/api/trpc/routers/backtester.ts"]
