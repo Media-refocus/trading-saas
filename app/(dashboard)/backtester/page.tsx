@@ -1627,47 +1627,49 @@ export default function BacktesterPage() {
                 )}
               </div>
             ) : (
-              <div className="text-center py-12 animate-fade-in">
-                {/* Icono de chart con gradiente */}
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 via-accent/10 to-green-500/10 mb-5 shadow-lg shadow-primary/10">
-                  <BarChart3 className="w-10 h-10 text-primary" />
+              <div className="flex flex-col items-center justify-center min-h-[300px] text-center py-8 animate-fade-in">
+                {/* Icono grande con color muted */}
+                <div className="flex items-center justify-center w-16 h-16 mb-4 text-muted-foreground">
+                  <TrendingUp className="w-full h-full" />
                 </div>
 
                 {/* Título y descripción */}
-                <h3 className="text-xl font-bold mb-2">Configura los parámetros y ejecuta tu primer backtest</h3>
-                <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-                  Ajusta los parámetros del grid y presiona el botón para simular tu estrategia con datos históricos
+                <h3 className="text-lg font-bold mb-2">Ejecuta tu primer backtest</h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
+                  Configura los parámetros y pulsa el botón para ver métricas, trades y heatmap de rendimiento
                 </p>
 
-                {/* Quick Start Presets */}
-                <div className="mb-6">
-                  <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide font-medium">Quick Start - Elige un preset:</p>
-                  <div className="flex flex-wrap justify-center gap-2">
+                {/* Quick Start - Presets clicables */}
+                <div className="mb-6 w-full max-w-lg">
+                  <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide font-medium">Quick Start</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <button
                       onClick={() => {
                         updateConfig("pipsDistance", 15);
-                        updateConfig("maxLevels", 4);
+                        updateConfig("maxLevels", 3);
                         updateConfig("takeProfitPips", 25);
-                        updateConfig("lotajeBase", 0.1);
+                        updateConfig("lotajeBase", 0.05);
                         updateConfig("useTrailingSL", true);
                         updateConfig("trailingSLPercent", 50);
                       }}
-                      className="px-4 py-2.5 text-xs font-medium rounded-lg border border-green-500/30 bg-green-500/10 text-green-600 hover:bg-green-500/20 hover:border-green-500/50 transition-all shadow-sm hover:shadow-md hover:shadow-green-500/10"
+                      className="p-3 text-xs font-medium rounded-lg border border-green-500/30 bg-green-500/10 text-green-600 hover:bg-green-500/20 hover:border-green-500/50 transition-all"
                     >
-                      🛡️ Conservador
+                      <div className="text-sm mb-1">🛡️ Conservador</div>
+                      <div className="text-[10px] opacity-80">15 pip · 3 niveles · TP 25</div>
                     </button>
                     <button
                       onClick={() => {
                         updateConfig("pipsDistance", 10);
-                        updateConfig("maxLevels", 6);
+                        updateConfig("maxLevels", 5);
                         updateConfig("takeProfitPips", 20);
                         updateConfig("lotajeBase", 0.1);
                         updateConfig("useTrailingSL", true);
                         updateConfig("trailingSLPercent", 50);
                       }}
-                      className="px-4 py-2.5 text-xs font-medium rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all shadow-sm hover:shadow-md hover:shadow-amber-500/10"
+                      className="p-3 text-xs font-medium rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all"
                     >
-                      ⚖️ Moderado
+                      <div className="text-sm mb-1">⚖️ Moderado</div>
+                      <div className="text-[10px] opacity-80">10 pip · 5 niveles · TP 20</div>
                     </button>
                     <button
                       onClick={() => {
@@ -1678,9 +1680,10 @@ export default function BacktesterPage() {
                         updateConfig("useTrailingSL", true);
                         updateConfig("trailingSLPercent", 40);
                       }}
-                      className="px-4 py-2.5 text-xs font-medium rounded-lg border border-red-500/30 bg-red-500/10 text-red-600 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-sm hover:shadow-md hover:shadow-red-500/10"
+                      className="p-3 text-xs font-medium rounded-lg border border-red-500/30 bg-red-500/10 text-red-600 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
                     >
-                      🚀 Agresivo
+                      <div className="text-sm mb-1">🚀 Agresivo</div>
+                      <div className="text-[10px] opacity-80">8 pip · 8 niveles · TP 15</div>
                     </button>
                   </div>
                 </div>
@@ -1690,7 +1693,7 @@ export default function BacktesterPage() {
                   onClick={handleExecute}
                   disabled={isBacktestPending}
                   size="lg"
-                  className="gap-2 px-8 h-12 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all hover:translate-y-[-1px]"
+                  className="gap-2 px-8 h-12 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all"
                 >
                   <Play className="w-5 h-5" />
                   Ejecutar Backtest

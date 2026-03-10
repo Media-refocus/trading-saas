@@ -34,7 +34,7 @@ _Última actualización: 2026-03-10 11:25 (auditoría UX/UI en progreso)_
 ### P0 pendientes (antes de clientes externos):
 - [ ] Tooltips y ayuda en settings panel (2-3h)
 - [ ] Estados de carga mejorados (2-3h)
-- [ ] Empty state con CTA (2h)
+- [x] Empty state con CTA (2h) → commit PENDIENTE
 
 **Score final:** 7.6/10 → Aprobado para beta
 
