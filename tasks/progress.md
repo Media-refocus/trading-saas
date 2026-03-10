@@ -47,6 +47,7 @@ _Última actualización: 2026-03-10 (heatmap integrado)_
   - Badge de consistencia (número de backtests con misma config)
   - Métricas visuales: Win Rate, Profit Factor, Sharpe Ratio
   - Integrado en panel de configuración del backtester
+  - **Verified:** 2026-03-10 - Feature fully functional (frontend + backend + integration)
 
 ---
 
