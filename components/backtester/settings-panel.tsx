@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { AutoTuningSuggestions, AutoTuningConfig } from "./auto-tuning-suggestions";
 
 interface SettingsPanelProps {
   config: {
@@ -393,6 +394,42 @@ export function SettingsPanel({
       <div className="text-xs text-[#666666] font-mono">
         Config: {config.pipsDistance}p × {config.maxLevels}L × {config.takeProfitPips}TP
         {config.useTrailingSL && ` × ${config.trailingSLPercent}%Trail`}
+      </div>
+
+      {/* Auto-Tuning Suggestions */}
+      <div className="pt-4 border-t border-[#3C3C3C]">
+        <AutoTuningSuggestions
+          onApplyConfig={(suggestion: AutoTuningConfig) => {
+            // Apply all suggested config values
+            if (suggestion.pipsDistance !== undefined) {
+              onUpdateConfig("pipsDistance", suggestion.pipsDistance);
+            }
+            if (suggestion.maxLevels !== undefined) {
+              onUpdateConfig("maxLevels", suggestion.maxLevels);
+            }
+            if (suggestion.takeProfitPips !== undefined) {
+              onUpdateConfig("takeProfitPips", suggestion.takeProfitPips);
+            }
+            if (suggestion.lotajeBase !== undefined) {
+              onUpdateConfig("lotajeBase", suggestion.lotajeBase);
+            }
+            if (suggestion.useTrailingSL !== undefined) {
+              onUpdateConfig("useTrailingSL", suggestion.useTrailingSL);
+            }
+            if (suggestion.trailingSLPercent !== undefined) {
+              onUpdateConfig("trailingSLPercent", suggestion.trailingSLPercent);
+            }
+            if (suggestion.useStopLoss !== undefined) {
+              onUpdateConfig("useStopLoss", suggestion.useStopLoss);
+            }
+            if (suggestion.stopLossPips !== undefined) {
+              onUpdateConfig("stopLossPips", suggestion.stopLossPips);
+            }
+            if (suggestion.restrictionType !== undefined) {
+              onUpdateConfig("restrictionType", suggestion.restrictionType);
+            }
+          }}
+        />
       </div>
     </div>
   );

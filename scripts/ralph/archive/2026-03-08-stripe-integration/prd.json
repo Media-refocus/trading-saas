@@ -1,0 +1,305 @@
+{
+  "projectName": "Trading Bot SaaS - Pre-Launch Polish",
+  "branchName": "ralph/pre-launch-polish",
+  "description": "Plan quirúrgico para finiquitar TBS antes de lanzamiento a producción",
+  "priority": "CRITICAL",
+  "estimatedTime": "1-2 días",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Actualizar ROADMAP.md con precios reales",
+      "priority": "CRITICAL",
+      "status": "pending",
+      "estimatedMinutes": 5,
+      "description": "Discrepancia detectada: ROADMAP muestra 97€/197€ pero pricing page tiene 147€/347€",
+      "acceptanceCriteria": [
+        "ROADMAP.md actualizado con precios: Trader 57€, Pro 147€, VIP 347€",
+        "Features por plan actualizadas para coincidir con pricing page",
+        "Timeline y métricas de éxito actualizadas"
+      ],
+      "files": ["ROADMAP.md"],
+      "agent": "trading-frontend",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-002",
+      "title": "Documentar variables de entorno faltantes",
+      "priority": "CRITICAL",
+      "status": "pending",
+      "estimatedMinutes": 10,
+      "description": "Añadir NEXT_PUBLIC_APP_URL y verificar que todas las env vars estén documentadas",
+      "acceptanceCriteria": [
+        ".env.local.example tiene NEXT_PUBLIC_APP_URL con descripción",
+        "Todas las env vars usadas en código están documentadas",
+        "Instrucciones claras de cómo obtener cada valor"
+      ],
+      "files": [".env.local.example"],
+      "agent": "trading-devops",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-003",
+      "title": "Implementar rate limiting en API endpoints",
+      "priority": "HIGH",
+      "status": "pending",
+      "estimatedMinutes": 30,
+      "description": "Añadir rate limiting para prevenir abuso de API (100 req/min por tenant)",
+      "acceptanceCriteria": [
+        "Middleware de rate limiting en /api/bot/* endpoints",
+        "Rate limit por tenantId (100 req/min)",
+        "Response headers con X-RateLimit-Limit y X-RateLimit-Remaining",
+        "Test manual: curl >100 veces → 429 Too Many Requests"
+      ],
+      "files": ["lib/rate-limit.ts", "app/api/bot/*/route.ts"],
+      "agent": "trading-backend",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-004",
+      "title": "Añadir tests unitarios básicos (Jest/Vitest)",
+      "priority": "HIGH",
+      "status": "pending",
+      "estimatedMinutes": 60,
+      "description": "Tests unitarios para lógica crítica: backtest engine, signal parser, stripe webhook handler",
+      "acceptanceCriteria": [
+        "vitest.config.ts configurado",
+        "lib/backtest-engine.test.ts con tests de cálculo de profit",
+        "lib/signal-parser.test.ts con tests de parsing Telegram",
+        "app/api/stripe/webhook/route.test.ts con tests de firma",
+        "npm run test pasa sin errores"
+      ],
+      "files": ["vitest.config.ts", "lib/*.test.ts", "app/api/stripe/webhook/route.test.ts"],
+      "agent": "trading-qa",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-005",
+      "title": "Añadir Playwright tests a GitHub Actions CI",
+      "priority": "HIGH",
+      "status": "pending",
+      "estimatedMinutes": 20,
+      "description": "Ejecutar tests e2e automáticamente en cada PR",
+      "acceptanceCriteria": [
+        ".github/workflows/ci.yml tiene step 'e2e-tests'",
+        "Tests se ejecutan en paralelo con build",
+        "Fallo de tests → CI falla → no merge",
+        "Artifacts de tests guardados en caso de fallo"
+      ],
+      "files": [".github/workflows/ci.yml"],
+      "agent": "trading-devops",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-006",
+      "title": "Configurar auto-deploy a Vercel en merge a master",
+      "priority": "HIGH",
+      "status": "pending",
+      "estimatedMinutes": 15,
+      "description": "Deploy automático a producción cuando se mergea PR a master",
+      "acceptanceCriteria": [
+        "Vercel project configurado con auto-deploy",
+        "Deploy solo si CI pasa (lint + typecheck + build + e2e tests)",
+        "Variable de entorno VERCEL_TOKEN configurada en GitHub secrets",
+        "Notificación en caso de deploy fallido"
+      ],
+      "files": [".github/workflows/deploy.yml"],
+      "agent": "trading-devops",
+      "dependencies": ["TASK-005"]
+    },
+    {
+      "id": "TASK-007",
+      "title": "Añadir CSP headers y revisar CORS",
+      "priority": "HIGH",
+      "status": "pending",
+      "estimatedMinutes": 20,
+      "description": "Security hardening: Content Security Policy + CORS configuration",
+      "acceptanceCriteria": [
+        "next.config.js tiene headers CSP configurados",
+        "CSP permite: self, unsafe-inline (si necesario), stripe.com, cdn.jsdelivr.net",
+        "CORS configurado en API routes si es necesario",
+        "Test con securityheaders.com → grade A o B"
+      ],
+      "files": ["next.config.ts", "middleware.ts"],
+      "agent": "trading-devops",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-008",
+      "title": "Eliminar código deprecado y scripts temporales",
+      "priority": "MEDIUM",
+      "status": "pending",
+      "estimatedMinutes": 15,
+      "description": "Limpiar deprecated/ folder y scripts de migración temporales",
+      "acceptanceCriteria": [
+        "deprecated/ folder eliminado",
+        "scripts/fix-all-timestamps.ts movido a archive/",
+        "Todos los TODOs en código resueltos o movidos a issues",
+        "npm run build pasa sin warnings de código muerto"
+      ],
+      "files": ["deprecated/", "scripts/fix-all-timestamps.ts"],
+      "agent": "trading-backend",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-009",
+      "title": "Implementar expandir/contraer trades en backtester",
+      "priority": "MEDIUM",
+      "status": "pending",
+      "estimatedMinutes": 30,
+      "description": "Añadir UI para expandir cada trade y ver niveles de grid",
+      "acceptanceCriteria": [
+        "Cada fila de trade tiene botón expandir/contraer",
+        "Expandido muestra: niveles de promedio, SL virtual, trailing history",
+        "Animación suave de expandir/contraer",
+        "Mobile-friendly"
+      ],
+      "files": ["components/backtester/deals-table.tsx"],
+      "agent": "trading-frontend",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-010",
+      "title": "Implementar exportar trades a CSV",
+      "priority": "MEDIUM",
+      "status": "pending",
+      "estimatedMinutes": 20,
+      "description": "Botón para descargar trades del backtest en formato CSV",
+      "acceptanceCriteria": [
+        "Botón 'Exportar CSV' en deals table",
+        "CSV incluye: timestamp, side, entry, exit, profit pips, profit €, close reason",
+        "Formato compatible con Excel/Google Sheets",
+        "Filename: backtest-{strategy}-{date}.csv"
+      ],
+      "files": ["components/backtester/deals-table.tsx", "lib/export-csv.ts"],
+      "agent": "trading-frontend",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-011",
+      "title": "Implementar gráfico superpuesto de equity curves",
+      "priority": "LOW",
+      "status": "pending",
+      "estimatedMinutes": 45,
+      "description": "En comparador de estrategias, mostrar equity curves superpuestas",
+      "acceptanceCriteria": [
+        "Componente EquityComparisonChart con 2-3 líneas",
+        "Cada línea es una estrategia guardada",
+        "Leyenda con nombres y colores",
+        "Hover muestra valores de todas las líneas",
+        "Toggle para mostrar/ocultar cada línea"
+      ],
+      "files": ["components/backtester/equity-comparison-chart.tsx"],
+      "agent": "trading-frontend",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-012",
+      "title": "Implementar guardar estrategias en la nube",
+      "priority": "LOW",
+      "status": "pending",
+      "estimatedMinutes": 40,
+      "description": "Permitir guardar configuraciones de backtest en BD, no solo localStorage",
+      "acceptanceCriteria": [
+        "Tabla UserStrategy en Prisma schema",
+        "tRPC router strategies.save() y strategies.list()",
+        "UI para cargar estrategia guardada",
+        "Indicador visual de estrategias guardadas vs temporales",
+        "Límite por plan: Trader 3, Pro 10, VIP ilimitadas"
+      ],
+      "files": ["prisma/schema.prisma", "server/api/trpc/routers/strategies.ts"],
+      "agent": "trading-backend",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-013",
+      "title": "Documentar backups automáticos en Supabase",
+      "priority": "CRITICAL",
+      "status": "pending",
+      "estimatedMinutes": 5,
+      "description": "Añadir sección en README o docs sobre política de backups",
+      "acceptanceCriteria": [
+        "README.md tiene sección 'Database Backups'",
+        "Documenta: Supabase automatic daily backups, 30-day retention",
+        "Instrucciones de cómo restaurar desde backup",
+        "Contacto de soporte Supabase documentado"
+      ],
+      "files": ["README.md"],
+      "agent": "trading-devops",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-014",
+      "title": "Test completo de flujo de pagos end-to-end",
+      "priority": "CRITICAL",
+      "status": "pending",
+      "estimatedMinutes": 45,
+      "description": "Test manual completo: registro → trial → Stripe checkout → webhook → activación",
+      "acceptanceCriteria": [
+        "Documento TEST_PLAN_PAYMENTS.md con pasos de test",
+        "Test con Stripe test cards: 4242424242424242 (success), 4000000000000002 (decline)",
+        "Verificar webhook llega y actualiza BD",
+        "Verificar email de confirmación llega",
+        "Verificar plan se actualiza en dashboard",
+        "Verificar límites de plan se aplican"
+      ],
+      "files": ["tests/manual/TEST_PLAN_PAYMENTS.md"],
+      "agent": "trading-qa",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-015",
+      "title": "Implementar contador de hits/misses en backtest cache",
+      "priority": "LOW",
+      "status": "pending",
+      "estimatedMinutes": 10,
+      "description": "Resolver TODO en lib/backtest-cache.ts: implementar contador de cache hits/misses",
+      "acceptanceCriteria": [
+        "BacktestCache.hitRate se actualiza en cada get/set",
+        "Métrica expuesta via tRPC para mostrar en dashboard",
+        "Log cada 100 operaciones con stats de cache",
+        "Test unitario del contador"
+      ],
+      "files": ["lib/backtest-cache.ts"],
+      "agent": "trading-backend",
+      "dependencies": []
+    },
+    {
+      "id": "TASK-016",
+      "title": "Calcular profitFactor en marketplace",
+      "priority": "LOW",
+      "status": "pending",
+      "estimatedMinutes": 15,
+      "description": "Resolver TODO en server/api/trpc/routers/marketplace.ts: calcular profitFactor real",
+      "acceptanceCriteria": [
+        "profitFactor calculado: grossProfit / grossLoss",
+        "Campo actualizado en PublishedStrategy después de backtest",
+        "Mostrar en card de estrategia en marketplace",
+        "Test unitario del cálculo"
+      ],
+      "files": ["server/api/trpc/routers/marketplace.ts"],
+      "agent": "trading-backend",
+      "dependencies": []
+    }
+  ],
+  "constraints": [
+    "NUNCA commit sin pasar tests",
+    "NUNCA deploy sin PR review",
+    "SIEMPRE consultar trading-architect antes de cambios de schema",
+    "SIEMPRE pasar por trading-qa antes de marcar task como done",
+    "NO añadir features nuevas que no estén en este PRD",
+    "Cada task = 1 PR = 1 commit (squash merge)"
+  ],
+  "successMetrics": [
+    "Todos los tasks CRITICAL completados",
+    "npm run test pasa al 100%",
+    "npm run build sin errores ni warnings",
+    "CI pasa en <10 minutos",
+    "Security headers grade A o B",
+    "Flow de pagos testado end-to-end"
+  ],
+  "abortConditions": [
+    "Si algún task CRITICAL falla después de 3 intentos",
+    "Si se detecta data leak entre tenants",
+    "Si tests de seguridad fallan críticamente"
+  ]
+}

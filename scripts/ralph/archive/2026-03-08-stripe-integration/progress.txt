@@ -1,0 +1,43 @@
+# Ralph Progress Log - TBS Pre-Launch Polish
+Started: 2026-03-08 00:15
+Branch: ralph/pre-launch-polish
+Total Tasks: 16
+Critical: 4
+High: 4
+Medium: 3
+Low: 5
+
+## Task Execution Order (Dependencies Respected)
+
+### Phase 1: Critical Foundation (No dependencies)
+1. TASK-001: Actualizar ROADMAP.md (5 min) ✓ READY
+2. TASK-002: Documentar env vars (10 min) ✓ READY
+3. TASK-003: Rate limiting (30 min) ✓ READY
+4. TASK-004: Tests unitarios (60 min) ✓ READY
+5. TASK-007: CSP headers (20 min) ✓ READY
+6. TASK-013: Documentar backups (5 min) ✓ READY
+7. TASK-014: Test pagos end-to-end (45 min) ✓ READY
+
+### Phase 2: High Priority (Dependencies resolved)
+8. TASK-005: CI tests e2e (20 min) - depends on TASK-004
+9. TASK-006: Auto-deploy (15 min) - depends on TASK-005
+10. TASK-008: Limpiar código (15 min) ✓ READY
+
+### Phase 3: Nice-to-Have (Parallelizable)
+11. TASK-009: Expandir trades (30 min) ✓ READY
+12. TASK-010: Exportar CSV (20 min) ✓ READY
+13. TASK-011: Gráficos superpuestos (45 min) ✓ READY
+14. TASK-012: Guardar estrategias nube (40 min) ✓ READY
+15. TASK-015: Cache hits/misses (10 min) ✓ READY
+16. TASK-016: ProfitFactor marketplace (15 min) ✓ READY
+
+## Execution Strategy
+- Ejecutar en orden de prioridad: CRITICAL → HIGH → MEDIUM → LOW
+- Tasks sin dependencias pueden ejecutarse en paralelo
+- Cada task = 1 iteración de Ralph
+- Max 16 iteraciones (o menos si tasks simples)
+
+## Notes
+- TASK-001 a TASK-007 + TASK-013 + TASK-014 = PRE-LAUNCH BLOCKERS
+- TASK-008 a TASK-016 = POST-LAUNCH IMPROVEMENTS
+- Estimated total: ~6 horas de trabajo quirúrgico

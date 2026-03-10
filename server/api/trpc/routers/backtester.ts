@@ -1192,4 +1192,148 @@ export const backtesterRouter = router({
         throw error;
       }
     }),
+
+  /**
+   * Auto-Tuning Suggestions
+   * Analiza backtests históricos y devuelve las top 3 configuraciones
+   * basadas en un score compuesto de winRate, profitFactor y sharpeRatio
+   */
+  getAutoTuningSuggestions: protectedProcedure
+    .query(async ({ ctx }) => {
+      // Obtener todos los backtests completados del tenant
+      const backtests = await prisma.backtest.findMany({
+        where: {
+          tenantId: ctx.user.tenantId,
+          status: "COMPLETED",
+          totalTrades: { gte: 10 }, // Mínimo 10 trades para significancia
+        },
+        select: {
+          id: true,
+          name: true,
+          parameters: true,
+          totalTrades: true,
+          totalProfit: true,
+          winRate: true,
+          profitFactor: true,
+          sharpeRatio: true,
+          maxDrawdown: true,
+          profitPercent: true,
+          completedAt: true,
+        },
+        orderBy: { completedAt: "desc" },
+        take: 100, // Analizar últimos 100 backtests
+      });
+
+      if (backtests.length === 0) {
+        return {
+          hasData: false,
+          message: "No hay backtests históricos suficientes para generar sugerencias",
+          suggestions: [],
+        };
+      }
+
+      // Agrupar por configuración similar (hash de parámetros clave)
+      const configGroups = new Map<string, {
+        config: any;
+        count: number;
+        avgWinRate: number;
+        avgProfitFactor: number;
+        avgSharpeRatio: number;
+        avgProfitPercent: number;
+        avgMaxDrawdown: number;
+        totalProfit: number;
+        bestBacktestId: string;
+        bestScore: number;
+      }>();
+
+      for (const bt of backtests) {
+        const params = bt.parameters as any;
+
+        // Crear hash de configuración clave (sin filtros de fecha ni límites)
+        const configKey = JSON.stringify({
+          pipsDistance: params.pipsDistance,
+          maxLevels: params.maxLevels,
+          takeProfitPips: params.takeProfitPips,
+          useTrailingSL: params.useTrailingSL,
+          trailingSLPercent: params.trailingSLPercent,
+          lotajeBase: params.lotajeBase,
+          numOrders: params.numOrders,
+          useStopLoss: params.useStopLoss,
+          stopLossPips: params.stopLossPips,
+          restrictionType: params.restrictionType,
+        });
+
+        const existing = configGroups.get(configKey);
+
+        // Calcular score individual (0-100)
+        // winRate (0-100%), profitFactor (0-5+), sharpeRatio (0-3+)
+        const normalizedWinRate = Math.min(bt.winRate, 100) / 100;
+        const normalizedPF = Math.min(bt.profitFactor / 3, 1); // PF > 3 es excelente
+        const normalizedSharpe = Math.min(Math.max(bt.sharpeRatio, 0) / 2, 1); // Sharpe > 2 es excelente
+        const score = (normalizedWinRate * 0.35 + normalizedPF * 0.35 + normalizedSharpe * 0.30) * 100;
+
+        if (existing) {
+          existing.count++;
+          existing.avgWinRate = (existing.avgWinRate * (existing.count - 1) + bt.winRate) / existing.count;
+          existing.avgProfitFactor = (existing.avgProfitFactor * (existing.count - 1) + bt.profitFactor) / existing.count;
+          existing.avgSharpeRatio = (existing.avgSharpeRatio * (existing.count - 1) + bt.sharpeRatio) / existing.count;
+          existing.avgProfitPercent = (existing.avgProfitPercent * (existing.count - 1) + bt.profitPercent) / existing.count;
+          existing.avgMaxDrawdown = (existing.avgMaxDrawdown * (existing.count - 1) + bt.maxDrawdown) / existing.count;
+          existing.totalProfit += bt.totalProfit;
+
+          if (score > existing.bestScore) {
+            existing.bestScore = score;
+            existing.bestBacktestId = bt.id;
+          }
+        } else {
+          configGroups.set(configKey, {
+            config: params,
+            count: 1,
+            avgWinRate: bt.winRate,
+            avgProfitFactor: bt.profitFactor,
+            avgSharpeRatio: bt.sharpeRatio,
+            avgProfitPercent: bt.profitPercent,
+            avgMaxDrawdown: bt.maxDrawdown,
+            totalProfit: bt.totalProfit,
+            bestBacktestId: bt.id,
+            bestScore: score,
+          });
+        }
+      }
+
+      // Calcular score final y ordenar
+      const suggestions = Array.from(configGroups.values())
+        .map((group) => {
+          // Score final pondera consistencia (count) y métricas
+          const consistencyBonus = Math.min(group.count / 5, 1) * 10; // +10 puntos si 5+ backtests
+          const normalizedWinRate = Math.min(group.avgWinRate, 100) / 100;
+          const normalizedPF = Math.min(group.avgProfitFactor / 3, 1);
+          const normalizedSharpe = Math.min(Math.max(group.avgSharpeRatio, 0) / 2, 1);
+          const baseScore = (normalizedWinRate * 0.35 + normalizedPF * 0.35 + normalizedSharpe * 0.30) * 100;
+
+          return {
+            config: group.config,
+            metrics: {
+              winRate: Math.round(group.avgWinRate * 10) / 10,
+              profitFactor: Math.round(group.avgProfitFactor * 100) / 100,
+              sharpeRatio: Math.round(group.avgSharpeRatio * 100) / 100,
+              profitPercent: Math.round(group.avgProfitPercent * 10) / 10,
+              maxDrawdown: Math.round(group.avgMaxDrawdown * 10) / 10,
+            },
+            score: Math.round((baseScore + consistencyBonus) * 10) / 10,
+            consistency: group.count,
+            totalProfit: Math.round(group.totalProfit * 100) / 100,
+            backtestId: group.bestBacktestId,
+          };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3); // Top 3
+
+      return {
+        hasData: true,
+        totalBacktests: backtests.length,
+        uniqueConfigs: configGroups.size,
+        suggestions,
+      };
+    }),
 });

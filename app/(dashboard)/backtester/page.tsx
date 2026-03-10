@@ -57,6 +57,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { PerformanceHeatmap } from "@/components/backtester/performance-heatmap";
+import { AutoTuningSuggestions, AutoTuningConfig } from "@/components/backtester/auto-tuning-suggestions";
 
 interface BacktestFilters {
   dateFrom?: string;
@@ -526,6 +528,14 @@ export default function BacktesterPage() {
 
   const updateConfig = <K extends keyof BacktestConfig>(key: K, value: BacktestConfig[K]) => {
     setConfig((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // Handler para aplicar configuración sugerida por auto-tuning
+  const handleApplyAutoTuneConfig = (autoTuneConfig: AutoTuningConfig) => {
+    setConfig((prev) => ({
+      ...prev,
+      ...autoTuneConfig,
+    }));
   };
 
   // Resultados: combinar tRPC (CSV) + estado local (Supabase)
@@ -1083,6 +1093,9 @@ export default function BacktesterPage() {
               );
             })()}
 
+            {/* Auto-Tuning Suggestions */}
+            <AutoTuningSuggestions onApplyConfig={handleApplyAutoTuneConfig} />
+
             {/* Botón Ejecutar Backtest - GRANDE (oculto en mobile, hay sticky) */}
             <Button
               className={`w-full h-14 text-base font-semibold transition-all duration-200 hidden sm:flex ${
@@ -1511,6 +1524,11 @@ export default function BacktesterPage() {
                       </div>
                     </div>
                   </div>
+                )}
+
+                {/* Performance Heatmap - Day/Session/Month analysis */}
+                {results.tradeDetails && results.tradeDetails.length > 0 && (
+                  <PerformanceHeatmap trades={results.tradeDetails} />
                 )}
 
                 {/* Guardar estrategia */}
