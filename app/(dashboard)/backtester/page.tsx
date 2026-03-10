@@ -2035,7 +2035,7 @@ export default function BacktesterPage() {
     {/* Execution Overlay - Loading state durante backtest */}
     <ExecutionOverlay
       isExecuting={isBacktestPending}
-      progress={isBacktestPending ? 50 : 0}
+      indeterminate={isBacktestPending}
       currentStep={isBacktestPending ? `Ejecutando backtest con ${signalLimit} señales...` : undefined}
     />
     </>

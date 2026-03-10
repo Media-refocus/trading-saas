@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { X, AlertCircle, CheckCircle2, Info, XCircle } from "lucide-react";
+import { X, AlertCircle, CheckCircle2, Info, XCircle, RefreshCw } from "lucide-react";
 import { useState, useEffect, createContext, useContext, useCallback } from "react";
 
 // ==================== PROGRESS BAR ====================
@@ -213,6 +213,7 @@ interface ExecutionOverlayProps {
   error?: string | null;
   success?: boolean;
   successMessage?: string;
+  indeterminate?: boolean; // Mostrar animación indeterminada cuando no hay progreso real
 }
 
 export function ExecutionOverlay({
@@ -223,8 +224,11 @@ export function ExecutionOverlay({
   error,
   success,
   successMessage = "Backtest completado",
+  indeterminate = false,
 }: ExecutionOverlayProps) {
   const [showSuccess, setShowSuccess] = useState(false);
+  // Progress animado para modo indeterminado
+  const [animatedProgress, setAnimatedProgress] = useState(0);
 
   useEffect(() => {
     if (success) {
@@ -234,7 +238,25 @@ export function ExecutionOverlay({
     }
   }, [success]);
 
+  // Animación de progreso indeterminado
+  useEffect(() => {
+    if (isExecuting && indeterminate) {
+      const interval = setInterval(() => {
+        setAnimatedProgress((prev) => {
+          // Oscila entre 10% y 90%
+          const next = prev >= 90 ? 10 : prev + Math.random() * 15;
+          return next;
+        });
+      }, 800);
+      return () => clearInterval(interval);
+    } else {
+      setAnimatedProgress(progress);
+    }
+  }, [isExecuting, indeterminate, progress]);
+
   if (!isExecuting && !error && !showSuccess) return null;
+
+  const displayProgress = indeterminate ? animatedProgress : progress;
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -262,21 +284,28 @@ export function ExecutionOverlay({
         ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 border-2 border-[#0078D4] border-t-transparent rounded-full animate-spin" />
-              <div>
-                <h3 className="text-sm font-medium text-white">Ejecutando Backtest</h3>
+              <div className="w-10 h-10 border-3 border-[#0078D4] border-t-transparent rounded-full animate-spin" />
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-white">Ejecutando Backtest</h3>
                 {currentStep && (
-                  <p className="text-xs text-[#888888]">{currentStep}</p>
+                  <p className="text-xs text-[#888888] mt-0.5">{currentStep}</p>
                 )}
               </div>
             </div>
 
             <ProgressBar
-              progress={progress}
-              showPercent
+              progress={displayProgress}
+              showPercent={!indeterminate}
+              sublabel={indeterminate ? "Procesando señales..." : undefined}
               cancellable={!!onCancel}
               onCancel={onCancel}
             />
+
+            {/* Info adicional */}
+            <div className="flex items-center justify-center gap-2 text-[10px] text-[#666666] pt-2">
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              <span>El backtest puede tardar varios segundos</span>
+            </div>
           </div>
         )}
       </div>
