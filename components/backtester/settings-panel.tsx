@@ -101,6 +101,34 @@ export function SettingsPanel({
 
   return (
     <div className="p-4 space-y-6">
+      {/* Quick Presets */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Zap className="w-4 h-4 text-[#0078D4]" />
+          <span className="text-sm font-semibold text-[#0078D4] uppercase tracking-wide">Quick Presets</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {PRESETS.map((preset) => (
+            <button
+              key={preset.name}
+              onClick={() => {
+                // Apply all preset config values
+                Object.entries(preset.config).forEach(([key, value]) => {
+                  onUpdateConfig(key as keyof SettingsPanelProps["config"], value as any);
+                });
+              }}
+              className={cn(
+                "p-3 rounded-lg border transition-all text-center",
+                preset.color
+              )}
+            >
+              <div className="font-semibold text-sm">{preset.name}</div>
+              <div className="text-[10px] opacity-80 mt-0.5">{preset.description}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Grid Layout - responsive */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {/* Columna 1: Fuente y Período */}
@@ -138,7 +166,7 @@ export function SettingsPanel({
 
           {/* CSV Source Selector (solo si sourceType es csv) */}
           {sourceType === "csv" && (
-            <InputGroup label="Signal Source" id="signal-source">
+            <InputGroup label="Signal Source" id="signal-source" tooltip="Archivo CSV con las señales históricas a probar">
               <select
                 id="signal-source"
                 className="mt5-select"
@@ -214,7 +242,7 @@ export function SettingsPanel({
           )}
 
           {/* Signal Limit */}
-          <InputGroup label="Signals to Test" id="signal-limit">
+          <InputGroup label="Signals to Test" id="signal-limit" tooltip="Número máximo de señales a procesar en el backtest">
             <input
               id="signal-limit"
               type="number"
@@ -232,7 +260,7 @@ export function SettingsPanel({
           <SectionTitle>Grid Parameters</SectionTitle>
 
           <div className="grid grid-cols-2 gap-2">
-            <InputGroup label="Pips Distance" id="pips-distance">
+            <InputGroup label="Pips Distance" id="pips-distance" tooltip="Distancia en pips entre cada nivel del grid">
               <input
                 id="pips-distance"
                 type="number"
@@ -244,7 +272,7 @@ export function SettingsPanel({
               />
             </InputGroup>
 
-            <InputGroup label="Max Levels" id="max-levels">
+            <InputGroup label="Max Levels" id="max-levels" tooltip="Número máximo de niveles de compra/venta">
               <input
                 id="max-levels"
                 type="number"
@@ -258,7 +286,7 @@ export function SettingsPanel({
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <InputGroup label="Take Profit (pips)" id="take-profit">
+            <InputGroup label="Take Profit (pips)" id="take-profit" tooltip="Ganancia objetivo en pips para cerrar el grid">
               <input
                 id="take-profit"
                 type="number"
@@ -270,7 +298,7 @@ export function SettingsPanel({
               />
             </InputGroup>
 
-            <InputGroup label="Lot Size" id="lot-size">
+            <InputGroup label="Lot Size" id="lot-size" tooltip="Tamaño del lote base para cada operación">
               <input
                 id="lot-size"
                 type="number"
@@ -294,10 +322,22 @@ export function SettingsPanel({
                 onChange={(e) => onUpdateConfig("useTrailingSL", e.target.checked)}
                 className="mt5-checkbox"
               />
-              <span>Trailing Stop Loss</span>
+              <span className="flex items-center gap-1">
+                Trailing Stop Loss
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3.5 h-3.5 text-[#666666] hover:text-[#0078D4] cursor-help shrink-0" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs bg-[#1E1E1E] border-[#3C3C3C] text-white">
+                      Stop loss que se mueve con el precio a favor
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </span>
             </label>
             {config.useTrailingSL && (
-              <InputGroup label="Trail Distance (% of TP)" id="trail-distance">
+              <InputGroup label="Trail Distance (% of TP)" id="trail-distance" tooltip="Porcentaje del TP para activar el trailing stop loss">
                 <input
                   id="trail-distance"
                   type="number"
@@ -316,7 +356,7 @@ export function SettingsPanel({
         <div className="space-y-4">
           <SectionTitle>Capital & Filters</SectionTitle>
 
-          <InputGroup label="Initial Capital (€)" id="initial-capital">
+          <InputGroup label="Initial Capital (€)" id="initial-capital" tooltip="Capital inicial para la simulación">
             <input
               id="initial-capital"
               type="number"
@@ -330,7 +370,7 @@ export function SettingsPanel({
           </InputGroup>
 
           {/* Session Filter */}
-          <InputGroup label="Session" id="session">
+          <InputGroup label="Session" id="session" tooltip="Filtrar señales por sesión de trading">
             <select
               id="session"
               className="mt5-select"
@@ -350,7 +390,7 @@ export function SettingsPanel({
           </InputGroup>
 
           {/* Side Filter */}
-          <InputGroup label="Direction" id="direction">
+          <InputGroup label="Direction" id="direction" tooltip="Filtrar señales por dirección (BUY/SELL)">
             <select
               id="direction"
               className="mt5-select"
@@ -415,7 +455,19 @@ export function SettingsPanel({
               onChange={(e) => onUpdateConfig("useRealPrices", e.target.checked)}
               className="mt5-checkbox"
             />
-            <span>Use Real Tick Prices</span>
+            <span className="flex items-center gap-1">
+              Use Real Tick Prices
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3.5 h-3.5 text-[#666666] hover:text-[#0078D4] cursor-help shrink-0" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs bg-[#1E1E1E] border-[#3C3C3C] text-white">
+                    Usar precios históricos reales (más preciso pero más lento)
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </span>
           </label>
         </div>
 
@@ -494,10 +546,31 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function InputGroup({ label, id, children }: { label: string; id?: string; children: React.ReactNode }) {
+interface InputGroupProps {
+  label: string;
+  id?: string;
+  children: React.ReactNode;
+  tooltip?: string;
+}
+
+function InputGroup({ label, id, children, tooltip }: InputGroupProps) {
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="text-xs text-[#888888]">{label}</label>
+      <div className="flex items-center gap-1">
+        <label htmlFor={id} className="text-xs text-[#888888]">{label}</label>
+        {tooltip && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="w-3 h-3 text-[#666666] hover:text-[#0078D4] cursor-help shrink-0" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs bg-[#1E1E1E] border-[#3C3C3C] text-white">
+                {tooltip}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
       {children}
     </div>
   );

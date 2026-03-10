@@ -2039,6 +2039,7 @@ export default function BacktesterPage() {
       currentStep={isBacktestPending ? `Ejecutando backtest con ${signalLimit} señales...` : undefined}
     />
     </>
+  );
 }
 
 // Componentes auxiliares mejorados
