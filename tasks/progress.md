@@ -1,6 +1,35 @@
 # TBS - Progress Tracker
 
-_Última actualización: 2026-03-11 (Trailing SL Virtual)_
+_Última actualización: 2026-03-11 (Dashboard Commands - FASE 4)_
+
+---
+
+## Sprint Completado: Dashboard Commands EA MT5 ✅
+
+- **Estado:** `completed`
+- **Inicio:** 2026-03-11
+- **Fin:** 2026-03-11
+- **Archivos:** `mt5/TBSSignalEA.mq5` (v1.3)
+
+### Tareas completadas FASE 4:
+- [x] Enum BotState (STATE_RUNNING, STATE_PAUSED)
+- [x] Struct HeartbeatResponse (serverTime, command, commandReason, success)
+- [x] Variables globales g_botState + g_heartbeatResponse
+- [x] ParseHeartbeatResponse() - parsea respuesta del heartbeat
+- [x] ExecuteCommand() - ejecuta PAUSE/RESUME/CLOSE_ALL
+- [x] ParseBoolField() - helper para parsear booleanos JSON
+- [x] SendHeartbeat() modificado para parsear respuesta
+- [x] CheckGridLevels() respeta g_botState
+- [x] OpenGridLevel() respeta g_botState
+- [x] ProcessSingleSignal() respeta g_botState para ENTRY
+- [x] CLOSE signal siempre se ejecuta (incluso si pausado)
+- [x] CHANGELOG actualizado v1.3
+
+### Validación pendiente:
+- [ ] Compilar en MetaEditor (MT5 Windows VPS)
+- [ ] Test manual con comando PAUSE
+- [ ] Test manual con comando RESUME
+- [ ] Test manual con comando CLOSE_ALL
 
 ---
 
@@ -39,12 +68,6 @@ _Última actualización: 2026-03-11 (Trailing SL Virtual)_
 - [x] Limpieza de VirtualSLs en CloseAllGridLevels()
 - [x] CHANGELOG actualizado v1.2
 
-### Validación pendiente:
-- [ ] Compilar en MetaEditor (MT5 Windows VPS)
-- [ ] Test manual con señal ENTRY
-- [ ] Test manual con señal CLOSE
-- [ ] Test manual de trailing SL (dejar posición correr + verificar cierre)
-
 ---
 
 ## Sprint Completado: Auditoría Backtester ✅
@@ -62,7 +85,7 @@ _Última actualización: 2026-03-11 (Trailing SL Virtual)_
 
 ---
 
-## Sprint Actual: Auditoría UX/UI Pre-Producción ✅
+## Sprint Completado: Auditoría UX/UI Pre-Producción ✅
 
 - **Estado:** `completed`
 - **Inicio:** 2026-03-10 11:25

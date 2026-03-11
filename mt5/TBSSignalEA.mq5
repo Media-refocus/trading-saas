@@ -5,6 +5,14 @@
 //+------------------------------------------------------------------+
 //
 // CHANGELOG:
+// 2026-03-11 v1.3: Dashboard Commands
+//   - ParseHeartbeatResponse() parsea comandos del servidor
+//   - ExecuteCommand() ejecuta PAUSE/RESUME/CLOSE_ALL
+//   - g_botState trackea estado (RUNNING/PAUSED)
+//   - CheckGridLevels() y ProcessSingleSignal() respetan estado
+//   - CLOSE_ALL cierra todo y pausa
+//   - CLOSE signal siempre se ejecuta (incluso si pausado)
+//
 // 2026-03-11 v1.2: Trailing SL Virtual
 //   - VirtualSL struct para trackear SL por posición
 //   - UpdateVirtualStops() en OnTick()
@@ -44,7 +52,7 @@
 
 #property copyright "Refocus Agency"
 #property link      "https://refocus.agency"
-#property version   "1.20"
+#property version   "1.30"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -101,6 +109,19 @@ struct VirtualSL {
    datetime lastUpdate;
 };
 
+// Estado del bot para comandos del dashboard
+enum BotState {
+   STATE_RUNNING = 0,
+   STATE_PAUSED = 1
+};
+
+struct HeartbeatResponse {
+   string   serverTime;
+   string   command;      // "PAUSE", "RESUME", "CLOSE_ALL", o vacío
+   string   commandReason;
+   bool     success;
+};
+
 //--- Globales
 datetime g_lastPollTime        = 0;
 datetime g_lastHeartbeatTime   = 0;
@@ -121,6 +142,10 @@ int       g_gridMaxLevelsActive  = 0;
 // Virtual SL management
 VirtualSL g_virtualSLs[100];      // Max 100 posiciones
 int       g_virtualSLCount = 0;
+
+// Dashboard commands
+BotState          g_botState = STATE_RUNNING;
+HeartbeatResponse g_heartbeatResponse;
 
 //+------------------------------------------------------------------+
 //| Expert initialization                                             |
@@ -324,6 +349,13 @@ void InitializeGrid(string id, string side, double basePrice, int maxLevels)
 //+------------------------------------------------------------------+
 bool OpenGridLevel(int levelIndex, double price)
 {
+   // NO abrir si está pausado
+   if(g_botState == STATE_PAUSED)
+   {
+      Print("TBS EA | Nivel ", levelIndex, " NO abierto — bot pausado");
+      return false;
+   }
+
    if(levelIndex >= ArraySize(g_gridLevels))
       return false;
 
@@ -377,6 +409,10 @@ bool OpenGridLevel(int levelIndex, double price)
 //+------------------------------------------------------------------+
 void CheckGridLevels()
 {
+   // NO abrir nuevos niveles si está pausado
+   if(g_botState == STATE_PAUSED)
+      return;
+
    if(g_currentSignalId == "" || g_currentDirection == 0)
       return;
 
@@ -714,9 +750,57 @@ void SendHeartbeat()
    int res = WebRequest("POST", ServerUrl + "/api/bot/heartbeat", headers, 5000, data, result, resultHeaders);
 
    if(res == 200)
+   {
       Print("TBS EA | Heartbeat enviado OK");
+      // Parsear comandos de la respuesta
+      string json = CharArrayToString(result);
+      ParseHeartbeatResponse(json);
+   }
    else if(res != 401 && res != 403 && res != 429) // No spam con errores de auth
       Print("TBS EA | Error heartbeat HTTP: ", res);
+}
+
+//+------------------------------------------------------------------+
+//| Parsea respuesta del heartbeat y ejecuta comandos                 |
+//+------------------------------------------------------------------+
+void ParseHeartbeatResponse(string json)
+{
+   // Extraer campos de la respuesta
+   g_heartbeatResponse.serverTime = ParseStringField(json, "serverTime");
+   g_heartbeatResponse.command = ParseStringField(json, "command");
+   g_heartbeatResponse.commandReason = ParseStringField(json, "commandReason");
+   g_heartbeatResponse.success = ParseBoolField(json, "success");
+
+   // Ejecutar comando si existe
+   if(g_heartbeatResponse.command != "")
+   {
+      ExecuteCommand(g_heartbeatResponse.command, g_heartbeatResponse.commandReason);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Ejecuta comando recibido del dashboard                             |
+//+------------------------------------------------------------------+
+void ExecuteCommand(string command, string reason)
+{
+   Print("TBS EA | Comando recibido: ", command, " | Razón: ", reason);
+
+   if(command == "PAUSE")
+   {
+      g_botState = STATE_PAUSED;
+      Print("TBS EA | Bot PAUSADO — no se abrirán nuevas posiciones");
+   }
+   else if(command == "RESUME")
+   {
+      g_botState = STATE_RUNNING;
+      Print("TBS EA | Bot REANUDADO — operativa normal");
+   }
+   else if(command == "CLOSE_ALL")
+   {
+      Print("TBS EA | KILL SWITCH ACTIVADO — cerrando todo");
+      CloseAllGridLevels();
+      g_botState = STATE_PAUSED; // Pausar después de cerrar
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -841,6 +925,14 @@ void ProcessSingleSignal(string signalObj)
       return;
 
    Print("TBS EA | Procesando señal ", signalId, " | Tipo: ", signalType, " | Side: ", side);
+
+   // ENTRY solo si está RUNNING
+   if(signalType == "ENTRY" && g_botState == STATE_PAUSED)
+   {
+      Print("TBS EA | Señal ENTRY ignorada — bot pausado");
+      AckSignal(signalId); // ACK de todas formas
+      return;
+   }
 
    bool success = false;
 
@@ -1125,5 +1217,31 @@ double ParseDoubleField(string json, string field)
 int ParseIntField(string json, string field)
 {
    return((int)ParseDoubleField(json, field));
+}
+
+bool ParseBoolField(string json, string key)
+{
+   string searchKey = "\"" + key + "\":";
+   int pos = StringFind(json, searchKey);
+
+   if(pos == -1)
+      return false;
+
+   pos += StringLen(searchKey);
+
+   // Skip whitespace
+   while(pos < StringLen(json) && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\n'))
+      pos++;
+
+   if(pos >= StringLen(json))
+      return false;
+
+   // Check for true/false
+   if(StringFind(json, "true", pos) == pos)
+      return true;
+   if(StringFind(json, "false", pos) == pos)
+      return false;
+
+   return false;
 }
 //+------------------------------------------------------------------+

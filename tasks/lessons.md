@@ -18,6 +18,14 @@
   - SELL: SL virtual baja con precio (currentPrice + back)
   - Cerrar posición cuando precio toca SL virtual
   - Limpiar array de VirtualSLs al cerrar grid
+- **Comandos remotos en MQL5:**
+  - Usar heartbeat para recibir comandos del servidor (bidireccional)
+  - Enum para estados finitos (RUNNING/PAUSED)
+  - Parsear respuesta JSON inmediatamente después de WebRequest
+  - PAUSE: bloquear nuevas entradas pero mantener posiciones abiertas
+  - RESUME: restaurar operativa normal
+  - CLOSE_ALL: kill switch que cierra todo y pausa
+  - CLOSE signals siempre se ejecutan (incluso si pausado) - safety feature
 
 ## Anti-patrones a Evitar
 -
