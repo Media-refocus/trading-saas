@@ -1,32 +1,49 @@
 # TBS - Progress Tracker
 
-_Última actualización: 2026-03-11 (Grid Management + Config Remota)_
+_Última actualización: 2026-03-11 (Trailing SL Virtual)_
 
 ---
 
-## Sprint Actual: Grid Management + Config Remota EA MT5 🚧
+## Sprint Completado: Trailing SL Virtual EA MT5 ✅
 
-- **Estado:** `in_progress`
+- **Estado:** `completed`
 - **Inicio:** 2026-03-11
-- **Archivos:** `mt5/TBSSignalEA.mq5`
+- **Fin:** 2026-03-11
+- **Archivos:** `mt5/TBSSignalEA.mq5` (v1.2)
 
-### Tareas completadas:
-- [x] FASE 1: LoadRemoteConfig() desde /api/bot/config
-- [x] FASE 1: Struct BotConfig con todos los params
-- [x] FASE 1: Refresh cada 5 minutos en OnTick()
-- [x] FASE 2: Struct GridLevel para trackear niveles
-- [x] FASE 2: InitializeGrid() calcula precios de niveles
-- [x] FASE 2: OpenGridLevel() abre órdenes con "TBS Grid L0", "TBS Grid L1"...
-- [x] FASE 2: CheckGridLevels() detecta cuando toca abrir nuevo nivel
-- [x] FASE 2: CloseAllGridLevels() cierra todo el grid
-- [x] FASE 2: ProcessSingleSignal() modificado para grid
+### Tareas completadas FASE 1-2:
+- [x] LoadRemoteConfig() desde /api/bot/config
+- [x] Struct BotConfig con todos los params
+- [x] Refresh cada 5 minutos en OnTick()
+- [x] Struct GridLevel para trackear niveles
+- [x] InitializeGrid() calcula precios de niveles
+- [x] OpenGridLevel() abre órdenes con "TBS Grid L0", "TBS Grid L1"...
+- [x] CheckGridLevels() detecta cuando toca abrir nuevo nivel
+- [x] CloseAllGridLevels() cierra todo el grid
+- [x] ProcessSingleSignal() modificado para grid
 - [x] SendTradeEvent() actualizado con campo "level"
 - [x] ExtractObject() para parsear JSON anidado
 
+### Tareas completadas FASE 3:
+- [x] Struct VirtualSL con ticket, entryPrice, virtualSL, highestPrice, lowestPrice
+- [x] Variables globales g_virtualSLs[100] + g_virtualSLCount
+- [x] FindOrCreateVirtualSL() - busca o crea VirtualSL por ticket
+- [x] RemoveVirtualSL() - elimina VirtualSL del array
+- [x] UpdateVirtualStops() - lógica principal de trailing:
+  - Calcula profitPips por posición
+  - Actualiza highestPrice (BUY) / lowestPrice (SELL)
+  - Activa trailing cuando profit >= entryTrailingActivate
+  - Mueve SL virtual según entryTrailingBack
+  - Cierra posición cuando precio toca SL virtual
+- [x] Llamada UpdateVirtualStops() en OnTick() después de CheckGridLevels()
+- [x] Limpieza de VirtualSLs en CloseAllGridLevels()
+- [x] CHANGELOG actualizado v1.2
+
 ### Validación pendiente:
-- [ ] Compilar en MetaEditor (MT5 Windows)
+- [ ] Compilar en MetaEditor (MT5 Windows VPS)
 - [ ] Test manual con señal ENTRY
 - [ ] Test manual con señal CLOSE
+- [ ] Test manual de trailing SL (dejar posición correr + verificar cierre)
 
 ---
 

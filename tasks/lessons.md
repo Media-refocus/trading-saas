@@ -11,6 +11,13 @@
 - **Refresh config:** Usar datetime g_lastConfigRefresh + OnTick() para refrescar cada 5 min
 - **Parsing JSON anidado:** Extraer sub-objeto con `ExtractObject(json, "key")` luego parsear campos
 - **Grid pricing:** BUY niveles abajo (price - step), SELL niveles arriba (price + step)
+- **Trailing SL virtual en MQL5:**
+  - Usar struct VirtualSL para trackear SL por ticket
+  - Activar trailing solo cuando profit >= threshold (entryTrailingActivate)
+  - BUY: SL virtual sube con precio (currentPrice - back)
+  - SELL: SL virtual baja con precio (currentPrice + back)
+  - Cerrar posición cuando precio toca SL virtual
+  - Limpiar array de VirtualSLs al cerrar grid
 
 ## Anti-patrones a Evitar
 -

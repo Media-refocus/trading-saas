@@ -5,6 +5,13 @@
 //+------------------------------------------------------------------+
 //
 // CHANGELOG:
+// 2026-03-11 v1.2: Trailing SL Virtual
+//   - VirtualSL struct para trackear SL por posición
+//   - UpdateVirtualStops() en OnTick()
+//   - Trailing se activa cuando profit >= entryTrailingActivate
+//   - SL virtual se mueve según entryTrailingBack
+//   - Posición se cierra cuando precio toca SL virtual
+//
 // 2026-03-11 v1.1: Grid Management + Remote Config
 //   - LoadRemoteConfig() carga config desde /api/bot/config
 //   - GridLevel[] struct para trackear niveles abiertos
@@ -37,7 +44,7 @@
 
 #property copyright "Refocus Agency"
 #property link      "https://refocus.agency"
-#property version   "1.10"
+#property version   "1.20"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -84,6 +91,16 @@ struct GridLevel {
    datetime openedAt;
 };
 
+struct VirtualSL {
+   ulong    ticket;
+   double   entryPrice;
+   double   virtualSL;
+   double   highestPrice;  // Para BUY
+   double   lowestPrice;   // Para SELL
+   bool     trailingActivated;
+   datetime lastUpdate;
+};
+
 //--- Globales
 datetime g_lastPollTime        = 0;
 datetime g_lastHeartbeatTime   = 0;
@@ -100,6 +117,10 @@ string    g_currentSignalId      = "";
 int       g_currentDirection     = 0;  // 1=BUY, -1=SELL
 double    g_gridBasePrice        = 0.0;
 int       g_gridMaxLevelsActive  = 0;
+
+// Virtual SL management
+VirtualSL g_virtualSLs[100];      // Max 100 posiciones
+int       g_virtualSLCount = 0;
 
 //+------------------------------------------------------------------+
 //| Expert initialization                                             |
@@ -193,6 +214,9 @@ void OnTick()
 
    // Check si toca abrir nuevo nivel de grid
    CheckGridLevels();
+
+   // Actualizar trailing SL virtual
+   UpdateVirtualStops();
 
    // Polling de señales cada N segundos
    if(now - g_lastPollTime < PollSeconds)
@@ -431,7 +455,173 @@ void CloseAllGridLevels()
       g_gridLevels[i].price = 0.0;
    }
 
+   // Limpiar todos los VirtualSLs
+   g_virtualSLCount = 0;
+   ArrayInitialize(g_virtualSLs, 0);
+
    Print("TBS EA | Grid cerrado | ", closedCount, " posición(es) cerrada(s)");
+}
+
+//+------------------------------------------------------------------+
+//| Busca o crea un VirtualSL para una posición                       |
+//+------------------------------------------------------------------+
+int FindOrCreateVirtualSL(ulong ticket, double entryPrice, long type)
+{
+   // Buscar existente
+   for(int i = 0; i < g_virtualSLCount; i++)
+   {
+      if(g_virtualSLs[i].ticket == ticket)
+         return i;
+   }
+
+   // Crear nuevo
+   if(g_virtualSLCount >= ArraySize(g_virtualSLs))
+      return -1;
+
+   int idx = g_virtualSLCount++;
+   g_virtualSLs[idx].ticket = ticket;
+   g_virtualSLs[idx].entryPrice = entryPrice;
+   g_virtualSLs[idx].virtualSL = 0.0;
+   g_virtualSLs[idx].highestPrice = entryPrice;
+   g_virtualSLs[idx].lowestPrice = entryPrice;
+   g_virtualSLs[idx].trailingActivated = false;
+   g_virtualSLs[idx].lastUpdate = TimeCurrent();
+
+   return idx;
+}
+
+//+------------------------------------------------------------------+
+//| Elimina un VirtualSL por ticket                                   |
+//+------------------------------------------------------------------+
+void RemoveVirtualSL(ulong ticket)
+{
+   for(int i = 0; i < g_virtualSLCount; i++)
+   {
+      if(g_virtualSLs[i].ticket == ticket)
+      {
+         // Mover último elemento aquí
+         g_virtualSLs[i] = g_virtualSLs[g_virtualSLCount - 1];
+         g_virtualSLCount--;
+         return;
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Actualiza trailing stops virtuales                                |
+//+------------------------------------------------------------------+
+void UpdateVirtualStops()
+{
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      ulong ticket = PositionGetTicket(i);
+
+      if(!PositionSelectByTicket(ticket))
+         continue;
+
+      // Solo posiciones de este EA
+      if(PositionGetInteger(POSITION_MAGIC) != MagicNumber)
+         continue;
+
+      double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+      double currentPrice = PositionGetDouble(POSITION_PRICE_CURRENT);
+      long type = PositionGetInteger(POSITION_TYPE);
+      string symbol = PositionGetString(POSITION_SYMBOL);
+
+      // Solo para símbolo configurado
+      if(symbol != EASymbol)
+         continue;
+
+      // Buscar o crear VirtualSL
+      int idx = FindOrCreateVirtualSL(ticket, openPrice, type);
+      if(idx < 0) continue;
+
+      // Calcular pips de beneficio
+      double profitPips = 0.0;
+      if(type == POSITION_TYPE_BUY)
+         profitPips = (currentPrice - openPrice) / 0.01;
+      else
+         profitPips = (openPrice - currentPrice) / 0.01;
+
+      // Actualizar highest/lowest
+      if(type == POSITION_TYPE_BUY)
+      {
+         if(currentPrice > g_virtualSLs[idx].highestPrice)
+            g_virtualSLs[idx].highestPrice = currentPrice;
+      }
+      else
+      {
+         if(currentPrice < g_virtualSLs[idx].lowestPrice)
+            g_virtualSLs[idx].lowestPrice = currentPrice;
+      }
+
+      // Activar trailing si supera activate
+      if(profitPips >= g_botConfig.entryTrailingActivate && !g_virtualSLs[idx].trailingActivated)
+      {
+         g_virtualSLs[idx].trailingActivated = true;
+         Print("TBS EA | Trailing activado para ticket ", ticket, " | Profit: ", profitPips, " pips");
+      }
+
+      // Mover SL virtual si trailing activo
+      if(g_virtualSLs[idx].trailingActivated)
+      {
+         double newSL = 0.0;
+
+         if(type == POSITION_TYPE_BUY)
+         {
+            // BUY: SL sigue subiendo
+            newSL = currentPrice - (g_botConfig.entryTrailingBack * 0.01);
+
+            if(newSL > g_virtualSLs[idx].virtualSL)
+            {
+               g_virtualSLs[idx].virtualSL = newSL;
+               Print("TBS EA | SL virtual BUY actualizado: ", newSL);
+            }
+         }
+         else
+         {
+            // SELL: SL sigue bajando
+            newSL = currentPrice + (g_botConfig.entryTrailingBack * 0.01);
+
+            if(newSL < g_virtualSLs[idx].virtualSL || g_virtualSLs[idx].virtualSL == 0)
+            {
+               g_virtualSLs[idx].virtualSL = newSL;
+               Print("TBS EA | SL virtual SELL actualizado: ", newSL);
+            }
+         }
+      }
+
+      // Verificar si toca cerrar por SL virtual
+      bool shouldClose = false;
+
+      if(type == POSITION_TYPE_BUY)
+      {
+         if(currentPrice <= g_virtualSLs[idx].virtualSL && g_virtualSLs[idx].trailingActivated)
+            shouldClose = true;
+      }
+      else
+      {
+         if(currentPrice >= g_virtualSLs[idx].virtualSL && g_virtualSLs[idx].trailingActivated)
+            shouldClose = true;
+      }
+
+      if(shouldClose)
+      {
+         Print("TBS EA | Cerrando posición por SL virtual | Ticket: ", ticket);
+
+         if(g_trade.PositionClose(ticket))
+         {
+            // Enviar CLOSE event
+            string side = (type == POSITION_TYPE_BUY) ? "BUY" : "SELL";
+            SendTradeEvent(g_currentSignalId, "CLOSE", side, symbol,
+                          PositionGetDouble(POSITION_VOLUME),
+                          currentPrice, 0, 0, 0, ticket, -1);
+
+            // Remover VirtualSL
+            RemoveVirtualSL(ticket);
+         }
+      }
+   }
 }
 
 //+------------------------------------------------------------------+
