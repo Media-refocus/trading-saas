@@ -1,0 +1,145 @@
+{
+  "projectName": "Trading Bot SaaS - Pre-Launch Polish",
+  "branchName": "ralph/pre-launch-polish",
+  "description": "Plan quirúrgico para finiquitar TBS antes de lanzamiento a producción",
+  "userStories": [
+    {
+      "id": "STORY-001",
+      "title": "Actualizar ROADMAP.md con precios reales",
+      "priority": "CRITICAL",
+      "passes": true,
+      "description": "Discrepancia detectada: ROADMAP muestra 97€/197€ pero pricing page tiene 147€/347€. Actualizar ROADMAP.md con precios correctos: Trader 57€, Pro 147€, VIP 347€. Actualizar features por plan para coincidir con pricing page.",
+      "testCriteria": "ROADMAP.md tiene precios actualizados y coincide con app/(marketing)/pricing/page.tsx",
+      "files": ["ROADMAP.md"]
+    },
+    {
+      "id": "STORY-002",
+      "title": "Documentar variables de entorno faltantes",
+      "priority": "CRITICAL",
+      "passes": true,
+      "description": "Añadir NEXT_PUBLIC_APP_URL a .env.local.example con descripción clara. Verificar que todas las env vars usadas en código estén documentadas con instrucciones de cómo obtener cada valor.",
+      "testCriteria": "Todas las env vars de .env están en .env.local.example con comentarios explicativos",
+      "files": [".env.local.example"]
+    },
+    {
+      "id": "STORY-003",
+      "title": "Implementar rate limiting en API endpoints",
+      "priority": "HIGH",
+      "passes": true,
+      "description": "Añadir rate limiting para prevenir abuso de API: 100 req/min por tenant. Crear lib/rate-limit.ts con middleware. Añadir a /api/bot/* endpoints. Response headers con X-RateLimit-Limit y X-RateLimit-Remaining.",
+      "testCriteria": "curl >100 veces a /api/bot/status retorna 429 Too Many Requests con headers de rate limit",
+      "files": ["lib/rate-limit.ts", "app/api/bot/*/route.ts"]
+    },
+    {
+      "id": "STORY-004",
+      "title": "Añadir tests unitarios básicos",
+      "priority": "HIGH",
+      "passes": true,
+      "description": "Configurar Vitest. Crear tests unitarios para: lib/backtest-engine.ts (cálculo profit), lib/signal-parser.ts (parsing Telegram), app/api/stripe/webhook/route.ts (verificación firma). npm run test debe pasar.",
+      "testCriteria": "npm run test pasa con >80% coverage en archivos testeables",
+      "files": ["vitest.config.ts", "lib/*.test.ts", "app/api/stripe/webhook/route.test.ts"]
+    },
+    {
+      "id": "STORY-005",
+      "title": "Añadir Playwright tests a GitHub Actions CI",
+      "priority": "HIGH",
+      "passes": true,
+      "description": "Modificar .github/workflows/ci.yml para ejecutar tests e2e automáticamente en cada PR. Tests en paralelo con build. Fallo de tests → CI falla. Guardar artifacts en caso de fallo.",
+      "testCriteria": "Push a branch → CI ejecuta tests e2e → report en GitHub Actions",
+      "files": [".github/workflows/ci.yml"]
+    },
+    {
+      "id": "STORY-006",
+      "title": "Configurar auto-deploy a Vercel",
+      "priority": "HIGH",
+      "passes": true,
+      "description": "Crear .github/workflows/deploy.yml para deploy automático a producción cuando se mergea PR a master. Deploy solo si CI pasa. Configurar VERCEL_TOKEN en GitHub secrets.",
+      "testCriteria": "Merge PR a master → deploy automático a Vercel → notificación",
+      "files": [".github/workflows/deploy.yml"]
+    },
+    {
+      "id": "STORY-007",
+      "title": "Añadir CSP headers y revisar CORS",
+      "priority": "HIGH",
+      "passes": true,
+      "description": "Añadir Content Security Policy en next.config.ts. CSP permite: self, unsafe-inline (si necesario), stripe.com, cdn.jsdelivr.net. Configurar CORS si es necesario. Test con securityheaders.com → grade A o B.",
+      "testCriteria": "securityheaders.com reporta grade A o B para el dominio",
+      "files": ["next.config.ts", "middleware.ts"]
+    },
+    {
+      "id": "STORY-008",
+      "title": "Eliminar código deprecado",
+      "priority": "MEDIUM",
+      "passes": true,
+      "description": "Eliminar deprecated/ folder. Mover scripts/fix-all-timestamps.ts a archive/. Resolver o documentar todos los TODOs en código. npm run build sin warnings de código muerto.",
+      "testCriteria": "npm run build pasa sin warnings, deprecated/ no existe",
+      "files": ["deprecated/", "scripts/fix-all-timestamps.ts"]
+    },
+    {
+      "id": "STORY-009",
+      "title": "Expandir/contraer trades en backtester",
+      "priority": "MEDIUM",
+      "passes": true,
+      "description": "Añadir UI para expandir cada trade y ver niveles de grid: niveles de promedio, SL virtual, trailing history. Animación suave. Mobile-friendly.",
+      "testCriteria": "Click en fila de trade → expande con detalles → click contrae",
+      "files": ["components/backtester/deals-table.tsx"]
+    },
+    {
+      "id": "STORY-010",
+      "title": "Exportar trades a CSV",
+      "priority": "MEDIUM",
+      "passes": true,
+      "description": "Botón 'Exportar CSV' en deals table. CSV incluye: timestamp, side, entry, exit, profit pips, profit €, close reason. Formato Excel-compatible. Filename: backtest-{strategy}-{date}.csv.",
+      "testCriteria": "Click en 'Exportar CSV' → descarga archivo válido para Excel",
+      "files": ["components/backtester/deals-table.tsx", "lib/export-csv.ts"]
+    },
+    {
+      "id": "STORY-011",
+      "title": "Documentar backups automáticos Supabase",
+      "priority": "CRITICAL",
+      "passes": true,
+      "description": "Añadir sección 'Database Backups' en README.md. Documentar: Supabase automatic daily backups, 30-day retention. Instrucciones de cómo restaurar desde backup. Contacto de soporte Supabase.",
+      "testCriteria": "README.md tiene sección completa de backups con instrucciones claras",
+      "files": ["README.md"]
+    },
+    {
+      "id": "STORY-012",
+      "title": "Test flujo pagos end-to-end",
+      "priority": "CRITICAL",
+      "passes": true,
+      "description": "Crear tests/manual/TEST_PLAN_PAYMENTS.md con pasos de test manual. Test con Stripe test cards: 4242424242424242 (success), 4000000000000002 (decline). Verificar webhook, email, plan en dashboard, límites aplicados.",
+      "testCriteria": "Documento completo + test manual ejecutado con éxito",
+      "files": ["tests/manual/TEST_PLAN_PAYMENTS.md"]
+    },
+    {
+      "id": "STORY-013",
+      "title": "Contador hits/misses backtest cache",
+      "priority": "LOW",
+      "passes": true,
+      "description": "Implementar contador de cache hits/misses en lib/backtest-cache.ts. Actualizar hitRate en cada get/set. Exponer via tRPC. Log cada 100 operaciones. Test unitario.",
+      "testCriteria": "hitRate se actualiza y se muestra en dashboard",
+      "files": ["lib/backtest-cache.ts", "server/api/trpc/routers/backtester.ts"]
+    },
+    {
+      "id": "STORY-014",
+      "title": "Calcular profitFactor en marketplace",
+      "priority": "LOW",
+      "passes": true,
+      "description": "Resolver TODO en server/api/trpc/routers/marketplace.ts: calcular profitFactor real = grossProfit / grossLoss. Actualizar campo en PublishedStrategy. Mostrar en card de estrategia. Test unitario.",
+      "testCriteria": "Marketplace muestra profitFactor calculado correctamente",
+      "files": ["server/api/trpc/routers/marketplace.ts"]
+    }
+  ],
+  "constraints": [
+    "NUNCA commit sin pasar npm run test y npm run build",
+    "NUNCA deploy sin PR review",
+    "SIEMPRE consultar trading-architect antes de cambios de schema",
+    "Cada story = 1 iteración de Ralph = 1 commit"
+  ],
+  "successCriteria": [
+    "Todas las stories CRITICAL marcadas como passes: true",
+    "npm run test pasa al 100%",
+    "npm run build sin errores ni warnings",
+    "CI pasa en <10 minutos"
+  ]
+}

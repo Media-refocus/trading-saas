@@ -5,6 +5,8 @@
 |-------|-------|---------------|
 | 2026-03-10 | `return (` sin `)` de cierre en componente JSX grande | El error "Expected ',', got '}'" indica paréntesis sin cerrar. Verificar que `return (` tenga su `);` antes del `}` final del componente |
 | 2026-03-11 | JSON anidado en MQL5 requiere parser manual | MQL5 no tiene librería JSON nativa. Usar `ExtractObject()` + `ParseDoubleField()` para objetos anidados |
+| 2026-03-12 | Editar código y dejar fragmentos duplicados que causan syntax errors | Siempre leer el contexto alrededor del cambio; verificar que no quedó código duplicado |
+| 2026-03-12 | Mover código que depende de variables definidas más adelante en el componente | Mantener el orden lógico: primero defines las variables, luego las usas |
 
 ## Patrones que Funcionan
 - **Grid en MQL5:** Usar array de structs GridLevel con isOpen/price/ticket para trackear estado
@@ -26,9 +28,13 @@
   - RESUME: restaurar operativa normal
   - CLOSE_ALL: kill switch que cierra todo y pausa
   - CLOSE signals siempre se ejecutan (incluso si pausado) - safety feature
+- **Persistencia en localStorage**: Inicializar estado con función `() => { ... }` que lee de localStorage en mount
+- **Atajos de teclado globales**: Usar eventos custom (`window.dispatchEvent(new CustomEvent(...))`) para comunicación entre componentes
+- **Progreso estimado frontend**: Simular progreso con curva de desaceleración mientras la API es síncrona, sin necesidad de modificar backend
 
 ## Anti-patrones a Evitar
--
+- Crear múltiples definiciones de la misma variable en diferentes partes del componente
+- Editar código en medio de bloques sin verificar el contexto completo
 
 ---
 

@@ -18,6 +18,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import SimpleCandleChart from "@/components/simple-candle-chart";
 import { CHART_THEMES, getPreferredTheme, savePreferredTheme } from "@/lib/chart-themes";
+import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 import { EnhancedCandleViewer } from "@/components/backtester/enhanced-candle-viewer";
 import {
   generateSyntheticCandles,
@@ -59,6 +60,7 @@ import {
 } from "@/components/ui/tooltip";
 import { PerformanceHeatmap, SegmentationHeatmap } from "@/components/backtester/performance-heatmap";
 import { AutoTuningSuggestions, AutoTuningConfig } from "@/components/backtester/auto-tuning-suggestions";
+import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 import { ExecutionOverlay } from "@/components/backtester/progress-overlay";
 
 interface BacktestFilters {
@@ -297,8 +299,34 @@ function RiskBadge({ level }: { level: RiskMetrics["overallRisk"] }) {
 }
 
 export default function BacktesterPage() {
-  const [config, setConfig] = useState<BacktestConfig>(defaultConfig);
-  const [signalLimit, setSignalLimit] = useState(100);
+  // Cargar config inicial desde localStorage si existe
+  const [config, setConfig] = useState<BacktestConfig>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("backtester-preferences");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Merge con defaultConfig para asegurar todos los campos
+          return { ...defaultConfig, ...parsed };
+        }
+      } catch (e) {
+        console.error("Error loading preferences:", e);
+      }
+    }
+    return defaultConfig;
+  });
+
+  const [signalLimit, setSignalLimit] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("backtester-signal-limit");
+        return saved ? parseInt(saved, 10) : 100;
+      } catch (e) {
+        return 100;
+      }
+    }
+    return 100;
+  });
   const [chartTheme, setChartTheme] = useState<string>(() => {
     if (typeof window !== "undefined") return getPreferredTheme();
     return "mt5";
@@ -313,6 +341,9 @@ export default function BacktesterPage() {
   const [supabaseResult, setSupabaseResult] = useState<any>(null);
   const [supabaseLoading, setSupabaseLoading] = useState(false);
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
+  const [backtestProgress, setBacktestProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState("");
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const clearCache = trpc.backtester.clearCache.useMutation();
   const saveAsStrategy = trpc.backtester.saveAsStrategy.useMutation();
 
@@ -341,6 +372,59 @@ export default function BacktesterPage() {
   // Comparador
   const [savedResults, setSavedResults] = useState<Array<{ name: string; config: BacktestConfig; results: any }>>([]);
   const [compareIndexes, setCompareIndexes] = useState<number[]>([]);
+
+  // Simular progreso durante backtest (frontend-only, no requiere cambios en API)
+  useEffect(() => {
+    // isBacktestPending se define más abajo, usamos supabaseLoading y executeBacktest.isPending directamente
+    const isPending = supabaseLoading || executeBacktest.isPending;
+    if (isPending) {
+      // Iniciar simulación de progreso
+      setBacktestProgress(0);
+      setProgressMessage("Procesando señales...");
+
+      progressIntervalRef.current = setInterval(() => {
+        setBacktestProgress((prev) => {
+          // Progreso con curva de desaceleración: más rápido al principio, más lento al final
+          if (prev < 30) return prev + 5; // 0-30%: rápido
+          if (prev < 60) return prev + 3; // 30-60%: medio
+          if (prev < 85) return prev + 2; // 60-85%: lento
+          if (prev < 95) return prev + 1; // 85-95%: muy lento
+          return prev; // Mantener en 95% hasta completar
+        });
+      }, 500);
+
+      // Actualizar mensaje según progreso
+      const messageInterval = setInterval(() => {
+        setBacktestProgress((p) => {
+          if (p < 30) setProgressMessage("Cargando datos históricos...");
+          else if (p < 60) setProgressMessage("Procesando señales...");
+          else if (p < 85) setProgressMessage("Ejecutando simulación...");
+          else if (p < 95) setProgressMessage("Calculando resultados...");
+          return p;
+        });
+      }, 2000);
+
+      return () => {
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+        clearInterval(messageInterval);
+      };
+    } else {
+      // Limpiar cuando no está ejecutando
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      // Resetear progreso después de un breve delay si no hay error
+      const timer = setTimeout(() => {
+        const isPending = supabaseLoading || executeBacktest.isPending;
+        if (!isPending && !supabaseError) {
+          setBacktestProgress(0);
+          setProgressMessage("");
+        }
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [supabaseLoading, executeBacktest.isPending, supabaseError]);
 
   // Gráfico
   const [selectedTradeIndex, setSelectedTradeIndex] = useState<number | null>(null);
@@ -426,6 +510,8 @@ export default function BacktesterPage() {
       }
 
       // Usar tRPC unificado para ambas fuentes
+      setBacktestProgress(0);
+      setProgressMessage("Ejecutando backtest...");
       const processedConfig = {
         ...config,
         signalsSourceType: sourceType,
@@ -455,6 +541,8 @@ export default function BacktesterPage() {
     } catch (error) {
       console.error("Error ejecutando backtest:", error);
       setSupabaseLoading(false);
+      setBacktestProgress(0);
+      setProgressMessage("");
       setSupabaseError(error instanceof Error ? error.message : "Error desconocido");
     }
   };
@@ -528,7 +616,32 @@ export default function BacktesterPage() {
   };
 
   const updateConfig = <K extends keyof BacktestConfig>(key: K, value: BacktestConfig[K]) => {
-    setConfig((prev) => ({ ...prev, [key]: value }));
+    setConfig((prev) => {
+      const updated = { ...prev, [key]: value };
+      // Persistir en localStorage (excluyendo strategyName que es dinámico)
+      if (typeof window !== "undefined" && key !== "strategyName") {
+        try {
+          // Crear objeto sin strategyName para guardar
+          const { strategyName, ...toSave } = updated as any;
+          localStorage.setItem("backtester-preferences", JSON.stringify(toSave));
+        } catch (e) {
+          console.error("Error saving preferences:", e);
+        }
+      }
+      return updated;
+    });
+  };
+
+  // Wrapper para setSignalLimit con persistencia
+  const handleSetSignalLimit = (limit: number) => {
+    setSignalLimit(limit);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("backtester-signal-limit", String(limit));
+      } catch (e) {
+        console.error("Error saving signal limit:", e);
+      }
+    }
   };
 
   // Handler para aplicar configuración sugerida por auto-tuning
@@ -545,6 +658,12 @@ export default function BacktesterPage() {
   const isBacktestPending = supabaseLoading || executeBacktest.isPending;
   const isBacktestError = supabaseError !== null || executeBacktest.isError;
   const backtestErrorMsg = supabaseError || executeBacktest.error?.message;
+
+  // Keyboard shortcuts: Ctrl+Enter para ejecutar backtest
+  useKeyboardShortcuts({
+    onExecute: handleExecute,
+    canExecute: !isBacktestPending,
+  });
 
   // Build config summary string
   const configSummary = `${config.pipsDistance}p × ${config.maxLevels}L × ${config.takeProfitPips}TP × ${config.trailingSLPercent}%Trail`;
@@ -871,7 +990,7 @@ export default function BacktesterPage() {
                   min="1"
                   className="h-11 text-xs font-mono bg-background/50 hover:bg-background transition-colors min-h-[44px] border-amber-500/30 focus:border-amber-500"
                   value={signalLimit}
-                  onChange={(e) => setSignalLimit(parseInt(e.target.value) || 0)}
+                  onChange={(e) => handleSetSignalLimit(parseInt(e.target.value) || 0)}
                 />
               </div>
             </div>
@@ -2035,11 +2154,13 @@ export default function BacktesterPage() {
       </Button>
     </div>
 
-    {/* Execution Overlay - Loading state durante backtest */}
+    {/* Progress overlay con barra de progreso real durante backtests largos */}
     <ExecutionOverlay
-      isExecuting={isBacktestPending}
-      indeterminate={isBacktestPending}
-      currentStep={isBacktestPending ? `Ejecutando backtest con ${signalLimit} señales...` : undefined}
+      isExecuting={isBacktestPending && backtestProgress < 100}
+      progress={backtestProgress}
+      currentStep={progressMessage}
+      error={backtestErrorMsg}
+      success={backtestProgress === 100 && !isBacktestPending}
     />
     </>
   );

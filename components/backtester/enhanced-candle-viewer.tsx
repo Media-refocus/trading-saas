@@ -237,6 +237,27 @@ export function EnhancedCandleViewer({
     );
   }, []);
 
+  // Listen for keyboard shortcut events (1-6 keys for timeframe)
+  useEffect(() => {
+    const handleTimeframeShortcut = (e: Event) => {
+      const customEvent = e as CustomEvent<number>;
+      const index = customEvent.detail; // 1-6
+
+      if (index >= 1 && index <= TIMEFRAME_OPTIONS.length) {
+        const selectedTf = TIMEFRAME_OPTIONS[index - 1].value;
+        handleTimeframeChange(selectedTf);
+      } else if (index === 6) {
+        // 6 = Auto (null)
+        handleTimeframeChange(null);
+      }
+    };
+
+    window.addEventListener("backtester-timeframe", handleTimeframeShortcut);
+    return () => {
+      window.removeEventListener("backtester-timeframe", handleTimeframeShortcut);
+    };
+  }, [handleTimeframeChange]);
+
   // Calculate MA lines for current candles
   const maLines = useMALines(compressedData.candles, maConfigs);
 
